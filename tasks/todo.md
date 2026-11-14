@@ -129,19 +129,19 @@ exist and contain LaTeX; a contract test covers both; one real call through
 
 ### Track Logic (may start after F2) — all test-first
 
-- [ ] **L1: Marking rules** (S)
+- [x] **L1: Marking rules** (S)
   - Acceptance: `outcomeFromScore`, `currentMark`, `attemptHintLevel`, `isSolutionUnlocked` and `canDispute` match C3 and the spec, including boundary scores 24, 25, 89, 90.
   - Verify: `npx vitest run src/lib/marking --coverage` at 100% lines.
   - Files: `src/lib/marking/rules.ts`, `src/lib/marking/rules.test.ts`
   - Depends on: F2
 
-- [ ] **L2: Mastery model** (S) — SC 14
+- [x] **L2: Mastery model** (S) — SC 14
   - Acceptance: `evidenceScore` and `replayMastery` match C3 and the spec's formulas; the five cases in SC 14 are tests.
   - Verify: `npx vitest run src/lib/mastery/mastery.test.ts --coverage` at 100% lines.
   - Files: `src/lib/mastery/evidence.ts`, `src/lib/mastery/mastery.ts`, `src/lib/mastery/mastery.test.ts`
   - Depends on: F2
 
-- [ ] **L3: Revision queue** (S)
+- [x] **L3: Revision queue** (S)
   - Acceptance: `buildQueue` matches C3: ranks by highest topic priority, due items first (1, 3, 7, 14 days; 1 day after a non-full outcome), fills `targetMinutes` at about 60% retry and 40% variant, uses variants when retries run out, and gives every item a reason.
   - Verify: `npx vitest run src/lib/mastery/queue.test.ts --coverage` at 100% lines.
   - Files: `src/lib/mastery/queue.ts`, `src/lib/mastery/queue.test.ts`
