@@ -104,7 +104,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
 
 ### Track AI (may start after F2)
 
-- [ ] **A1: AI wrapper and fixture mode** (S)
+- [x] **A1: AI wrapper and fixture mode** (S)
   - Acceptance:
     - The agent reads the current Claude API documentation first and records model id, input limits and the structured-output method used in `src/lib/ai/README.md`.
     - `callAi` matches C2: validates with Zod, retries once on invalid output, throws `AiOutputError` after the second failure, and with `AI_FIXTURES=1` returns `tests/fixtures/ai/<callName>.json` without any network call.
@@ -120,12 +120,12 @@ exist and contain LaTeX; a contract test covers both; one real call through
 `scripts/try-ai.ts` gives a sensible result. Files: `src/lib/ai/<name>.ts`,
 `src/lib/ai/<name>.test.ts`, the two fixtures. Depends on: A1.
 
-- [ ] **A2: `parseSheet`** (S) — first; real check with a real 10-question sheet under 60 s
-- [ ] **A3: `generateHints`** (S) — includes `hintsLeakAnswer` and one regeneration; test that a leaking fixture triggers regeneration
-- [ ] **A4: `markAttempt`** (S) — real check with a typed answer and a handwriting photo
-- [ ] **A5: `extractSolutions`** (S) — test rejects output that omits a question id
-- [ ] **A6: `generateVariant`** (S) — uses `hintsLeakAnswer` from A3; depends on A3
-- [ ] **A7: `summariseSheet`** (S)
+- [x] **A2: `parseSheet`** (S) — first; real check with a real 10-question sheet under 60 s
+- [x] **A3: `generateHints`** (S) — includes `hintsLeakAnswer` and one regeneration; test that a leaking fixture triggers regeneration
+- [x] **A4: `markAttempt`** (S) — real check with a typed answer and a handwriting photo
+- [x] **A5: `extractSolutions`** (S) — test rejects output that omits a question id
+- [x] **A6: `generateVariant`** (S) — uses `hintsLeakAnswer` from A3; depends on A3
+- [x] **A7: `summariseSheet`** (S)
 
 ### Track Logic (may start after F2) — all test-first
 
@@ -154,10 +154,10 @@ For each: the component matches its C7 props; a development-only page at
 production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
 `src/app/dev/charts/<name>/page.tsx`. Depends on: F1.
 
-- [ ] **C1: `HintRungs` and `HintLadderBar`** (S) — needed by M6
-- [ ] **C2: `SkillMap`** (S) — D3 force layout; colour by mastery, size by attempts, opacity 0.4 when confidence < 0.3; node click follows `hrefForTopic`
-- [ ] **C3: `HeatStrip`** (S) — *cut with H5*
-- [ ] **C4: `MasteryOverTime`** (S) — *cut with V5*
+- [x] **C1: `HintRungs` and `HintLadderBar`** (S) — needed by M6
+- [x] **C2: `SkillMap`** (S) — D3 force layout; colour by mastery, size by attempts, opacity 0.4 when confidence < 0.3; node click follows `hrefForTopic`
+- [x] **C3: `HeatStrip`** (S) — *cut with H5*
+- [x] **C4: `MasteryOverTime`** (S) — *cut with V5*
 
 ### Track Main (after F3, F4, F5) — sequential
 
