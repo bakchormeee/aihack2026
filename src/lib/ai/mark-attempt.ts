@@ -40,7 +40,9 @@ How to mark
 "errorType": the kind of error at the first wrong step. Use null when the score is 90 or more. Otherwise use exactly one of:
 - conceptual: a misunderstanding of a definition, theorem or idea, or a method that cannot work.
 - method: a suitable idea applied wrongly, or a wrong choice in setting it up.
-- algebra_slip: an arithmetic, sign, copying or algebra error inside an otherwise correct method.
+- algebra_slip: a sign or algebra error inside an otherwise correct method.
+- arithmetic_slip: wrong arithmetic, or a number copied wrongly from one line to the next.
+- notation: a wrong symbol or a missing bracket where the intended meaning is clear.
 - misread_question: an answer to a different question from the one asked, or wrong given data.
 - incomplete: correct as far as it goes, but stops before the end or leaves out a part.
 

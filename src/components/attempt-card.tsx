@@ -1,7 +1,11 @@
 import { MathText } from "@/components/math-text";
 import { Badge } from "@/components/ui/badge";
 import type { AttemptRecord } from "@/db/queries/history";
-import type { ErrorType, Outcome } from "@/lib/domain";
+import type { Outcome } from "@/lib/domain";
+import { ERROR_LABEL } from "@/lib/marking/labels";
+
+// Re-exported so existing imports from this file keep working.
+export { ERROR_LABEL };
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   full: "Full marks",
@@ -13,16 +17,8 @@ export const OUTCOME_VARIANT: Record<Outcome, "default" | "secondary" | "destruc
   partial: "secondary",
   stuck: "destructive",
 };
-export const ERROR_LABEL: Record<ErrorType, string> = {
-  conceptual: "Concept",
-  method: "Method",
-  algebra_slip: "Algebra slip",
-  misread_question: "Misread the question",
-  incomplete: "Incomplete",
-};
-
-/** "1 h 5 min", "12 min", "45 s"; "–" when no time was recorded. */
-export function formatDuration(seconds: number | null): string {
+export /** "1 h 5 min", "12 min", "45 s"; "–" when no time was recorded. */
+function formatDuration(seconds: number | null): string {
   if (seconds === null || seconds <= 0) return "–";
   if (seconds < 60) return `${seconds} s`;
   const minutes = Math.round(seconds / 60);

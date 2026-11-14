@@ -102,6 +102,7 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
     const attempt: MarkedAttempt = {
       at: r.startedAt,
       outcome: mark.outcome,
+      score: mark.score,
       basis: mark.basis,
       hintLevel: attemptHintLevel(r.inherited as HintLevel, revealed.get(r.attemptId) ?? []),
       secondsSpent: r.secondsSpent,

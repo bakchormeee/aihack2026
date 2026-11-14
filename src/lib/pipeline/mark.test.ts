@@ -20,7 +20,7 @@ import { runMark, type MarkIo } from "./mark";
 type MarkResult = Awaited<ReturnType<MarkIo["mark"]>>;
 
 const result = (o: Partial<MarkResult> = {}): MarkResult => ({
-  score: 60,
+  score: 3,
   errorType: "algebra_slip",
   firstWrongStep: "line 3",
   feedback: "Sign slip in line 3.",
@@ -89,12 +89,12 @@ describe("runMark (ai)", () => {
   it("saves a mark with the outcome derived from the score and marks the submission done", async () => {
     const { attempt, submission } = await setup("m-ok@test.local");
 
-    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 60 }));
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 3 }));
 
     const [mark] = await marksOf(attempt.id);
     expect(mark).toMatchObject({
       basis: "ai",
-      score: 60,
+      score: 3,
       outcome: "partial",
       errorType: "algebra_slip",
       firstWrongStep: "line 3",
@@ -107,10 +107,11 @@ describe("runMark (ai)", () => {
   });
 
   it.each([
-    [90, "full"],
-    [89, "partial"],
-    [25, "partial"],
-    [24, "stuck"],
+    [5, "full"],
+    [4, "full"],
+    [3, "partial"],
+    [2, "partial"],
+    [1, "stuck"],
     [0, "stuck"],
   ] as const)("a score of %i is %s", async (score, outcome) => {
     const { attempt, submission } = await setup(`m-score-${score}@test.local`);
@@ -272,17 +273,17 @@ describe("runMark (ai)", () => {
 describe("runMark (dispute and official)", () => {
   it("a dispute adds a new mark flagged as a dispute and keeps the earlier one", async () => {
     const { attempt, submission } = await setup("d-ok@test.local");
-    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 40 }));
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 2 }));
 
     await runMark(
       { submissionId: submission.id, basis: "ai", disputeReason: "I used a different method" },
-      okIo({ score: 95, errorType: null, firstWrongStep: null }),
+      okIo({ score: 5, errorType: null, firstWrongStep: null }),
     );
 
     const all = await marksOf(attempt.id);
     expect(all.map((m) => [m.score, m.isDispute, m.disputeReason])).toEqual([
-      [40, false, null],
-      [95, true, "I used a different method"],
+      [2, false, null],
+      [5, true, "I used a different method"],
     ]);
     expect(await statusOf(submission.id)).toBe("done");
   });
@@ -304,9 +305,9 @@ describe("runMark (dispute and official)", () => {
     const { attempt, submission } = await setup("o-changed@test.local");
     await runMark(
       { submissionId: submission.id, basis: "ai" },
-      okIo({ score: 95, errorType: null, firstWrongStep: null }),
+      okIo({ score: 5, errorType: null, firstWrongStep: null }),
     );
-    const mark = vi.fn(async () => result({ score: 40 }));
+    const mark = vi.fn(async () => result({ score: 2 }));
 
     await runMark({ submissionId: submission.id, basis: "official" }, { ...okIo(), mark });
 
@@ -320,9 +321,9 @@ describe("runMark (dispute and official)", () => {
 
   it("an official mark with the same outcome is not flagged as changed", async () => {
     const { attempt, submission } = await setup("o-same@test.local");
-    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 60 }));
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 3 }));
 
-    await runMark({ submissionId: submission.id, basis: "official" }, okIo({ score: 70 }));
+    await runMark({ submissionId: submission.id, basis: "official" }, okIo({ score: 2 }));
 
     expect((await marksOf(attempt.id))[1].outcomeChanged).toBe(false);
   });

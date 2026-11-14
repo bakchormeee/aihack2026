@@ -10,6 +10,7 @@ function attempt(o: Partial<MarkedAttempt> & { outcome?: Outcome } = {}): Marked
   return {
     at: T0,
     outcome: "full",
+    score: 5,
     hintLevel: 0,
     secondsSpent: null,
     expectedMinutes: 10,
@@ -19,6 +20,23 @@ function attempt(o: Partial<MarkedAttempt> & { outcome?: Outcome } = {}): Marked
 }
 
 describe("evidenceScore", () => {
+  it("a correct answer with careless slips (4/5) counts as 0.9 of a perfect one", () => {
+    expect(evidenceScore(attempt({ outcome: "full", score: 4 }))).toBeCloseTo(0.9);
+  });
+
+  it("a perfect answer (5/5) counts fully", () => {
+    expect(evidenceScore(attempt({ outcome: "full", score: 5 }))).toBe(1);
+  });
+
+  it("a 4 moves mastery less than a 5 and more than a partly right answer", () => {
+    const now = new Date(T0.getTime() + DAY);
+    const five = replayMastery([attempt({ score: 5 })], now).mastery;
+    const four = replayMastery([attempt({ score: 4 })], now).mastery;
+    const partial = replayMastery([attempt({ outcome: "partial", score: 3 })], now).mastery;
+    expect(four).toBeLessThan(five);
+    expect(four).toBeGreaterThan(partial);
+  });
+
   it.each([
     ["full", 1],
     ["partial", 0.5],

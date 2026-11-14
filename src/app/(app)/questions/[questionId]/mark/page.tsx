@@ -12,7 +12,8 @@ import { orNotFound } from "@/lib/auth/guards";
 import { requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { getNextHref } from "@/lib/navigation";
-import type { ErrorType, Outcome } from "@/lib/domain";
+import type { Outcome } from "@/lib/domain";
+import { ERROR_LABEL } from "@/lib/marking/labels";
 import { isStale } from "@/lib/pipeline/stale";
 
 import { canDispute } from "@/lib/marking/rules";
@@ -32,13 +33,6 @@ const OUTCOME_VARIANT: Record<Outcome, "default" | "secondary" | "destructive"> 
   full: "default",
   partial: "secondary",
   stuck: "destructive",
-};
-const ERROR_LABEL: Record<ErrorType, string> = {
-  conceptual: "Concept",
-  method: "Method",
-  algebra_slip: "Algebra slip",
-  misread_question: "Misread the question",
-  incomplete: "Incomplete",
 };
 
 export default async function MarkPage({

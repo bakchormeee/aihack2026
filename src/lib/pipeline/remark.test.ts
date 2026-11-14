@@ -46,7 +46,7 @@ function io(
         .map((q) => ({ questionId: q.id, body: `official ${q.label}` })),
     };
   });
-  const mark = vi.fn<MarkIo["mark"]>(async (i) => markResult(o.scores?.[i.questionBody] ?? 95));
+  const mark = vi.fn<MarkIo["mark"]>(async (i) => markResult(o.scores?.[i.questionBody] ?? 5));
   const value: RemarkIo = {
     readFile: async () => Buffer.from("pdf"),
     extract,
@@ -101,7 +101,7 @@ async function submitted(userId: string, questionId: string, aiScore: number, is
       attemptId: attempt.id,
       basis: "ai",
       score: aiScore,
-      outcome: aiScore >= 90 ? "full" : aiScore >= 25 ? "partial" : "stuck",
+      outcome: aiScore >= 4 ? "full" : aiScore >= 2 ? "partial" : "stuck",
       feedback: "f",
       overallFeedback: "o",
     });
@@ -126,10 +126,10 @@ describe("runOfficialRemark", () => {
   it("saves one official solution per question and one official mark per submitted attempt", async () => {
     const { user, sheet, qs } = await setup("rm-basic@test.local");
     await addFiles(sheet.id);
-    const a1 = await submitted(user.id, qs[0].id, 60); // ai partial, official full: changed
-    const a2 = await submitted(user.id, qs[1].id, 60); // ai partial, official partial: same
+    const a1 = await submitted(user.id, qs[0].id, 3); // ai partial, official full: changed
+    const a2 = await submitted(user.id, qs[1].id, 3); // ai partial, official partial: same
     const draft = await submitted(user.id, qs[1].id, 0, false);
-    const fake = io({ scores: { Q1: 95, Q2: 60 } });
+    const fake = io({ scores: { Q1: 5, Q2: 3 } });
 
     await runOfficialRemark(sheet.id, fake.value);
 
@@ -148,8 +148,8 @@ describe("runOfficialRemark", () => {
   it("does not mark a question the document has no solution for", async () => {
     const { user, sheet, qs } = await setup("rm-missing@test.local");
     await addFiles(sheet.id);
-    const a1 = await submitted(user.id, qs[0].id, 60);
-    const a2 = await submitted(user.id, qs[1].id, 60);
+    const a1 = await submitted(user.id, qs[0].id, 3);
+    const a2 = await submitted(user.id, qs[1].id, 3);
 
     await runOfficialRemark(sheet.id, io({ missing: ["2"] }).value);
 
@@ -161,7 +161,7 @@ describe("runOfficialRemark", () => {
   it("creates no duplicates when it runs again", async () => {
     const { user, sheet, qs } = await setup("rm-rerun@test.local");
     await addFiles(sheet.id);
-    const a1 = await submitted(user.id, qs[0].id, 60);
+    const a1 = await submitted(user.id, qs[0].id, 3);
     const fake = io();
 
     await runOfficialRemark(sheet.id, fake.value);
@@ -174,7 +174,7 @@ describe("runOfficialRemark", () => {
 
   it("marks again after a new upload", async () => {
     const { user, sheet, qs } = await setup("rm-reupload@test.local");
-    const a1 = await submitted(user.id, qs[0].id, 60);
+    const a1 = await submitted(user.id, qs[0].id, 3);
     const fake = io();
     expect(
       await startOfficialSolutions(user.id, sheet.id, [{ path: "a.pdf", mime: "application/pdf" }]),
@@ -193,8 +193,8 @@ describe("runOfficialRemark", () => {
   it("is safe when two runs overlap", async () => {
     const { user, sheet, qs } = await setup("rm-overlap@test.local");
     await addFiles(sheet.id);
-    const a1 = await submitted(user.id, qs[0].id, 60);
-    const a2 = await submitted(user.id, qs[1].id, 60);
+    const a1 = await submitted(user.id, qs[0].id, 3);
+    const a2 = await submitted(user.id, qs[1].id, 3);
     const fake = io();
 
     await Promise.all([
@@ -210,7 +210,7 @@ describe("runOfficialRemark", () => {
   it("sets failed when the solutions cannot be read, and a retry works", async () => {
     const { user, sheet, qs } = await setup("rm-fail@test.local");
     await addFiles(sheet.id);
-    const a1 = await submitted(user.id, qs[0].id, 60);
+    const a1 = await submitted(user.id, qs[0].id, 3);
 
     await runOfficialRemark(sheet.id, io({ extractFails: true }).value);
     expect((await sheetRow(sheet.id)).solutionsStatus).toBe("failed");
@@ -226,7 +226,7 @@ describe("runOfficialRemark", () => {
   it("sets failed when a mark fails", async () => {
     const { user, sheet, qs } = await setup("rm-markfail@test.local");
     await addFiles(sheet.id);
-    await submitted(user.id, qs[0].id, 60);
+    await submitted(user.id, qs[0].id, 3);
     const fake = io();
     fake.mark.mockRejectedValue(new Error("ai down"));
 

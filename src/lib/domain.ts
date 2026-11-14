@@ -9,7 +9,13 @@ export const ERROR_TYPES = [
   "algebra_slip",
   "misread_question",
   "incomplete",
+  // Added by Marking v2 (SPEC-marking-v2.md).
+  "arithmetic_slip",
+  "notation",
 ] as const;
+
+/** Careless slips cost less than structural errors (SPEC-marking-v2.md). */
+export const SEVERITIES = ["careless", "structural"] as const;
 export const MARK_BASES = ["ai", "official"] as const;
 
 export const SHEET_STATUSES = ["parsing", "ready", "failed"] as const;
@@ -25,6 +31,7 @@ export const REVISION_ITEM_SOURCES = ["retry", "variant"] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
 export type ErrorType = (typeof ERROR_TYPES)[number];
+export type Severity = (typeof SEVERITIES)[number];
 export type MarkBasis = (typeof MARK_BASES)[number];
 export type SheetStatus = (typeof SHEET_STATUSES)[number];
 export type SolutionsStatus = (typeof SOLUTIONS_STATUSES)[number];

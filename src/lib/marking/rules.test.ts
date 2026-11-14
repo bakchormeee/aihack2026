@@ -5,25 +5,67 @@ import {
   canDispute,
   currentMark,
   isSolutionUnlocked,
+  MAX_SCORE,
   outcomeFromScore,
+  scoreFromOldScale,
+  severityOf,
 } from "./rules";
 
-describe("outcomeFromScore", () => {
+describe("outcomeFromScore (marks out of 5)", () => {
   it.each([
     [0, "stuck"],
-    [24, "stuck"],
-    [25, "partial"],
-    [89, "partial"],
-    [90, "full"],
-    [100, "full"],
-  ] as const)("score %i is %s", (score, outcome) => {
+    [1, "stuck"],
+    [2, "partial"],
+    [3, "partial"],
+    [4, "full"],
+    [5, "full"],
+  ] as const)("a score of %i is %s", (score, outcome) => {
     expect(outcomeFromScore(score)).toBe(outcome);
   });
 
-  it("boundary 24 is stuck", () => expect(outcomeFromScore(24)).toBe("stuck"));
-  it("boundary 25 is partial", () => expect(outcomeFromScore(25)).toBe("partial"));
-  it("boundary 89 is partial", () => expect(outcomeFromScore(89)).toBe("partial"));
-  it("boundary 90 is full", () => expect(outcomeFromScore(90)).toBe("full"));
+  it("a 4 (right structure, 1-2 careless slips) counts as correct", () => {
+    expect(outcomeFromScore(4)).toBe("full");
+  });
+
+  it("rejects a score outside 0 to 5 or not a whole number", () => {
+    expect(() => outcomeFromScore(6)).toThrow(RangeError);
+    expect(() => outcomeFromScore(-1)).toThrow(RangeError);
+    expect(() => outcomeFromScore(2.5)).toThrow(RangeError);
+  });
+
+  it("the maximum score is 5", () => expect(MAX_SCORE).toBe(5));
+});
+
+describe("severityOf", () => {
+  it.each(["algebra_slip", "arithmetic_slip", "notation"] as const)("%s is careless", (type) => {
+    expect(severityOf(type)).toBe("careless");
+  });
+
+  it.each(["conceptual", "method", "incomplete", "misread_question"] as const)(
+    "%s is structural",
+    (type) => {
+      expect(severityOf(type)).toBe("structural");
+    },
+  );
+});
+
+describe("scoreFromOldScale", () => {
+  it.each([
+    [100, 5],
+    [90, 5],
+    [89, 4],
+    [70, 4],
+    [69, 3],
+    [50, 3],
+    [49, 2],
+    [25, 2],
+    [24, 1],
+    [10, 1],
+    [9, 0],
+    [0, 0],
+  ])("an old mark of %i becomes %i", (old, score) => {
+    expect(scoreFromOldScale(old)).toBe(score);
+  });
 });
 
 describe("currentMark", () => {

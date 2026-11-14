@@ -54,7 +54,7 @@ async function setup(email: string) {
 const mark = (attemptId: string, o: Partial<typeof marks.$inferInsert> = {}) => ({
   attemptId,
   basis: "ai" as const,
-  score: 60,
+  score: 3,
   outcome: "partial" as const,
   errorType: "method" as const,
   feedback: "f",
@@ -82,11 +82,11 @@ describe("getMarkScreenData", () => {
     await db
       .insert(marks)
       .values(
-        mark(attempt.id, { score: 40, outcome: "partial", createdAt: new Date(Date.now() - 2000) }),
+        mark(attempt.id, { score: 2, outcome: "partial", createdAt: new Date(Date.now() - 2000) }),
       );
     await db.insert(marks).values(
       mark(attempt.id, {
-        score: 95,
+        score: 5,
         outcome: "full",
         errorType: null,
         isDispute: true,
@@ -97,8 +97,8 @@ describe("getMarkScreenData", () => {
     const data = await getMarkScreenData(user.id, attempt.id);
 
     expect(data.submission?.markStatus).toBe("done");
-    expect(data.marks.map((m) => m.score)).toEqual([40, 95]);
-    expect(data.current?.score).toBe(95);
+    expect(data.marks.map((m) => m.score)).toEqual([2, 5]);
+    expect(data.current?.score).toBe(5);
   });
 
   it("prefers an official mark over a later AI mark", async () => {
@@ -106,12 +106,12 @@ describe("getMarkScreenData", () => {
     await db
       .insert(marks)
       .values(
-        mark(attempt.id, { basis: "official", score: 70, createdAt: new Date(Date.now() - 2000) }),
+        mark(attempt.id, { basis: "official", score: 4, createdAt: new Date(Date.now() - 2000) }),
       );
     await db.insert(marks).values(
       mark(attempt.id, {
         basis: "ai",
-        score: 99,
+        score: 5,
         outcome: "full",
         createdAt: new Date(Date.now() - 1000),
       }),
@@ -171,10 +171,10 @@ describe("getVisibleSolution", () => {
   it("is locked after a partial or stuck mark", async () => {
     const { user, question, attempt } = await withSolutions("vs-partial@test.local");
     await submit(attempt.id);
-    await db.insert(marks).values(mark(attempt.id, { score: 60, outcome: "partial" }));
+    await db.insert(marks).values(mark(attempt.id, { score: 3, outcome: "partial" }));
     const second = await newAttempt(user.id, question.id);
     await submit(second.id);
-    await db.insert(marks).values(mark(second.id, { score: 5, outcome: "stuck" }));
+    await db.insert(marks).values(mark(second.id, { score: 0, outcome: "stuck" }));
 
     expect(await getVisibleSolution(user.id, question.id)).toBeNull();
   });
@@ -182,9 +182,7 @@ describe("getVisibleSolution", () => {
   it("unlocks after a full mark and shows the AI solution", async () => {
     const { user, question, attempt } = await withSolutions("vs-full@test.local");
     await submit(attempt.id);
-    await db
-      .insert(marks)
-      .values(mark(attempt.id, { score: 95, outcome: "full", errorType: null }));
+    await db.insert(marks).values(mark(attempt.id, { score: 5, outcome: "full", errorType: null }));
 
     expect(await getVisibleSolution(user.id, question.id)).toEqual({
       basis: "ai",
@@ -195,9 +193,7 @@ describe("getVisibleSolution", () => {
   it("uses the official solution once the attempt's current mark is the official full one", async () => {
     const { user, question, attempt } = await withSolutions("vs-off@test.local", true);
     await submit(attempt.id);
-    await db
-      .insert(marks)
-      .values(mark(attempt.id, { score: 95, outcome: "full", errorType: null }));
+    await db.insert(marks).values(mark(attempt.id, { score: 5, outcome: "full", errorType: null }));
 
     expect(await getVisibleSolution(user.id, question.id)).toEqual({
       basis: "official",
@@ -211,7 +207,7 @@ describe("getVisibleSolution", () => {
     await db.insert(marks).values(
       mark(attempt.id, {
         basis: "ai",
-        score: 95,
+        score: 5,
         outcome: "full",
         errorType: null,
         createdAt: new Date(Date.now() - 2000),
@@ -220,7 +216,7 @@ describe("getVisibleSolution", () => {
     await db.insert(marks).values(
       mark(attempt.id, {
         basis: "official",
-        score: 50,
+        score: 3,
         outcome: "partial",
         createdAt: new Date(Date.now() - 1000),
       }),
@@ -251,7 +247,7 @@ describe("getVisibleSolution", () => {
     await submit(owner.attempt.id);
     await db
       .insert(marks)
-      .values(mark(owner.attempt.id, { score: 100, outcome: "full", errorType: null }));
+      .values(mark(owner.attempt.id, { score: 5, outcome: "full", errorType: null }));
     const other = await setup("vs-other@test.local");
 
     await expect(getVisibleSolution(other.user.id, owner.question.id)).rejects.toBeInstanceOf(
@@ -288,9 +284,7 @@ describe("getVisibleSolution", () => {
   it("returns null, not an error, when the question has no solution yet", async () => {
     const { user, question, attempt } = await setup("vs-nosol@test.local");
     await submit(attempt.id);
-    await db
-      .insert(marks)
-      .values(mark(attempt.id, { score: 100, outcome: "full", errorType: null }));
+    await db.insert(marks).values(mark(attempt.id, { score: 5, outcome: "full", errorType: null }));
 
     expect(await getVisibleSolution(user.id, question.id)).toBeNull();
   });
@@ -336,40 +330,40 @@ describe("getSolutionsReview", () => {
     const { user, qs, sheetId } = await sheetWith("rv-order@test.local", 4);
     // Q1: ai full, official full: nothing to review.
     await attemptWith(user.id, qs[0].id, [
-      { score: 95, outcome: "full" },
-      { basis: "official", score: 95, outcome: "full" },
+      { score: 5, outcome: "full" },
+      { basis: "official", score: 5, outcome: "full" },
     ]);
     // Q2: ai partial, official partial: not full, not changed.
     const a2 = await attemptWith(user.id, qs[1].id, [
-      { score: 60 },
-      { basis: "official", score: 50, outcome: "partial" },
+      { score: 3 },
+      { basis: "official", score: 3, outcome: "partial" },
     ]);
     // Q3: ai full, official stuck: changed (comes first although it is later in the sheet).
     const a3 = await attemptWith(user.id, qs[2].id, [
-      { score: 95, outcome: "full" },
-      { basis: "official", score: 10, outcome: "stuck", outcomeChanged: true },
+      { score: 5, outcome: "full" },
+      { basis: "official", score: 1, outcome: "stuck", outcomeChanged: true },
     ]);
     // Q4: unmarked by the official solutions yet, ai stuck.
-    const a4 = await attemptWith(user.id, qs[3].id, [{ score: 5, outcome: "stuck" }]);
+    const a4 = await attemptWith(user.id, qs[3].id, [{ score: 0, outcome: "stuck" }]);
 
     const review = await getSolutionsReview(user.id, sheetId);
 
     expect(review.changed.map((i) => i.attemptId)).toEqual([a3.id]);
-    expect(review.changed[0].earlierAi).toEqual({ score: 95, outcome: "full" });
+    expect(review.changed[0].earlierAi).toEqual({ score: 5, outcome: "full" });
     expect(review.changed[0].mark.basis).toBe("official");
     expect(review.notFull.map((i) => i.attemptId)).toEqual([a2.id, a4.id]);
   });
 
   it("uses the best attempt of a question and shows it once", async () => {
     const { user, qs, sheetId } = await sheetWith("rv-best@test.local", 1);
-    await attemptWith(user.id, qs[0].id, [{ score: 30 }]);
-    const good = await attemptWith(user.id, qs[0].id, [{ score: 70 }]);
+    await attemptWith(user.id, qs[0].id, [{ score: 2 }]);
+    const good = await attemptWith(user.id, qs[0].id, [{ score: 4 }]);
 
     expect((await getSolutionsReview(user.id, sheetId)).notFull.map((i) => i.attemptId)).toEqual([
       good.id,
     ]);
 
-    await attemptWith(user.id, qs[0].id, [{ score: 95, outcome: "full" }]);
+    await attemptWith(user.id, qs[0].id, [{ score: 5, outcome: "full" }]);
     const after = await getSolutionsReview(user.id, sheetId);
     expect(after.notFull).toEqual([]);
   });
@@ -377,8 +371,8 @@ describe("getSolutionsReview", () => {
   it("does not list a changed attempt a second time, and ignores drafts", async () => {
     const { user, qs, sheetId } = await sheetWith("rv-dup@test.local", 1);
     const changed = await attemptWith(user.id, qs[0].id, [
-      { score: 95, outcome: "full" },
-      { basis: "official", score: 10, outcome: "stuck", outcomeChanged: true },
+      { score: 5, outcome: "full" },
+      { basis: "official", score: 1, outcome: "stuck", outcomeChanged: true },
     ]);
     const [draft] = await db
       .insert(attempts)
@@ -404,8 +398,8 @@ describe("getSolutionsReview", () => {
     await db
       .insert(solutions)
       .values(qs.map((q) => ({ questionId: q.id, basis: "official" as const, body: "S" })));
-    await attemptWith(user.id, qs[0].id, [{ score: 60 }, { basis: "official", score: 60 }]);
-    await attemptWith(user.id, qs[1].id, [{ score: 60 }]);
+    await attemptWith(user.id, qs[0].id, [{ score: 3 }, { basis: "official", score: 3 }]);
+    await attemptWith(user.id, qs[1].id, [{ score: 3 }]);
 
     expect(await getRemarkProgress(user.id, sheetId)).toEqual({ total: 2, marked: 1 });
   });
@@ -444,7 +438,7 @@ describe("startDispute", () => {
     const { user, attempt } = await marked("dp-basic@test.local");
 
     const claim = await startDispute(user.id, attempt.id, "  step 3 is correct  ");
-    await performMark(claim, io(95));
+    await performMark(claim, io(5));
 
     const rows = await allMarks(attempt.id);
     expect(rows).toHaveLength(2);
@@ -452,16 +446,16 @@ describe("startDispute", () => {
     const disputed = rows.find((m) => m.isDispute)!;
     expect(disputed).toMatchObject({
       basis: "ai",
-      score: 95,
+      score: 5,
       disputeReason: "step 3 is correct",
     });
-    expect(rows.find((m) => !m.isDispute)!.score).toBe(60);
+    expect(rows.find((m) => !m.isDispute)!.score).toBe(3);
   });
 
   it("accepts a dispute with no reason", async () => {
     const { user, attempt } = await marked("dp-noreason@test.local");
 
-    await performMark(await startDispute(user.id, attempt.id, undefined), io(60));
+    await performMark(await startDispute(user.id, attempt.id, undefined), io(3));
 
     const [disputed] = (await allMarks(attempt.id)).filter((m) => m.isDispute);
     expect(disputed.disputeReason).toBeNull();
@@ -470,7 +464,7 @@ describe("startDispute", () => {
   it("refuses a third dispute on the server", async () => {
     const { user, attempt } = await marked("dp-limit@test.local");
     for (let i = 0; i < 2; i++) {
-      await performMark(await startDispute(user.id, attempt.id, `try ${i}`), io(60));
+      await performMark(await startDispute(user.id, attempt.id, `try ${i}`), io(3));
     }
 
     await expect(startDispute(user.id, attempt.id, "again")).rejects.toBeInstanceOf(
@@ -482,9 +476,9 @@ describe("startDispute", () => {
   it("keeps the basis of the current mark", async () => {
     const { user, attempt, question } = await marked("dp-basis@test.local");
     await db.insert(solutions).values({ questionId: question.id, basis: "official", body: "O" });
-    await db.insert(marks).values(mark(attempt.id, { basis: "official", score: 40 }));
+    await db.insert(marks).values(mark(attempt.id, { basis: "official", score: 2 }));
 
-    await performMark(await startDispute(user.id, attempt.id, "r"), io(80));
+    await performMark(await startDispute(user.id, attempt.id, "r"), io(4));
 
     const disputed = (await allMarks(attempt.id)).find((m) => m.isDispute)!;
     expect(disputed.basis).toBe("official");

@@ -10,7 +10,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
 
 ## Phase 1: Foundation (40 min)
 
-- [ ] **P1: Rules, labels and the LaTeX check** (M)
+- [x] **P1: Rules, labels and the LaTeX check** (M)
   - Acceptance: `outcomeFromScore` gives 4–5 full, 2–3 partial, 0–1 stuck and rejects anything but 0–5 whole numbers; `severityOf` makes algebra, arithmetic and notation slips careless and everything else structural; `scoreFromOldScale` follows the spec's table; a 4 counts 0.9 in mastery evidence; one shared list of labels and the marking scheme; `mathIsDelimited` rejects LaTeX outside `$…$`.
   - Verify: checks; `npm test -- --coverage` keeps 100% on `src/lib/marking` and `src/lib/mastery`.
   - Files: `src/lib/domain.ts`, `src/lib/marking/rules.ts` (+ test), `src/lib/mastery/evidence.ts` (+ test), `src/lib/marking/labels.ts`, `src/lib/marking/math-check.ts` (+ test)
