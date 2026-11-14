@@ -1,0 +1,14 @@
+{
+  "wentWell": [
+    "You solved question 1 without hints: your use of the product rule on $x^2 \\sin x$ was correct and clearly set out.",
+    "Your set-up for integration by parts was right every time, with a sensible choice of $u$ and $dv$."
+  ],
+  "wasHard": [
+    "Question 2 needed two hints and still lost marks to a sign slip in $\\int \\sin x \\, dx$.",
+    "Question 3 was left incomplete: you found the eigenvalues from $\\det(A - \\lambda I) = 0$ but not the eigenvectors."
+  ],
+  "nextSteps": [
+    "Practise standard antiderivatives until $\\int \\sin x \\, dx = -\\cos x + C$ is automatic, and check each one by differentiating.",
+    "Redo question 3 and solve $(A - \\lambda I)\\mathbf{v} = \\mathbf{0}$ for each eigenvalue."
+  ]
+}

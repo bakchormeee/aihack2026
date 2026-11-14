@@ -1,0 +1,7 @@
+{
+  "body": "Evaluate $\\int_0^{\\pi/2} x \\sin x \\, dx$.",
+  "solution": "Integrate by parts with $u = x$ and $dv = \\sin x \\, dx$.",
+  "finalAnswer": "$1$",
+  "hints": ["Think about **integration by parts**.", "Take $u = x$."],
+  "expectedMinutes": "8 minutes"
+}

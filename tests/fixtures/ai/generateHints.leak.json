@@ -1,0 +1,7 @@
+{
+  "hint1": "This is an integral of a product, so think about **integration by parts**.",
+  "hint2": "Use $\\int u \\, dv = uv - \\int v \\, du$ with $u = x$ and $dv = \\cos x \\, dx$. The boundary term vanishes, so you should find that the integral equals $-2$.",
+  "hint3": "Outline:\n\n1. Set $u = x$ and $dv = \\cos x \\, dx$.\n2. Substitute into $\\big[ uv \\big]_0^{\\pi} - \\int_0^{\\pi} v \\, du$.\n3. Evaluate both terms.",
+  "solution": "Let $u = x$ and $dv = \\cos x \\, dx$. Then $\\int_0^{\\pi} x \\cos x \\, dx = \\big[ x \\sin x \\big]_0^{\\pi} - \\int_0^{\\pi} \\sin x \\, dx = 0 - 2 = -2$.",
+  "finalAnswer": "$\\int_0^{\\pi} x \\cos x \\, dx = -2$"
+}

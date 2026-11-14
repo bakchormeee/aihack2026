@@ -1,0 +1,19 @@
+{
+  "solutions": [
+    {
+      "questionId": "q1",
+      "found": true,
+      "body": "By the product rule,\n\n$$f'(x) = 2x \\sin x + x^2 \\cos x.$$"
+    },
+    {
+      "questionId": "q2",
+      "found": true,
+      "body": "**(a)** Integrating by parts with $u = x$ and $dv = \\cos x \\, dx$,\n\n$$\\int_0^{\\pi} x \\cos x \\, dx = \\big[ x \\sin x \\big]_0^{\\pi} - \\int_0^{\\pi} \\sin x \\, dx = -2.$$\n\n**(b)** Integrating by parts with $u = x^2$ and $dv = \\sin x \\, dx$,\n\n$$\\int_0^{\\pi} x^2 \\sin x \\, dx = \\big[ -x^2 \\cos x \\big]_0^{\\pi} + 2 \\int_0^{\\pi} x \\cos x \\, dx = \\pi^2 - 4.$$"
+    },
+    {
+      "questionId": "q3",
+      "found": true,
+      "body": "The characteristic polynomial is $\\det(A - \\lambda I) = (2 - \\lambda)^2 - 1$, so $\\lambda = 1$ or $\\lambda = 3$, with eigenvectors $\\begin{pmatrix} 1 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} 1 \\\\ 1 \\end{pmatrix}$."
+    }
+  ]
+}
