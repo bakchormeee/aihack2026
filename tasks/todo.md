@@ -260,7 +260,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
 
 ### Track R — official solutions (owns `app/sheets/[sheetId]/solutions/`, `app/questions/[questionId]/mark/`, `src/db/queries/marking.ts`, `src/lib/pipeline/remark.ts`)
 
-- [ ] **R1: Official solutions upload and re-mark** (M) — SC 13 (marks)
+- [x] **R1: Official solutions upload and re-mark** (M) — SC 13 (marks)
   - Acceptance:
     - The Solutions tab uploads the official solutions; `runOfficialRemark(sheetId)` claims the sheet (`solutions_status`), calls `extractSolutions`, saves one `official` solution per question, then calls `runMark` with basis `official` for every submitted attempt on the sheet with concurrency 5.
     - Each new mark is labelled "AI-marked against official solutions" and has `outcome_changed` set when its outcome differs from the latest `ai` mark.
@@ -269,13 +269,13 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/lib/pipeline/remark.ts` (+ test), `src/lib/pipeline/mark.ts`, `app/sheets/[sheetId]/solutions/page.tsx`, `app/sheets/[sheetId]/solutions/actions.ts`, `src/db/queries/marking.ts`
   - Depends on: M10, A5
 
-- [ ] **R2: Solutions review** (S) — SC 13 (review)
+- [x] **R2: Solutions review** (S) — SC 13 (review)
   - Acceptance: when `solutions_status` is `done`, the Solutions tab lists changed marks first, then every question whose best outcome is not full, each with the official solution (through `getVisibleSolution` in review mode) beside the student's working and a "retry now" button.
   - Verify: integration test of the review query ordering; manual check.
   - Files: `app/sheets/[sheetId]/solutions/page.tsx`, `src/components/side-by-side.tsx`, `src/db/queries/marking.ts`
   - Depends on: R1
 
-- [ ] **R3: Dispute a mark** (S) — *cuttable 5* — SC 12
+- [x] **R3: Dispute a mark** (S) — *cuttable 5* — SC 12
   - Acceptance: "I think this is right" with an optional reason calls `runMark` with the current basis and the reason; the new mark has `is_dispute` set and the earlier mark stays visible; the button is disabled when `canDispute` is false.
   - Verify: integration test (new mark added, old mark kept, third dispute rejected).
   - Files: `app/questions/[questionId]/mark/actions.ts` (+ test), `app/questions/[questionId]/mark/page.tsx`
@@ -283,7 +283,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
 
 ### Track H — history (owns `app/sheets/[sheetId]/history/`, `…/summary/`, `app/courses/[courseId]/sheets/`, `…/mistakes/`, `src/db/queries/history.ts`, `src/lib/export/`)
 
-- [ ] **H1: Sheet list statistics and sheet history** (M) — SC 15 (detail)
+- [x] **H1: Sheet list statistics and sheet history** (M) — SC 15 (detail)
   - Acceptance:
     - The Sheets tab shows, per sheet, submitted/total, average score, hints revealed, time and provisional/confirmed.
     - The History tab shows every question with all attempts: working (files through `/api/files/submission/…`, typed text through `<MathText>`), every mark, hints revealed and time.
@@ -292,25 +292,25 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/courses/[courseId]/sheets/page.tsx`, `app/sheets/[sheetId]/history/page.tsx`, `src/components/attempt-card.tsx`, `src/db/queries/history.ts` (+ test)
   - Depends on: M10
 
-- [ ] **H2: Sheet summary** (S) — SC 15 (summary)
+- [x] **H2: Sheet summary** (S) — SC 15 (summary)
   - Acceptance: when every question has a submitted, marked attempt, the Summary tab generates the summary with `summariseSheet` and stores it; it regenerates when `generated_at` is older than the sheet's newest mark; it shows the three lists and `<HintLadderBar>`; before that it shows how many questions remain.
   - Verify: integration test of the staleness rule with fixtures; manual check.
   - Files: `app/sheets/[sheetId]/summary/page.tsx`, `app/sheets/[sheetId]/summary/actions.ts` (+ test), `src/db/queries/history.ts`
   - Depends on: H1, A7, C1
 
-- [ ] **H3: Mistake log** (S) — SC 16
+- [x] **H3: Mistake log** (S) — SC 16
   - Acceptance: the Mistakes tab lists every attempt in the course whose current outcome is not full, newest first, and filters by `?topic=` and `?error=`.
   - Verify: integration test of both filters; manual check.
   - Files: `app/courses/[courseId]/mistakes/page.tsx`, `src/db/queries/history.ts` (+ test)
   - Depends on: H1 (same query file; run after H2 or by the same agent)
 
-- [ ] **H4: Hand-in export** (S) — *cuttable 7* — SC 17
+- [x] **H4: Hand-in export** (S) — *cuttable 7* — SC 17
   - Acceptance: a button on the History tab builds one PDF in the browser: per question in order, its label and the working of its latest submitted attempt (PDFs merged, images one per page, typed working as an image of its preview); unsubmitted questions are listed as "not attempted"; no mark, hint or feedback text.
   - Verify: unit test of the page-ordering function; manual export of a sheet with all three kinds of working.
   - Files: `src/lib/export/hand-in.ts` (+ test), `src/components/export-button.tsx`, `app/sheets/[sheetId]/history/page.tsx`
   - Depends on: H1
 
-- [ ] **H5: Heat strip on the Sheets tab** (S) — *cuttable 6* — SC 22
+- [x] **H5: Heat strip on the Sheets tab** (S) — *cuttable 6* — SC 22
   - Acceptance: the Sheets tab shows `<HeatStrip>` with one row per sheet and one cell per question (best outcome, hint level of that attempt).
   - Verify: integration test of the heat-strip query; manual check after a new mark.
   - Files: `app/courses/[courseId]/sheets/page.tsx`, `src/db/queries/history.ts` (+ test)
@@ -318,13 +318,13 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
 
 ### Track V — mastery, revision and maps (owns `app/revise/`, `app/courses/[courseId]/page.tsx`, `…/progress/`, `src/db/queries/mastery.ts`, `src/db/queries/revision.ts`, `src/lib/pipeline/revision.ts`, `src/lib/navigation.ts`)
 
-- [ ] **V1: Course mastery query** (S)
+- [x] **V1: Course mastery query** (S)
   - Acceptance: `getCourseMastery` matches C5: for each topic it loads the user's marked attempts with their current mark and returns the result of `replayMastery`; topics with no attempts have `mastery: null`.
   - Verify: integration test on PGlite (official mark moves mastery twice as far as provisional; another user's attempts are ignored).
   - Files: `src/db/queries/mastery.ts`, `src/db/queries/mastery.test.ts`
   - Depends on: M10, L2
 
-- [ ] **V2: Start and build a revision session** (M) — SC 18, 19
+- [x] **V2: Start and build a revision session** (M) — SC 18, 19
   - Acceptance:
     - `/revise` lets the student choose course, length (20/45/90) and optional topics, pre-filled from `?course=` and `?topic=`; a course with no candidates shows an explanation.
     - `buildRevisionSession(sessionId)` claims the session, loads candidates and priorities, calls `buildQueue`, and for each variant item calls `generateVariant` (concurrency 5) and saves a variant question with the parent's topics, three hints and an `ai` solution; it saves `revision_item` rows with reasons and sets `ready`.
@@ -333,19 +333,19 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/revise/page.tsx`, `app/revise/actions.ts`, `src/lib/pipeline/revision.ts` (+ test), `src/db/queries/revision.ts`, `src/app/api/revise/[sessionId]/status/route.ts`
   - Depends on: V1, L3, A6
 
-- [ ] **V3: Run a revision session** (S) — SC 20
+- [x] **V3: Run a revision session** (S) — SC 20
   - Acceptance: `/revise/[sessionId]` lists the items with their reasons and progress; each item opens the question page with `?session=`; `getNextHref` with a session id returns the next unanswered item or the session page; attempts are saved with context `revision`.
   - Verify: integration test of `getNextHref` for a session; manual run in which a marked item changes the topic's mastery.
   - Files: `app/revise/[sessionId]/page.tsx`, `src/lib/navigation.ts` (+ test), `src/db/queries/revision.ts`
   - Depends on: V2
 
-- [ ] **V4: Skill map as course home** (S) — SC 21 — may run beside V2
+- [x] **V4: Skill map as course home** (S) — SC 21 — may run beside V2
   - Acceptance: `/courses/[courseId]` shows `<SkillMap>` from `getCourseMastery`; selecting a topic shows links to `/courses/[courseId]/mistakes?topic=<id>` and `/revise?course=<id>&topic=<id>`; a course with no sheets shows an upload prompt linking to the Sheets tab.
   - Verify: manual check with two courses showing different maps.
   - Files: `app/courses/[courseId]/page.tsx`, `src/components/topic-panel.tsx`
   - Depends on: V1, C2
 
-- [ ] **V5: Mastery over time** (S) — *cuttable 4* — SC 22 — may run beside V2
+- [x] **V5: Mastery over time** (S) — *cuttable 4* — SC 22 — may run beside V2
   - Acceptance: the Progress tab shows `<MasteryOverTime>` from the `series` in `getCourseMastery`, with sheet uploads and revision sessions as events.
   - Verify: manual check after a revision session.
   - Files: `app/courses/[courseId]/progress/page.tsx`, `src/db/queries/mastery.ts`
