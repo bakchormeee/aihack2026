@@ -223,11 +223,13 @@ export function RevisionForm({
             {error}
           </p>
         ) : null}
-        {mode === "long_form" ? (
-          <Button type="submit" disabled={pending || available === 0} className="self-start">
-            {pending ? "Starting…" : "Start revision"}
-          </Button>
-        ) : null}
+        <Button
+          type="submit"
+          disabled={pending || (mode === "spot_error" ? plantable === 0 : available === 0)}
+          className="self-start"
+        >
+          {pending ? "Starting…" : mode === "spot_error" ? "Start spot the error" : "Start revision"}
+        </Button>
       </form>
       {mode === "spot_error" ? (
         <CommonErrors

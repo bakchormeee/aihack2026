@@ -65,7 +65,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
 
 ## Phase 4: Finish (30 min)
 
-- [ ] **S9: End-to-end tests and build** (S)
+- [x] **S9: End-to-end tests and build** (S)
   - Acceptance: a new end-to-end spec: mark an answer, see the common-errors list, start a 5-question spot session, answer one with ticked lines and one with "No error", see the reveal and the summary, confirm the skill map changed; existing specs still pass; every new screen fits 375 px.
   - Verify: `npm run e2e` (local Postgres until migration C is on Neon); full checks; `npm run build`.
   - Files: `tests/e2e/spot-the-error.spec.ts`, `tests/e2e/helpers.ts`
