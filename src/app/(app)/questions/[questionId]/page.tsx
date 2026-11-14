@@ -1,9 +1,12 @@
+import { eq } from "drizzle-orm";
 import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { QuestionView } from "@/components/question-view";
 import { findOpenAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
+import { db } from "@/db";
+import { sheets } from "@/db/schema";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
@@ -27,6 +30,10 @@ export default async function QuestionPage({
   const visible = attempt ? await visibleHintsFor(user.id, attempt.id) : { level: 0, hints: [] };
   const query = sessionId ? `?session=${sessionId}` : "";
   const hintsReady = question.hintsStatus === "ready";
+  const [sheet] = question.sheetId
+    ? await db.select().from(sheets).where(eq(sheets.id, question.sheetId))
+    : [];
+  const timerEnabled = sheet?.timerEnabled ?? true;
 
   return (
     <section className="flex flex-col gap-6">
@@ -58,6 +65,9 @@ export default async function QuestionPage({
         initialAttemptId={attempt?.id ?? null}
         initialHints={visible.hints}
         hintsReady={hintsReady}
+        timerEnabled={timerEnabled}
+        initialSeconds={attempt?.secondsSpent ?? 0}
+        initialRating={attempt?.difficultyRating ?? null}
         prevHref={neighbours.prevId ? `/questions/${neighbours.prevId}${query}` : null}
         nextHref={neighbours.nextId ? `/questions/${neighbours.nextId}${query}` : null}
       />

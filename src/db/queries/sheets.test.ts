@@ -13,6 +13,7 @@ import {
   listSheets,
   requeueHintsForSheet,
   requeueParse,
+  setTimerEnabled,
   titleFromFileName,
 } from "./sheets";
 
@@ -306,5 +307,37 @@ describe("requeueHintsForSheet", () => {
 
     expect(await requeueHintsForSheet(other.user.id, sheet.id)).toBe(0);
     expect(await statuses(sheet.id)).toEqual(["failed"]);
+  });
+});
+
+describe("setTimerEnabled", () => {
+  it("switches the timer off and on for the owner's sheet", async () => {
+    const { user, course } = await userWithCourse("te-owner@test.local");
+    const sheet = await createSheetWithFiles(course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+
+    expect(await setTimerEnabled(user.id, sheet.id, false)).toBe(true);
+    expect((await db.select().from(sheets).where(eq(sheets.id, sheet.id)))[0].timerEnabled).toBe(
+      false,
+    );
+
+    expect(await setTimerEnabled(user.id, sheet.id, true)).toBe(true);
+    expect((await db.select().from(sheets).where(eq(sheets.id, sheet.id)))[0].timerEnabled).toBe(
+      true,
+    );
+  });
+
+  it("does nothing for another user's sheet", async () => {
+    const owner = await userWithCourse("te-a@test.local");
+    const other = await userWithCourse("te-b@test.local");
+    const sheet = await createSheetWithFiles(owner.course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+
+    expect(await setTimerEnabled(other.user.id, sheet.id, false)).toBe(false);
+    expect((await db.select().from(sheets).where(eq(sheets.id, sheet.id)))[0].timerEnabled).toBe(
+      true,
+    );
   });
 });

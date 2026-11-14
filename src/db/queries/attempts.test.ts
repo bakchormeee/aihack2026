@@ -19,6 +19,8 @@ import {
   HintsNotReadyError,
   NoMoreHintsError,
   openAttemptFor,
+  recordSecondsSpent,
+  setDifficultyRating,
   revealNextHintFor,
   startAttemptFor,
   visibleHintsFor,
@@ -304,6 +306,134 @@ describe("getSheetNeighbours", () => {
     const other = await setup("n-other@test.local");
 
     await expect(getSheetNeighbours(other.user.id, all[0].id)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe("recordSecondsSpent", () => {
+  const secondsOf = async (id: string) =>
+    (await db.select().from(attempts).where(eq(attempts.id, id)))[0].secondsSpent;
+
+  it("saves the seconds on an open attempt", async () => {
+    const { user, question } = await setup("t-save@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    expect(await recordSecondsSpent(user.id, attempt.id, 95)).toBe(true);
+
+    expect(await secondsOf(attempt.id)).toBe(95);
+  });
+
+  it("never lowers the saved time, so a late stale save cannot undo progress", async () => {
+    const { user, question } = await setup("t-mono@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+    await recordSecondsSpent(user.id, attempt.id, 200);
+
+    await recordSecondsSpent(user.id, attempt.id, 50);
+
+    expect(await secondsOf(attempt.id)).toBe(200);
+  });
+
+  it("caps an unreasonable value at six hours", async () => {
+    const { user, question } = await setup("t-cap@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    await recordSecondsSpent(user.id, attempt.id, 10_000_000);
+
+    expect(await secondsOf(attempt.id)).toBe(6 * 60 * 60);
+  });
+
+  it("rejects a negative or fractional value", async () => {
+    const { user, question } = await setup("t-bad@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    await expect(recordSecondsSpent(user.id, attempt.id, -1)).rejects.toThrow();
+    await expect(recordSecondsSpent(user.id, attempt.id, 1.5)).rejects.toThrow();
+  });
+
+  it("saves nothing when the timer is switched off for the sheet", async () => {
+    const { user, sheet, question } = await setup("t-off@test.local");
+    await db.update(sheets).set({ timerEnabled: false }).where(eq(sheets.id, sheet.id));
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    expect(await recordSecondsSpent(user.id, attempt.id, 60)).toBe(false);
+
+    expect(await secondsOf(attempt.id)).toBeNull();
+  });
+
+  it("saves nothing once the working has been submitted", async () => {
+    const { user, question } = await setup("t-done@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+    await recordSecondsSpent(user.id, attempt.id, 30);
+    await db
+      .insert(submissions)
+      .values({ attemptId: attempt.id, text: "x", submittedAt: new Date() });
+
+    expect(await recordSecondsSpent(user.id, attempt.id, 999)).toBe(false);
+
+    expect(await secondsOf(attempt.id)).toBe(30);
+  });
+
+  it("refuses another user's attempt", async () => {
+    const owner = await setup("t-owner@test.local");
+    const other = await setup("t-other@test.local");
+    const attempt = await openAttemptFor(owner.user.id, owner.question.id);
+
+    await expect(recordSecondsSpent(other.user.id, attempt.id, 10)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe("setDifficultyRating", () => {
+  const ratingOf = async (id: string) =>
+    (await db.select().from(attempts).where(eq(attempts.id, id)))[0].difficultyRating;
+
+  it.each([1, 3, 5])("saves a rating of %i", async (rating) => {
+    const { user, question } = await setup(`d-ok-${rating}@test.local`);
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    expect(await setDifficultyRating(user.id, attempt.id, rating)).toBe(true);
+
+    expect(await ratingOf(attempt.id)).toBe(rating);
+  });
+
+  it("clears the rating when given null (skipped)", async () => {
+    const { user, question } = await setup("d-clear@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+    await setDifficultyRating(user.id, attempt.id, 4);
+
+    await setDifficultyRating(user.id, attempt.id, null);
+
+    expect(await ratingOf(attempt.id)).toBeNull();
+  });
+
+  it.each([0, 6, 2.5, -1])("rejects a rating of %s", async (rating) => {
+    const { user, question } = await setup(`d-bad-${rating}@test.local`);
+    const attempt = await openAttemptFor(user.id, question.id);
+
+    await expect(setDifficultyRating(user.id, attempt.id, rating)).rejects.toThrow();
+  });
+
+  it("changes nothing once the working has been submitted", async () => {
+    const { user, question } = await setup("d-done@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+    await setDifficultyRating(user.id, attempt.id, 2);
+    await db
+      .insert(submissions)
+      .values({ attemptId: attempt.id, text: "x", submittedAt: new Date() });
+
+    expect(await setDifficultyRating(user.id, attempt.id, 5)).toBe(false);
+
+    expect(await ratingOf(attempt.id)).toBe(2);
+  });
+
+  it("refuses another user's attempt", async () => {
+    const owner = await setup("d-owner@test.local");
+    const other = await setup("d-other@test.local");
+    const attempt = await openAttemptFor(owner.user.id, owner.question.id);
+
+    await expect(setDifficultyRating(other.user.id, attempt.id, 3)).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });

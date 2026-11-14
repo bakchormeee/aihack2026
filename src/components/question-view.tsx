@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import { AttemptTimer } from "@/components/attempt-timer";
 import { HintRungs } from "@/components/charts/hint-rungs";
+import { DifficultyRating } from "@/components/difficulty-rating";
 import { MathText } from "@/components/math-text";
 import { Button } from "@/components/ui/button";
 import type { HintLevel } from "@/lib/domain";
@@ -20,6 +22,10 @@ type Props = {
   initialAttemptId: string | null;
   initialHints: ShownHint[];
   hintsReady: boolean;
+  /** Whether the sheet's timer is on. */
+  timerEnabled: boolean;
+  initialSeconds: number;
+  initialRating: number | null;
   prevHref: string | null;
   nextHref: string | null;
   children?: React.ReactNode;
@@ -32,6 +38,9 @@ export function QuestionView({
   initialAttemptId,
   initialHints,
   hintsReady,
+  timerEnabled,
+  initialSeconds,
+  initialRating,
   prevHref,
   nextHref,
   children,
@@ -117,6 +126,15 @@ export function QuestionView({
           </p>
         ) : null}
       </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {timerEnabled ? (
+          <AttemptTimer attemptId={attemptId} initialSeconds={initialSeconds} />
+        ) : (
+          <span />
+        )}
+        <DifficultyRating attemptId={attemptId} initialRating={initialRating} />
+      </div>
 
       {children}
 

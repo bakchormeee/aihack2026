@@ -156,3 +156,25 @@ export async function requeueHintsForSheet(userId: string, sheetId: string): Pro
     .returning({ id: questions.id });
   return rows.length;
 }
+
+/** Switches the sheet's timer on or off. Returns false unless the sheet is the user's. */
+export async function setTimerEnabled(
+  userId: string,
+  sheetId: string,
+  enabled: boolean,
+): Promise<boolean> {
+  const rows = await db
+    .update(sheets)
+    .set({ timerEnabled: enabled })
+    .where(
+      and(
+        eq(sheets.id, sheetId),
+        inArray(
+          sheets.courseId,
+          db.select({ id: courses.id }).from(courses).where(eq(courses.userId, userId)),
+        ),
+      ),
+    )
+    .returning({ id: sheets.id });
+  return rows.length > 0;
+}

@@ -28,5 +28,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `src/db/schema.ts` (plural names: `users`, `courses`, `sheets`, …).
 - In a page, load user data as `await orNotFound(requireSheet(user.id, id))`
   (`@/lib/auth/guards`): a missing or foreign id then shows the 404 page.
+- Parallel agents share ONE browser and its cookies, and cookies ignore port
+  numbers: signing in on `localhost:3001` signs out `localhost:3000`. Each agent
+  opens its own dev server under its own hostname: the coordinator uses
+  `http://127.0.0.1:3000` (allowed in `next.config.ts`), track agents use
+  `http://localhost:<their port>`. Never sign in on another agent's hostname.
 - Render any question, hint, solution or feedback text with `<MathText>`.
 - Before reporting a task done: `npm run lint`, `npm run typecheck`, `npm test`.

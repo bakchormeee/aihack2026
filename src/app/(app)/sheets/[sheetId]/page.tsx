@@ -11,7 +11,7 @@ import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
 
-import { retryHintsAction, retryParseAction } from "./actions";
+import { retryHintsAction, retryParseAction, setTimerAction } from "./actions";
 
 // The retry button starts the background parse again, which can run for a few minutes.
 export const maxDuration = 300;
@@ -47,7 +47,20 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
         >
           All sheets
         </Link>
-        <h1 className="text-xl font-semibold">{sheet.title}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold">{sheet.title}</h1>
+          <form
+            action={setTimerAction.bind(null, sheet.id, !sheet.timerEnabled)}
+            className="flex items-center gap-2"
+          >
+            <span className="text-muted-foreground text-sm">
+              Timer is {sheet.timerEnabled ? "on" : "off"}
+            </span>
+            <Button type="submit" variant="outline" size="sm">
+              Turn {sheet.timerEnabled ? "off" : "on"}
+            </Button>
+          </form>
+        </div>
       </div>
 
       {reading ? (

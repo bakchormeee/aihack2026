@@ -3,7 +3,7 @@
 import { and, asc, desc, eq, isNull, lte, notExists, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { attempts, hintReveals, hints, questions, submissions } from "@/db/schema";
+import { attempts, hintReveals, hints, questions, sheets, submissions } from "@/db/schema";
 import { requireAttempt, requireQuestion } from "@/lib/auth/ownership";
 import type { HintLevel } from "@/lib/domain";
 import { attemptHintLevel } from "@/lib/marking/rules";
@@ -223,4 +223,62 @@ export async function getSheetNeighbours(userId: string, questionId: string) {
     position: index + 1,
     total: siblings.length,
   };
+}
+
+const MAX_SECONDS = 6 * 60 * 60;
+
+/** True when the attempt's working has not been submitted yet. */
+async function isOpen(attemptId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: sql`1` })
+    .from(submissions)
+    .where(and(eq(submissions.attemptId, attemptId), sql`${submissions.submittedAt} is not null`));
+  return rows.length === 0;
+}
+
+/**
+ * Saves the time spent so far. It never lowers the saved value (a late, stale
+ * save cannot undo progress), caps it at six hours, and does nothing when the
+ * timer is off for the sheet or the working is already submitted.
+ * Returns whether anything was saved.
+ */
+export async function recordSecondsSpent(
+  userId: string,
+  attemptId: string,
+  seconds: number,
+): Promise<boolean> {
+  if (!Number.isInteger(seconds) || seconds < 0)
+    throw new RangeError("Seconds must be a whole number of at least 0");
+  const attempt = await requireAttempt(userId, attemptId);
+
+  const [row] = await db
+    .select({ timerEnabled: sheets.timerEnabled })
+    .from(questions)
+    .leftJoin(sheets, eq(questions.sheetId, sheets.id))
+    .where(eq(questions.id, attempt.questionId));
+  if (row?.timerEnabled === false) return false;
+  if (!(await isOpen(attemptId))) return false;
+
+  const capped = Math.min(seconds, MAX_SECONDS);
+  await db
+    .update(attempts)
+    .set({ secondsSpent: sql`greatest(coalesce(${attempts.secondsSpent}, 0), ${capped})` })
+    .where(eq(attempts.id, attemptId));
+  return true;
+}
+
+/** Saves the student's 1–5 difficulty rating, or clears it with null. Does nothing once submitted. */
+export async function setDifficultyRating(
+  userId: string,
+  attemptId: string,
+  rating: number | null,
+): Promise<boolean> {
+  if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    throw new RangeError("Rating must be a whole number from 1 to 5");
+  }
+  await requireAttempt(userId, attemptId);
+  if (!(await isOpen(attemptId))) return false;
+
+  await db.update(attempts).set({ difficultyRating: rating }).where(eq(attempts.id, attemptId));
+  return true;
 }

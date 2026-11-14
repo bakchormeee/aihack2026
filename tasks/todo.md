@@ -209,7 +209,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/questions/[questionId]/page.tsx`, `app/questions/[questionId]/actions.ts` (+ test), `src/components/question-view.tsx`, `src/db/queries/attempts.ts`, `src/lib/navigation.ts`
   - Depends on: M4, L1, C1
 
-- [ ] **M7: Timer and difficulty rating** (S) — SC 8
+- [x] **M7: Timer and difficulty rating** (S) — SC 8
   - Acceptance: the timer counts while the question is visible, pauses on demand and on tab blur, and saves `seconds_spent` on pause, on blur, every 15 s and on submit; the sheet overview has a timer on/off switch, and with it off `seconds_spent` stays null; a 1–5 rating can be saved or skipped.
   - Verify: unit test of the timer's accumulate/pause logic; manual blur check.
   - Files: `src/components/attempt-timer.tsx`, `src/lib/timer.ts` (+ test), `app/questions/[questionId]/timer-actions.ts`
