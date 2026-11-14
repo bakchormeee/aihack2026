@@ -44,7 +44,7 @@ export function SpotReveal({
         ) : null}
       </div>
 
-      <ol className="flex flex-col gap-2">
+      <ol className="bg-card rise-children divide-y overflow-hidden rounded-lg border">
         {lines.map((text, index) => {
           const line = index + 1;
           const error = planted.find((p) => p.line === line);
@@ -55,26 +55,31 @@ export function SpotReveal({
               key={line}
               data-line={line}
               data-planted={error ? "true" : undefined}
-              className={`flex flex-col gap-2 rounded-lg border p-3 ${error ? "border-red-600 bg-red-500/10" : tick ? "border-amber-500 bg-amber-400/10" : ""}`}
+              className={`relative flex flex-col gap-2 px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${error ? "before:bg-pen bg-red-500/[0.07]" : tick ? "bg-amber-400/10 before:bg-amber-500" : "before:bg-transparent"}`}
             >
               <div className="flex items-start gap-3">
-                <span className="text-muted-foreground mt-0.5 w-5 shrink-0 text-sm">{line}.</span>
-                <MathText className="min-w-0 text-sm">{text}</MathText>
+                <span className="text-muted-foreground mt-0.5 w-5 shrink-0 font-mono text-xs leading-5">
+                  {line}
+                </span>
+                <MathText className="min-w-0 text-[15px]">{text}</MathText>
               </div>
               {error ? (
                 <div className="flex flex-col gap-1 pl-8 text-sm">
-                  <p className="text-xs font-semibold text-red-700 uppercase dark:text-red-400">
+                  <p className="text-pen flex items-center gap-1.5 text-xs font-semibold">
+                    <span aria-hidden="true">{tick ? "✓" : "✗"}</span>
                     {tick ? "You found this" : "You did not tick this line"}
                   </p>
                   <MathText className="text-sm">{error.whatsWrong}</MathText>
-                  <p className="text-muted-foreground text-xs font-medium">Correct line</p>
-                  <MathText className="text-sm">{error.correctLine}</MathText>
+                  <div className="bg-background/70 mt-1 flex flex-col gap-1 rounded-md border border-dashed p-2">
+                    <p className="text-muted-foreground text-xs font-medium">Correct line</p>
+                    <MathText className="text-sm">{error.correctLine}</MathText>
+                  </div>
                   <p className="text-muted-foreground text-xs">
                     Based on your common error:{" "}
                     <MathText className="inline [&_p]:inline">{error.misconception}</MathText>
                   </p>
                   {tick ? (
-                    <div className="mt-1 flex flex-col gap-1 rounded-md border p-2">
+                    <div className="bg-card mt-1 flex flex-col gap-1 rounded-md border p-2">
                       <p className="text-xs font-medium">Your explanation</p>
                       <MathText className="text-sm">{tick.explanation}</MathText>
                       {verdict ? (
@@ -89,7 +94,7 @@ export function SpotReveal({
                   ) : null}
                 </div>
               ) : tick ? (
-                <p className="pl-8 text-xs font-semibold text-amber-700 uppercase dark:text-amber-400">
+                <p className="pl-8 text-xs font-semibold text-amber-700 dark:text-amber-400">
                   This line was correct
                 </p>
               ) : null}

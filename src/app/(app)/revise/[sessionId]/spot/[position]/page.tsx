@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { MathText } from "@/components/math-text";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { PageHeader, Panel } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { SpotAnswerForm } from "@/components/spot-answer-form";
 import { SpotReveal } from "@/components/spot-reveal";
@@ -41,19 +42,23 @@ export default async function SpotQuestionPage({
   const nextHref = item.position < count ? `${sessionHref}/spot/${item.position + 1}` : sessionHref;
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <Link href={sessionHref} className="text-muted-foreground text-sm underline">
-          Back to the session
-        </Link>
-        <h1 className="text-xl font-semibold">
-          Spot the error: question {item.position} of {count}
-        </h1>
+    <section className="flex flex-col gap-6">
+      <PageHeader
+        back={{ href: sessionHref, label: "Back to the session" }}
+        title={`Spot the error: question ${item.position} of ${count}`}
+      />
+      <div className="flex gap-1.5" aria-hidden="true">
+        {Array.from({ length: count }, (_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${i + 1 < item.position ? "bg-foreground/70" : i + 1 === item.position ? "bg-pen" : "bg-muted"}`}
+          />
+        ))}
       </div>
 
-      <div className="rounded-lg border p-4">
-        <MathText className="text-sm">{item.body}</MathText>
-      </div>
+      <Panel className="border-foreground/80 border-t-2 px-6 py-5">
+        <MathText className="font-heading text-[17px] leading-relaxed">{item.body}</MathText>
+      </Panel>
 
       {answered && answer && answer.outcome ? (
         <>
@@ -70,9 +75,14 @@ export default async function SpotQuestionPage({
             noError={answer.noError}
             outcome={answer.outcome}
           />
-          <Link href={nextHref} className={buttonVariants({ className: "self-start" })}>
-            {item.position < count ? "Next question" : "Finish"}
-          </Link>
+          <div className="flex justify-end border-t pt-4">
+            <Link href={nextHref} className={buttonVariants({ className: "group" })}>
+              {item.position < count ? "Next question" : "Finish"}
+              <span aria-hidden="true" className="transition-transform group-hover:translate-x-1">
+                →
+              </span>
+            </Link>
+          </div>
         </>
       ) : answered ? (
         <p className="text-muted-foreground text-sm" role="status">

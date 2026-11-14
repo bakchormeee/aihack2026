@@ -125,11 +125,12 @@ export default async function MarkPage({
 
       {current ? (
         <div className="flex flex-col gap-5">
-          <Panel className="border-foreground/80 flex flex-wrap items-center gap-x-5 gap-y-3 border-t-2">
-            <span className="font-heading text-pen text-5xl leading-none italic tabular-nums">
+          <Panel className="border-foreground/80 relative flex flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden border-t-2">
+            <span className="font-heading text-pen stamp rounded-full border-[3px] border-current px-4 py-3 text-5xl leading-none italic tabular-nums">
               {current.score}/5
             </span>
             <div className="flex flex-col gap-2">
+              <ScorePips score={current.score} />
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={OUTCOME_VARIANT[current.outcome]}>
                   {OUTCOME_LABEL[current.outcome]}
@@ -144,6 +145,24 @@ export default async function MarkPage({
                   : "AI-marked, provisional"}
               </span>
             </div>
+            {current.outcome === "full" ? (
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="text-pen ml-auto size-16 shrink-0 max-sm:hidden"
+              >
+                <path
+                  d="M4 13.5 9.2 19 20 5"
+                  pathLength={100}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="pen-draw [--delay:650ms]"
+                />
+              </svg>
+            ) : null}
           </Panel>
 
           {current.mistakes && current.mistakes.length > 0 && submission?.text?.trim() ? (
@@ -278,6 +297,21 @@ export default async function MarkPage({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** Five marks in a row, the earned ones in red pen. */
+function ScorePips({ score }: { score: number }) {
+  return (
+    <div className="flex gap-1.5" aria-hidden="true">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span
+          key={n}
+          className={`pip-in h-2 w-7 rounded-full ${n <= score ? "bg-pen" : "bg-muted"}`}
+          style={{ animationDelay: `${400 + n * 80}ms` }}
+        />
+      ))}
+    </div>
   );
 }
 

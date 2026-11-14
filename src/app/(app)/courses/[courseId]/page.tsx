@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
+import { EmptyState, Meter, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { TopicPanel } from "@/components/topic-panel";
 import { getCourseMastery } from "@/db/queries/mastery";
@@ -74,6 +74,9 @@ export default async function CoursePage({
               ? "No marked attempts yet."
               : `Mastery ${Math.round(selected.mastery * 100)}% from ${selected.attempts} ${selected.attempts === 1 ? "attempt" : "attempts"}.`}
           </p>
+          {selected.mastery !== null ? (
+            <Meter value={selected.mastery} label={`Mastery of ${selected.name}`} />
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/courses/${course.id}/mistakes?topic=${selected.id}`}
@@ -86,6 +89,12 @@ export default async function CoursePage({
               className={buttonVariants()}
             >
               Revise this topic
+            </Link>
+            <Link
+              href={`/revise?course=${course.id}&topic=${selected.id}&mode=spot_error`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Spot the error
             </Link>
           </div>
         </Panel>

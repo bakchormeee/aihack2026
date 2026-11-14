@@ -31,8 +31,8 @@ export function CommonErrors({
   hideAction: (misconceptionId: string) => Promise<void>;
 }) {
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="common-errors-heading">
-      <h2 id="common-errors-heading" className="text-base font-semibold">
+    <section className="flex flex-col gap-3 border-t pt-6" aria-labelledby="common-errors-heading">
+      <h2 id="common-errors-heading" className="text-lg font-medium">
         Your common errors
       </h2>
       {updating ? (
@@ -46,11 +46,15 @@ export function CommonErrors({
           marked, they will appear here.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="rise-children flex flex-col gap-3">
           {errors.map((error) => (
-            <li key={error.id} className="flex flex-col gap-2 rounded-lg border p-3">
+            <li
+              key={error.id}
+              className="bg-background/60 border-l-pen flex flex-col gap-2 rounded-lg border border-l-4 p-4"
+            >
               <MathText className="text-sm">{error.description}</MathText>
               <p className="text-muted-foreground text-xs">
+                <span className="text-pen font-semibold tabular-nums">×{error.timesSeen}</span> ·{" "}
                 {error.timesSeen === 1 ? "Seen once" : `Seen ${error.timesSeen} times`}
                 {error.lastSeen ? `, last on ${formatDate(error.lastSeen)}` : ""}
               </p>

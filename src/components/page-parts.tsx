@@ -77,6 +77,26 @@ export function EmptyState({
   );
 }
 
+/** A mastery or progress bar from 0 to 1, filled in red pen. */
+export function Meter({ value, label }: { value: number; label: string }) {
+  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  return (
+    <div
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      className="bg-muted h-2 w-full max-w-sm overflow-hidden rounded-full"
+    >
+      <div
+        className="bg-pen h-full origin-left rounded-full transition-[width] duration-700 ease-out"
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
+}
+
 /** A list with a thin rule between rows, like the lines of a sheet. */
 export function RuledList({ className, ...props }: React.ComponentProps<"ol">) {
   return (
@@ -88,4 +108,5 @@ export function RuledList({ className, ...props }: React.ComponentProps<"ol">) {
 }
 
 /** The link style for a whole row of a ruled list. */
-export const RULED_ROW_LINK = "hover:bg-muted/50 flex flex-col gap-2 px-5 py-4 transition-colors";
+export const RULED_ROW_LINK =
+  "hover:bg-muted/50 relative flex flex-col gap-2 px-5 py-4 transition-colors before:bg-pen before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:origin-top before:scale-y-0 before:transition-transform before:duration-200 hover:before:scale-y-100";

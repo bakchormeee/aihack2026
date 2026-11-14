@@ -2,6 +2,14 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
+import {
+  Meter,
+  PageHeader,
+  Panel,
+  RULED_ROW_LINK,
+  RuledList,
+  SectionTitle,
+} from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,21 +35,18 @@ export async function SpotSessionView({
   const wanted = session.questionCount ?? items.length;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-6">
       <AutoRefresh active={building} />
-      <div>
-        <Link
-          href={`/courses/${session.courseId}`}
-          className="text-muted-foreground text-sm underline"
-        >
-          Course
-        </Link>
-        <h1 className="text-xl font-semibold">Spot the error, {wanted} questions</h1>
-      </div>
+      <PageHeader
+        back={{ href: `/courses/${session.courseId}`, label: "Course" }}
+        title={`Spot the error, ${wanted} questions`}
+        description="Each solution was written with your own common errors planted in it. Find them."
+      />
 
       {building ? (
         <div className="flex flex-col gap-3" aria-live="polite">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground flex items-center gap-2 text-sm">
+            <span className="bg-pen size-2 animate-pulse rounded-full" aria-hidden="true" />
             Writing solutions with your own common errors in them. This takes a minute.
           </p>
           <Skeleton className="h-16 w-full" />
@@ -50,14 +55,14 @@ export async function SpotSessionView({
       ) : null}
 
       {session.status === "failed" || stuck ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
+        <Panel role="alert" className="flex flex-col items-start gap-3">
           <p className="text-sm">
             {stuck ? "Building this session is taking too long." : "Building this session failed."}
           </p>
           <form action={retryRevisionAction.bind(null, session.id)}>
             <Button type="submit">Try again</Button>
           </form>
-        </div>
+        </Panel>
       ) : null}
 
       {session.status === "ready" ? (
@@ -67,26 +72,31 @@ export async function SpotSessionView({
               Only {items.length} of {wanted} questions could be written this time.
             </p>
           ) : null}
-          <p className="text-muted-foreground text-sm">
-            {answered} of {items.length} answered.
-          </p>
-          <ol className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-sm">
+              {answered} of {items.length} answered.
+            </p>
+            <Meter value={items.length ? answered / items.length : 0} label="Questions answered" />
+          </div>
+          <RuledList className="rise-children">
             {items.map((item) => (
               <li key={item.position}>
                 <Link
                   href={`/revise/${session.id}/spot/${item.position}`}
-                  className="hover:bg-muted flex items-center justify-between gap-2 rounded-lg border p-3"
+                  className={`${RULED_ROW_LINK} flex-row items-center justify-between`}
                 >
-                  <span className="font-medium">Question {item.position}</span>
+                  <span className="font-heading text-lg font-medium">Question {item.position}</span>
                   {item.outcome ? (
-                    <Badge variant="secondary">{OUTCOME_LABEL[item.outcome]}</Badge>
+                    <Badge variant={item.outcome === "full" ? "default" : "secondary"}>
+                      {OUTCOME_LABEL[item.outcome]}
+                    </Badge>
                   ) : (
                     <Badge variant="outline">{item.answered ? "Checking…" : "To do"}</Badge>
                   )}
                 </Link>
               </li>
             ))}
-          </ol>
+          </RuledList>
 
           {next ? (
             <Link
@@ -98,17 +108,25 @@ export async function SpotSessionView({
           ) : null}
 
           {done ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4" aria-label="Summary">
-              <h2 className="text-base font-semibold">Summary</h2>
-              <p className="text-sm">
-                {counts.full} correct, {counts.partial} partly right, {counts.stuck} stuck.
-              </p>
+            <Panel
+              className="border-foreground/80 rise flex flex-col gap-4 border-t-2"
+              aria-label="Summary"
+            >
+              <SectionTitle>Summary</SectionTitle>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <span className="font-heading text-pen stamp rounded-full border-[3px] border-current px-4 py-2 text-4xl leading-none italic tabular-nums">
+                  {counts.full}/{items.length}
+                </span>
+                <p className="text-sm">
+                  {counts.full} correct, {counts.partial} partly right, {counts.stuck} stuck.
+                </p>
+              </div>
               {missed.length > 0 ? (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">Common errors you missed this time</p>
                   <ul className="flex flex-col gap-2">
                     {missed.map((description) => (
-                      <li key={description} className="text-sm">
+                      <li key={description} className="border-l-pen border-l-2 pl-3 text-sm">
                         <MathText>{description}</MathText>
                       </li>
                     ))}
@@ -123,7 +141,7 @@ export async function SpotSessionView({
               >
                 Practise again
               </Link>
-            </div>
+            </Panel>
           ) : null}
         </>
       ) : null}
