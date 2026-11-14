@@ -63,7 +63,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
   - Files: `src/lib/domain.ts`, `src/db/schema.ts`, `src/db/index.ts`, `src/db/migrations/…`, `src/db/db.test.ts`, `src/lib/concurrency.ts` (+ test), `drizzle.config.ts`
   - Depends on: F1
 
-- [ ] **F3: Sign-in, app shell and placeholder routes** (M) — SC 1 (Google) — parallel with F4
+- [x] **F3: Sign-in, app shell and placeholder routes** (M) — *built without T0; still to verify once Google keys exist: a real Google sign-in locally and on Vercel* — SC 1 (Google) — parallel with F4
   - Acceptance:
     - Google sign-in and sign-out work; `requireUser()` returns the user or redirects to `/sign-in`; there is no middleware.
     - A test sign-in page signs in as any `<name>@test.local` user and returns 404 unless `NODE_ENV !== "production"` and `ENABLE_TEST_SIGN_IN=1`.
