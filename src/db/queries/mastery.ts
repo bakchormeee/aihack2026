@@ -12,6 +12,8 @@ import {
   marks,
   questions,
   questionTopics,
+  revisionSessions,
+  sheets,
   topicPrereqs,
   topics,
 } from "@/db/schema";
@@ -126,4 +128,34 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
     }),
     prereqs,
   };
+}
+
+/** Sheet uploads and finished revision sessions of the course, oldest first, for the progress chart. */
+export async function getCourseEvents(
+  userId: string,
+  courseId: string,
+): Promise<{ at: Date; kind: "sheet" | "revision"; label: string }[]> {
+  const sheetRows = await db
+    .select({ at: sheets.uploadedAt, title: sheets.title })
+    .from(sheets)
+    .innerJoin(courses, eq(sheets.courseId, courses.id))
+    .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId)));
+  const sessionRows = await db
+    .select({ at: revisionSessions.createdAt, minutes: revisionSessions.targetMinutes })
+    .from(revisionSessions)
+    .where(
+      and(
+        eq(revisionSessions.courseId, courseId),
+        eq(revisionSessions.userId, userId),
+        eq(revisionSessions.status, "ready"),
+      ),
+    );
+  return [
+    ...sheetRows.map((r) => ({ at: r.at, kind: "sheet" as const, label: r.title })),
+    ...sessionRows.map((r) => ({
+      at: r.at,
+      kind: "revision" as const,
+      label: `Revision, ${r.minutes} min`,
+    })),
+  ].sort((x, y) => x.at.getTime() - y.at.getTime());
 }

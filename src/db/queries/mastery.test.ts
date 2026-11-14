@@ -7,12 +7,14 @@ import {
   marks,
   questions,
   questionTopics,
+  revisionSessions,
+  sheets,
   topicPrereqs,
   topics,
   users,
 } from "@/db/schema";
 
-import { getCourseMastery } from "./mastery";
+import { getCourseEvents, getCourseMastery } from "./mastery";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -171,5 +173,39 @@ describe("getCourseMastery", () => {
 
     expect(result.topics).toEqual([]);
     expect(result.prereqs).toEqual([]);
+  });
+});
+
+describe("getCourseEvents", () => {
+  it("lists sheet uploads and ready revision sessions of the user's course only", async () => {
+    const a = await setup("ev-a@test.local");
+    const b = await setup("ev-b@test.local");
+    await db.insert(sheets).values([
+      {
+        courseId: a.course.id,
+        title: "Sheet 1",
+        status: "ready",
+        uploadedAt: new Date(Date.now() - 3 * DAY),
+      },
+      { courseId: b.course.id, title: "Other", status: "ready" },
+    ]);
+    await db.insert(revisionSessions).values([
+      {
+        userId: a.user.id,
+        courseId: a.course.id,
+        targetMinutes: 20,
+        status: "ready",
+        createdAt: new Date(Date.now() - DAY),
+      },
+      { userId: a.user.id, courseId: a.course.id, targetMinutes: 45, status: "failed" },
+    ]);
+
+    const events = await getCourseEvents(a.user.id, a.course.id);
+
+    expect(events.map((e) => [e.kind, e.label])).toEqual([
+      ["sheet", "Sheet 1"],
+      ["revision", "Revision, 20 min"],
+    ]);
+    expect(await getCourseEvents(b.user.id, a.course.id)).toEqual([]);
   });
 });
