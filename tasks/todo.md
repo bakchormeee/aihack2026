@@ -161,7 +161,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
 
 ### Track Main (after F3, F4, F5) — sequential
 
-- [ ] **M1: Courses** (S)
+- [x] **M1: Courses** (S)
   - Acceptance: a student can create a course and sees only their own courses; a course opens at `/courses/[courseId]`.
   - Verify: integration test that listing excludes another user's courses; manual check.
   - Files: `app/courses/page.tsx`, `app/courses/actions.ts`, `src/db/queries/courses.ts` (+ test)

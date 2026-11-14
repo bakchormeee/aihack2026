@@ -26,5 +26,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   the real migrations applied, so integration tests need no setup.
 - Shared enums and types are in `src/lib/domain.ts`; table definitions are in
   `src/db/schema.ts` (plural names: `users`, `courses`, `sheets`, …).
+- In a page, load user data as `await orNotFound(requireSheet(user.id, id))`
+  (`@/lib/auth/guards`): a missing or foreign id then shows the 404 page.
 - Render any question, hint, solution or feedback text with `<MathText>`.
 - Before reporting a task done: `npm run lint`, `npm run typecheck`, `npm test`.
