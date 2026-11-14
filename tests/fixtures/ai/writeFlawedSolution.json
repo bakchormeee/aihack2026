@@ -1,0 +1,19 @@
+{
+  "body": "Evaluate $\\int_0^{\\pi} \\sin x \\, dx + 3 - (2 + 8)$.",
+  "lines": [
+    "The integral is $\\int_0^{\\pi} \\sin x \\, dx = \\big[ -\\cos x \\big]_0^{\\pi}$.",
+    "Evaluating gives $-\\cos \\pi + \\cos 0 = 1 + 1 = 2$.",
+    "Next, $3 - (2 + 8) = 3 - 2 + 8$.",
+    "So the expression equals $2 + 3 - 2 + 8$.",
+    "Hence the value is $11$."
+  ],
+  "planted": [
+    {
+      "line": 3,
+      "misconception": "e1",
+      "whatsWrong": "The minus sign applies to the whole bracket, so the bracket's terms both change sign.",
+      "correctLine": "Next, $3 - (2 + 8) = 3 - 2 - 8$."
+    }
+  ],
+  "expectedMinutes": 3
+}

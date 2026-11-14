@@ -40,7 +40,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
 
 ## Phase 3: Spot-the-error sessions (2 h 30 min)
 
-- [ ] **S5: Writing flawed solutions and building a session** (M)
+- [x] **S5: Writing flawed solutions and building a session** (M)
   - Acceptance: `writeFlawedSolution` (schema, LaTeX check on body, lines and planted text, one retry, fixtures) returns a question, numbered lines and 0–2 planted errors on given lines with what is wrong and the correct line; `buildSpotSession` deals questions with S1's rules, writes them 5 at a time, drops a question that fails twice, is ready with at least one question, fails (retry button) with none, and is safe to run twice; the start action creates a spot session.
   - Verify: checks; integration tests with a fake AI; one real-API session of 5 on a local database, reviewed by you.
   - Files: `src/lib/ai/write-flawed-solution.ts` (+ test, fixtures), `src/lib/pipeline/spot-session.ts` (+ test), `src/db/queries/revision.ts`, `src/app/(app)/revise/actions.ts`

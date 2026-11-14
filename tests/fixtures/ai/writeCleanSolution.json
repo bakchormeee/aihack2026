@@ -1,0 +1,10 @@
+{
+  "body": "Solve $2x + 3 = 11$ for $x$.",
+  "lines": [
+    "Subtract $3$ from both sides: $2x = 8$.",
+    "Divide both sides by $2$: $x = 4$.",
+    "Check: $2 \\cdot 4 + 3 = 11$."
+  ],
+  "planted": [],
+  "expectedMinutes": 2
+}
