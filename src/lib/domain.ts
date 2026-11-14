@@ -27,6 +27,9 @@ export const SESSION_STATUSES = ["building", "ready", "failed"] as const;
 export const SHEET_FILE_KINDS = ["sheet", "official_solutions"] as const;
 export const QUESTION_SOURCES = ["original", "variant"] as const;
 export const ATTEMPT_CONTEXTS = ["sheet", "revision"] as const;
+/** Long-form revision (retry and variants) or spot-the-error (SPEC-spot-the-error.md). */
+export const SESSION_MODES = ["long_form", "spot_error"] as const;
+export const SPOT_QUESTION_COUNTS = [5, 10, 15] as const;
 export const REVISION_ITEM_SOURCES = ["retry", "variant"] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
@@ -41,6 +44,7 @@ export type SessionStatus = (typeof SESSION_STATUSES)[number];
 export type SheetFileKind = (typeof SHEET_FILE_KINDS)[number];
 export type QuestionSource = (typeof QUESTION_SOURCES)[number];
 export type AttemptContext = (typeof ATTEMPT_CONTEXTS)[number];
+export type SessionMode = (typeof SESSION_MODES)[number];
 export type RevisionItemSource = (typeof REVISION_ITEM_SOURCES)[number];
 
 /** 0 means no hint was visible; 1–3 is the highest hint level visible. */

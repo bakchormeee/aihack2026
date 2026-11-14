@@ -15,10 +15,14 @@ export type MarkedAttempt = {
   secondsSpent: number | null;
   expectedMinutes: number;
   basis: MarkBasis;
+  /** A long-form attempt (the default) or a spot-the-error answer. */
+  kind?: "attempt" | "spot";
 };
 
 /** Evidence in [0, 1] that the student can do this kind of question unaided. */
 export function evidenceScore(a: MarkedAttempt): number {
+  // Spot-the-error has no hints and no timing: the outcome is the evidence.
+  if (a.kind === "spot") return OUTCOME_VALUE[a.outcome];
   const tookTooLong = a.secondsSpent !== null && a.secondsSpent > 2 * a.expectedMinutes * 60;
   const value =
     a.outcome === "full" && a.score < 5 ? CARELESS_CORRECT_VALUE : OUTCOME_VALUE[a.outcome];

@@ -19,6 +19,35 @@ function attempt(o: Partial<MarkedAttempt> & { outcome?: Outcome } = {}): Marked
   };
 }
 
+describe("spot-the-error evidence", () => {
+  it("is the outcome value, with no hint multiplier and no time factor", () => {
+    const spot = (outcome: Outcome) =>
+      evidenceScore(
+        attempt({ kind: "spot", outcome, hintLevel: 3, secondsSpent: 99999, score: 0 }),
+      );
+
+    expect(spot("full")).toBe(1);
+    expect(spot("partial")).toBe(0.5);
+    expect(spot("stuck")).toBe(0);
+  });
+
+  it("moves mastery at weight 0.25, half of a provisional long-form attempt", () => {
+    const now = new Date(T0.getTime() + DAY);
+    const long = replayMastery([attempt({ outcome: "full" })], now).mastery;
+    const spot = replayMastery([attempt({ kind: "spot", outcome: "full" })], now).mastery;
+
+    expect(long).toBeCloseTo(0.5 + 0.3 * 0.5 * 0.5);
+    expect(spot).toBeCloseTo(0.5 + 0.3 * 0.25 * 0.5);
+  });
+
+  it("counts a quarter towards confidence", () => {
+    const now = T0;
+    const four = Array.from({ length: 4 }, () => attempt({ kind: "spot" }));
+
+    expect(replayMastery(four, now).confidence).toBeCloseTo(0.25);
+  });
+});
+
 describe("evidenceScore", () => {
   it("a correct answer with careless slips (4/5) counts as 0.9 of a perfect one", () => {
     expect(evidenceScore(attempt({ outcome: "full", score: 4 }))).toBeCloseTo(0.9);

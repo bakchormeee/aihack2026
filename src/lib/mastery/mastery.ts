@@ -5,6 +5,8 @@ export type { MarkedAttempt };
 const LEARNING_RATE = 0.3;
 const START_MASTERY = 0.5;
 const PROVISIONAL_WEIGHT = 0.5;
+// A spot-the-error answer counts half as much as a provisional long-form mark.
+const SPOT_WEIGHT = 0.25;
 const WEIGHT_FOR_FULL_CONFIDENCE = 4;
 const CONFIDENCE_HALF_LIFE_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -30,7 +32,8 @@ export function replayMastery(
   const series: { at: Date; mastery: number }[] = [];
 
   for (const a of ordered) {
-    const weight = a.basis === "official" ? 1 : PROVISIONAL_WEIGHT;
+    const weight =
+      a.kind === "spot" ? SPOT_WEIGHT : a.basis === "official" ? 1 : PROVISIONAL_WEIGHT;
     mastery += LEARNING_RATE * weight * (evidenceScore(a) - mastery);
     totalWeight += weight;
     series.push({ at: a.at, mastery });

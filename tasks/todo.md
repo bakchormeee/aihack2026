@@ -10,7 +10,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
 
 ## Phase 1: Foundation (45 min)
 
-- [ ] **S1: Spot-the-error rules** (M)
+- [x] **S1: Spot-the-error rules** (M)
   - Acceptance: `rankMisconceptions` puts seen-twice-or-more first (most often seen, then most recent), then seen-once (most recent), skips hidden ones and ones outside the chosen topics; `dealQuestions(n, ranked)` deals misconceptions in turn and gives each question 0, 1 or 2 planted errors with about 1 in 5 at zero and 1 in 5 at two (two different misconceptions where possible); `spotOutcome` follows the spec's section 4 for all six line cases; `timesSeen` counts distinct attempts whose current mark has a source; spot evidence is the outcome value at weight 0.25.
   - Verify: checks; `npm test -- --coverage` with `src/lib/spot` added to the 100% folders.
   - Files: `src/lib/spot/rules.ts` (+ test), `src/lib/domain.ts`, `src/lib/mastery/evidence.ts` (+ test), `vitest.config.mts`
