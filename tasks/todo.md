@@ -54,7 +54,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
   - Files: `package.json`, `package-lock.json`, config files at the root, `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/globals.css`, `src/components/ui/…`, `src/components/math-text.tsx` (+ test), `.env.example`, `.gitignore`
   - Depends on: none
 
-- [ ] **F2: Domain types, full schema and test database** (M)
+- [x] **F2: Domain types, full schema and test database** (M)
   - Acceptance:
     - `src/lib/domain.ts` matches C1.
     - `src/db/schema.ts` contains every table, status column and unique constraint in the spec's data model, including the Auth.js adapter tables; one generated migration exists.

@@ -355,18 +355,18 @@ server-side after the request returns, and the page polls a status field.
   `verification_token` tables that the Auth.js Drizzle adapter requires
 - `course` (id, user_id, name)
 - `topic` (id, course_id, name, parent_id), `topic_prereq` (topic_id, prereq_id)
-- `sheet` (id, course_id, title, status: parsing | ready | failed, status_updated_at, error nullable, timer_enabled, uploaded_at, solutions_status: none | extracting | remarking | done | failed, solutions_uploaded_at)
+- `sheet` (id, course_id, title, status: parsing | ready | failed, status_updated_at, error nullable, timer_enabled, uploaded_at, solutions_status: none | extracting | remarking | done | failed, solutions_status_updated_at, solutions_uploaded_at)
 - `sheet_file` (id, sheet_id, kind: sheet | official_solutions, path, mime, position)
-- `question` (id, course_id, sheet_id nullable, position, label, body, expected_minutes, source: original | variant, parent_question_id, hints_status)
+- `question` (id, course_id, sheet_id nullable, position, label, body, expected_minutes, source: original | variant, parent_question_id, hints_status: pending | ready | failed, hints_status_updated_at)
 - `question_topic` (question_id, topic_id)
 - `hint` (id, question_id, level, body)
 - `solution` (id, question_id, basis: ai | official, body)
 - `attempt` (id, user_id, question_id, context: sheet | revision, revision_session_id nullable, started_at, seconds_spent nullable, inherited_hint_level, difficulty_rating nullable)
 - `hint_reveal` (attempt_id, hint_id, revealed_at)
-- `submission` (id, attempt_id unique, text nullable, submitted_at nullable — null means draft, mark_status: none | pending | done | failed), `submission_file` (id, submission_id, path, mime, position)
-- `mark` (id, attempt_id, basis: ai | official, score, outcome, error_type, first_wrong_step, feedback, is_dispute, dispute_reason, outcome_changed, created_at)
+- `submission` (id, attempt_id unique, text nullable, submitted_at nullable — null means draft, mark_status: none | pending | done | failed, mark_status_updated_at), `submission_file` (id, submission_id, path, mime, position)
+- `mark` (id, attempt_id, basis: ai | official, score, outcome, error_type, first_wrong_step, feedback, overall_feedback, is_dispute, dispute_reason, outcome_changed, created_at)
 - `sheet_summary` (sheet_id, body_json, generated_at)
-- `revision_session` (id, user_id, course_id, target_minutes, status: building | ready | failed, created_at), `revision_item` (session_id, question_id, position, source: retry | variant, reason)
+- `revision_session` (id, user_id, course_id, target_minutes, topic_ids nullable, status: building | ready | failed, status_updated_at, created_at), `revision_item` (session_id, question_id, position, source: retry | variant, reason)
 
 Unique constraints: `topic` (course_id, lower(name)); `hint` (question_id,
 level); `hint_reveal` (attempt_id, hint_id); `solution` (question_id, basis);

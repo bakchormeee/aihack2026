@@ -21,5 +21,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - UI components in `src/components/ui/` are shadcn/ui built on Base UI, not
   Radix: there is no `asChild`; use the `render` prop, or `buttonVariants()`
   for links styled as buttons.
+- Import the database client only as `import { db } from "@/db"`. Under
+  Vitest that import is an empty in-memory Postgres (one per test file) with
+  the real migrations applied, so integration tests need no setup.
+- Shared enums and types are in `src/lib/domain.ts`; table definitions are in
+  `src/db/schema.ts` (plural names: `users`, `courses`, `sheets`, …).
 - Render any question, hint, solution or feedback text with `<MathText>`.
 - Before reporting a task done: `npm run lint`, `npm run typecheck`, `npm test`.

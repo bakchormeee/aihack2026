@@ -3,7 +3,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(import.meta.dirname, "src") },
+    alias: [
+      // Tests get an in-memory database in place of the real client.
+      { find: /^@\/db$/, replacement: path.resolve(import.meta.dirname, "src/db/test-db.ts") },
+      { find: /^@\//, replacement: path.resolve(import.meta.dirname, "src") + "/" },
+    ],
   },
   test: {
     environment: "node",
