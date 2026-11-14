@@ -9,7 +9,8 @@ import { HintRungs } from "@/components/charts/hint-rungs";
 import { DifficultyRating } from "@/components/difficulty-rating";
 import { WorkingInput } from "@/components/working-input";
 import { MathText } from "@/components/math-text";
-import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/page-parts";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { HintLevel } from "@/lib/domain";
 import {
   openAttempt,
@@ -108,22 +109,25 @@ export function QuestionView({
 
   return (
     <div className="flex flex-col gap-6">
-      <section aria-labelledby="hints-heading" className="flex flex-col gap-3">
+      <section
+        aria-labelledby="hints-heading"
+        className="bg-card flex flex-col gap-4 rounded-lg border p-5"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="hints-heading" className="text-base font-semibold">
+          <h2 id="hints-heading" className="text-lg font-medium">
             Hints
           </h2>
           <HintRungs revealed={level} />
         </div>
 
         {shown.length > 0 ? (
-          <ol className="flex flex-col gap-2">
+          <ol className="flex flex-col gap-3">
             {shown.map((hint) => (
-              <li key={hint.level} className="rounded-lg border p-3">
+              <li key={hint.level} className="border-foreground/25 border-l-2 py-0.5 pl-4">
                 <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Hint {hint.level} · {HINT_NAMES[hint.level - 1]}
                 </p>
-                <MathText className="text-sm">{hint.body}</MathText>
+                <MathText>{hint.body}</MathText>
               </li>
             ))}
           </ol>
@@ -189,24 +193,18 @@ export function QuestionView({
       />
 
       {submitted ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
-          <span>Your working has been submitted.</span>
+        <Panel className="flex flex-wrap items-center gap-3">
+          <span className="mr-auto">Your working has been submitted.</span>
           <Link
             href={`/questions/${questionId}/mark?attempt=${attemptId}${sessionId ? `&session=${sessionId}` : ""}`}
-            className="underline"
+            className={buttonVariants()}
           >
             See the mark
           </Link>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={startNewAttempt}
-            disabled={pending}
-          >
+          <Button type="button" variant="outline" onClick={startNewAttempt} disabled={pending}>
             Start a new attempt
           </Button>
-        </div>
+        </Panel>
       ) : null}
 
       {children}
@@ -216,14 +214,14 @@ export function QuestionView({
         className="flex items-center justify-between border-t pt-4 text-sm"
       >
         {prevHref ? (
-          <Link href={prevHref} className="underline">
+          <Link href={prevHref} className={buttonVariants({ variant: "ghost" })}>
             ← Previous question
           </Link>
         ) : (
           <span />
         )}
         {nextHref ? (
-          <Link href={nextHref} className="underline">
+          <Link href={nextHref} className={buttonVariants({ variant: "ghost" })}>
             Next question →
           </Link>
         ) : (

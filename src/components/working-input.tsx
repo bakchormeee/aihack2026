@@ -132,13 +132,16 @@ export function WorkingInput({
 
   if (submitted) {
     return (
-      <section aria-labelledby="working-heading" className="flex flex-col gap-3">
-        <h2 id="working-heading" className="text-base font-semibold">
+      <section
+        aria-labelledby="working-heading"
+        className="bg-card flex flex-col gap-3 rounded-lg border p-5"
+      >
+        <h2 id="working-heading" className="text-lg font-medium">
           Your working (submitted)
         </h2>
         {text.trim() ? (
-          <div className="rounded-lg border p-3">
-            <MathText className="text-sm">{text}</MathText>
+          <div className="bg-muted/40 rounded-md border p-3">
+            <MathText>{text}</MathText>
           </div>
         ) : null}
         <FileList files={files} />
@@ -149,8 +152,11 @@ export function WorkingInput({
   const hasWorking = text.trim().length > 0 || files.length > 0;
 
   return (
-    <section aria-labelledby="working-heading" className="flex flex-col gap-4">
-      <h2 id="working-heading" className="text-base font-semibold">
+    <section
+      aria-labelledby="working-heading"
+      className="bg-card flex flex-col gap-4 rounded-lg border p-5"
+    >
+      <h2 id="working-heading" className="text-lg font-medium">
         Your working
       </h2>
 
@@ -176,9 +182,9 @@ export function WorkingInput({
               : "Drafts save automatically"}
         </p>
         {text.trim() ? (
-          <div className="rounded-lg border p-3">
+          <div className="bg-muted/40 rounded-md border p-3">
             <p className="text-muted-foreground mb-1 text-xs font-medium">Preview</p>
-            <MathText className="text-sm">{text}</MathText>
+            <MathText>{text}</MathText>
           </div>
         ) : null}
       </div>

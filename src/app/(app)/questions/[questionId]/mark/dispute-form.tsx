@@ -23,7 +23,7 @@ export function DisputeForm({
   );
 
   return (
-    <form action={action} className="flex flex-col gap-3 rounded-lg border p-4">
+    <form action={action} className="bg-card flex flex-col gap-3 rounded-lg border p-5">
       <Label htmlFor="dispute-reason">
         Do you think your working is right? Ask for another look ({remaining} left).
       </Label>

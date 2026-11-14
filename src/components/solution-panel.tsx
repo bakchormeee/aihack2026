@@ -12,10 +12,10 @@ export function SolutionPanel({
   return (
     <section
       aria-labelledby="solution-heading"
-      className="flex flex-col gap-2 rounded-lg border p-4"
+      className="bg-card border-foreground/80 flex flex-col gap-3 rounded-lg border border-t-2 p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="solution-heading" className="text-base font-semibold">
+        <h2 id="solution-heading" className="text-lg font-medium">
           Worked solution
         </h2>
         <span className="text-muted-foreground text-xs">
@@ -24,7 +24,7 @@ export function SolutionPanel({
             : "Written by the AI, not checked by your tutor"}
         </span>
       </div>
-      <MathText className="text-sm">{solution.body}</MathText>
+      <MathText>{solution.body}</MathText>
     </section>
   );
 }

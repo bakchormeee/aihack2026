@@ -3,10 +3,11 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { MarkingScheme, MistakeList } from "@/components/mistake-list";
+import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
 import { PhotoWithBoxes } from "@/components/photo-with-boxes";
 import { WorkingWithBoxes } from "@/components/working-with-boxes";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SolutionPanel } from "@/components/solution-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLatestAttemptFor, visibleHintsFor } from "@/db/queries/attempts";
@@ -76,25 +77,26 @@ export default async function MarkPage({
   return (
     <section className="flex flex-col gap-6">
       <AutoRefresh active={Boolean(waiting || remarking)} />
-      <div>
-        <Link href={back} className="text-muted-foreground text-sm underline">
-          Back to question {question.label}
-        </Link>
-        <h1 className="text-xl font-semibold">Question {question.label}: mark</h1>
-      </div>
+      <PageHeader
+        back={{ href: back, label: `Back to question ${question.label}` }}
+        title={`Question ${question.label}: mark`}
+      />
 
       {!submission?.submittedAt ? (
-        <div className="flex flex-col items-start gap-3 rounded-lg border p-4">
-          <p className="text-sm">This attempt has not been submitted yet.</p>
-          <Link href={back} className="underline">
-            Go back and submit your working
-          </Link>
-        </div>
+        <EmptyState
+          action={
+            <Link href={back} className={buttonVariants({ variant: "outline" })}>
+              Go back and submit your working
+            </Link>
+          }
+        >
+          This attempt has not been submitted yet.
+        </EmptyState>
       ) : null}
 
       {waiting ? (
         <div className="flex flex-col gap-3" aria-live="polite">
-          <p className="text-muted-foreground text-sm">Marking your working…</p>
+          <p className="text-muted-foreground">Marking your working…</p>
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
@@ -107,8 +109,8 @@ export default async function MarkPage({
       ) : null}
 
       {failed ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
-          <p className="text-sm">
+        <Panel role="alert" className="flex flex-col items-start gap-3">
+          <p>
             {submission?.markStatus === "none"
               ? "Your working has not been marked yet."
               : stuck
@@ -118,42 +120,48 @@ export default async function MarkPage({
           <form action={retryMarkAction.bind(null, questionId, attemptId)}>
             <Button type="submit">Mark my working</Button>
           </form>
-        </div>
+        </Panel>
       ) : null}
 
       {current ? (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={OUTCOME_VARIANT[current.outcome]}>
-              {OUTCOME_LABEL[current.outcome]}
-            </Badge>
-            <span className="text-lg font-semibold">{current.score}/5</span>
-            {current.errorType ? (
-              <Badge variant="outline">{ERROR_LABEL[current.errorType]}</Badge>
-            ) : null}
-            <span className="text-muted-foreground text-xs">
-              {current.basis === "official"
-                ? "AI-marked against the official solutions"
-                : "AI-marked, provisional"}
+        <div className="flex flex-col gap-5">
+          <Panel className="border-foreground/80 flex flex-wrap items-center gap-x-5 gap-y-3 border-t-2">
+            <span className="font-heading text-pen text-5xl leading-none italic tabular-nums">
+              {current.score}/5
             </span>
-          </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={OUTCOME_VARIANT[current.outcome]}>
+                  {OUTCOME_LABEL[current.outcome]}
+                </Badge>
+                {current.errorType ? (
+                  <Badge variant="outline">{ERROR_LABEL[current.errorType]}</Badge>
+                ) : null}
+              </div>
+              <span className="text-muted-foreground text-xs">
+                {current.basis === "official"
+                  ? "AI-marked against the official solutions"
+                  : "AI-marked, provisional"}
+              </span>
+            </div>
+          </Panel>
 
           {current.mistakes && current.mistakes.length > 0 && submission?.text?.trim() ? (
-            <div className="flex flex-col gap-2 rounded-lg border p-4">
-              <h2 className="text-base font-semibold">Your working</h2>
+            <Panel className="flex flex-col gap-3">
+              <SectionTitle>Your working</SectionTitle>
               <p className="text-muted-foreground text-xs">
                 Red is a structural mistake, amber a careless slip. The numbers match the list
                 below.
               </p>
               <WorkingWithBoxes text={submission.text} mistakes={current.mistakes} />
-            </div>
+            </Panel>
           ) : null}
 
           {current.mistakes &&
           current.mistakes.length > 0 &&
           submission?.files.some((file) => file.mime.startsWith("image/")) ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4">
-              <h2 className="text-base font-semibold">Your photos</h2>
+            <Panel className="flex flex-col gap-3">
+              <SectionTitle>Your photos</SectionTitle>
               {submission.files.map((file, index) =>
                 file.mime.startsWith("image/") ? (
                   <PhotoWithBoxes
@@ -164,34 +172,35 @@ export default async function MarkPage({
                   />
                 ) : null,
               )}
-            </div>
+            </Panel>
           ) : null}
 
           {current.mistakes && current.mistakes.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <h2 className="text-base font-semibold">What to check</h2>
+            <div className="flex flex-col gap-3">
+              <SectionTitle>What to check</SectionTitle>
               <MistakeList mistakes={current.mistakes} />
             </div>
           ) : current.firstWrongStep ? (
-            <div className="rounded-lg border p-4">
+            <Panel>
               <p className="text-muted-foreground mb-1 text-xs font-medium">
                 Where it first goes wrong
               </p>
-              <MathText className="text-sm">{current.firstWrongStep}</MathText>
-            </div>
+              <MathText>{current.firstWrongStep}</MathText>
+            </Panel>
           ) : null}
 
-          <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground mb-1 text-xs font-medium">Feedback</p>
-            <MathText className="text-sm">{current.feedback}</MathText>
-          </div>
+          <Panel className="divide-y p-0">
+            <div className="px-5 py-4">
+              <p className="text-muted-foreground mb-1 text-xs font-medium">Feedback</p>
+              <MathText>{current.feedback}</MathText>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-muted-foreground mb-1 text-xs font-medium">Overall</p>
+              <MathText>{current.overallFeedback}</MathText>
+            </div>
+          </Panel>
 
-          <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground mb-1 text-xs font-medium">Overall</p>
-            <MathText className="text-sm">{current.overallFeedback}</MathText>
-          </div>
-
-          <details className="rounded-lg border p-4">
+          <details className="bg-card rounded-lg border px-5 py-4">
             <summary className="cursor-pointer text-sm font-medium">
               How marks out of 5 work
             </summary>
@@ -201,8 +210,8 @@ export default async function MarkPage({
           </details>
 
           {current.outcome !== "full" ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4">
-              <p className="text-sm">
+            <Panel className="flex flex-col gap-4">
+              <p>
                 {solution
                   ? "You can try again, with the worked solution below to help."
                   : "Not there yet. Try again, or take a hint first. The worked solution unlocks when you get it fully right, or after all three hints."}
@@ -219,7 +228,7 @@ export default async function MarkPage({
                   </form>
                 ) : null}
               </div>
-            </div>
+            </Panel>
           ) : null}
 
           {submission?.markStatus === "done" && current.outcome !== "full" ? (
@@ -239,11 +248,11 @@ export default async function MarkPage({
           {solution ? <SolutionPanel solution={solution} /> : null}
 
           {data.marks.length > 1 ? (
-            <section className="flex flex-col gap-2 rounded-lg border p-4">
-              <h2 className="text-base font-semibold">All marks for this attempt</h2>
-              <ul className="flex flex-col gap-2 text-sm">
+            <section className="bg-card flex flex-col gap-3 rounded-lg border p-5">
+              <SectionTitle>All marks for this attempt</SectionTitle>
+              <ul className="flex flex-col divide-y text-sm">
                 {data.marks.map((mark) => (
-                  <li key={mark.id} className="flex flex-col gap-0.5">
+                  <li key={mark.id} className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
                     <span>
                       {mark.score}/5 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
                       {mark.basis === "official" ? "official solutions" : "AI, provisional"}
@@ -261,8 +270,8 @@ export default async function MarkPage({
             </section>
           ) : null}
 
-          <div className="flex justify-end text-sm">
-            <Link href={nextHref} className="underline">
+          <div className="flex justify-end border-t pt-4">
+            <Link href={nextHref} className={buttonVariants({ variant: "outline" })}>
               Next →
             </Link>
           </div>
@@ -274,14 +283,17 @@ export default async function MarkPage({
 
 function NothingToMark({ questionId, sessionId }: { questionId: string; sessionId?: string }) {
   return (
-    <section className="flex flex-col items-start gap-3">
-      <p className="text-sm">There is no attempt to mark yet.</p>
-      <Link
-        href={`/questions/${questionId}${sessionId ? `?session=${sessionId}` : ""}`}
-        className="underline"
-      >
-        Go to the question
-      </Link>
-    </section>
+    <EmptyState
+      action={
+        <Link
+          href={`/questions/${questionId}${sessionId ? `?session=${sessionId}` : ""}`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Go to the question
+        </Link>
+      }
+    >
+      There is no attempt to mark yet.
+    </EmptyState>
   );
 }
