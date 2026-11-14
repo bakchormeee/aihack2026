@@ -14,10 +14,16 @@ export function BrandMark({
   compact?: boolean;
 }) {
   return (
-    <Link href={href} className={cn("flex items-center gap-2", className)}>
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="text-pen size-5 shrink-0">
+    <Link href={href} className={cn("group flex items-center gap-2", className)}>
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="text-pen size-5 shrink-0 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110"
+      >
         <path
           d="M4 13.5 9.2 19 20 5"
+          pathLength={100}
+          className="pen-draw"
           fill="none"
           stroke="currentColor"
           strokeWidth="2.6"

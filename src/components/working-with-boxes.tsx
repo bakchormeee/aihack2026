@@ -40,7 +40,8 @@ export function WorkingWithBoxes({ text, mistakes }: { text: string; mistakes: M
             key={i}
             data-mistake={piece.box + 1}
             data-severity={severity}
-            className={`rounded border-2 px-1 ${SEVERITY_CLASS[severity].box}`}
+            className={`ring-once rounded border-2 px-1 ${SEVERITY_CLASS[severity].box}`}
+            style={{ "--delay": `${600 + piece.box * 250}ms` } as React.CSSProperties}
           >
             <sup
               className={`mr-1 rounded px-1 text-[10px] font-semibold ${SEVERITY_CLASS[severity].badge}`}

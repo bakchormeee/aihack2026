@@ -26,9 +26,10 @@ export function MainNav() {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                  "relative inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                  "after:bg-pen after:absolute after:inset-x-3 after:-bottom-[11px] after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:transition-transform after:duration-300",
                   active
-                    ? "bg-muted text-foreground"
+                    ? "text-foreground after:scale-x-100"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
                 )}
               >

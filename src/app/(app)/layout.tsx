@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="bg-background/95 sticky top-0 z-10 border-b">
+      <header className="bg-background/80 sticky top-0 z-10 border-b backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-4 sm:gap-6">
             <BrandMark href="/courses" compact />
@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <main
         id="main"
-        className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 [&_h1]:text-2xl [&_h1]:font-medium [&_h1]:tracking-tight"
+        className="rise mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 [&_h1]:text-2xl [&_h1]:font-medium [&_h1]:tracking-tight"
       >
         {children}
       </main>
