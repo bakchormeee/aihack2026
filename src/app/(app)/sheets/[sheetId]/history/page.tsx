@@ -21,7 +21,7 @@ export default async function HistoryPage({ params }: PageProps<"/sheets/[sheetI
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">{sheet.title}: history</h1>
+        <h1>{sheet.title}: history</h1>
         {history.length > 0 ? (
           <ExportButton
             title={sheet.title}

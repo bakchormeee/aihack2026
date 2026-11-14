@@ -22,7 +22,7 @@ export default async function SummaryPage({ params }: PageProps<"/sheets/[sheetI
   return (
     <section className="flex flex-col gap-4">
       <AutoRefresh active={state.kind === "generating"} />
-      <h1 className="text-xl font-semibold">{sheet.title}: summary</h1>
+      <h1>{sheet.title}: summary</h1>
 
       {state.kind === "waiting" ? (
         <p className="text-muted-foreground text-sm">

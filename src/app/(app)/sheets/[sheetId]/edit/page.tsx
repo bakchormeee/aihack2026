@@ -19,7 +19,7 @@ export default async function EditQuestionsPage({ params }: PageProps<"/sheets/[
   if (sheet.status !== "ready") {
     return (
       <section className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold">Edit questions</h1>
+        <h1>Edit questions</h1>
         <p className="text-muted-foreground text-sm">
           The sheet can be edited once it has been read.{" "}
           <Link href={`/sheets/${sheetId}`} className="underline">
@@ -41,7 +41,7 @@ export default async function EditQuestionsPage({ params }: PageProps<"/sheets/[
     <section className="flex flex-col gap-4">
       <AutoRefresh active={hintsPending} />
       <div>
-        <h1 className="text-xl font-semibold">Edit questions</h1>
+        <h1>Edit questions</h1>
         <p className="text-muted-foreground text-sm">
           Fix anything the reader got wrong. Once you have attempted a question, only its label and
           topics can change.

@@ -29,7 +29,7 @@ export function WorkingWithBoxes({ text, mistakes }: { text: string; mistakes: M
   const pieces = splitByRanges(text, ranges);
 
   return (
-    <div className="text-sm leading-7">
+    <div className="text-sm leading-8">
       {pieces.map((piece, i) => {
         if (piece.box === null) {
           return <Lines key={i}>{piece.text}</Lines>;
@@ -40,7 +40,7 @@ export function WorkingWithBoxes({ text, mistakes }: { text: string; mistakes: M
             key={i}
             data-mistake={piece.box + 1}
             data-severity={severity}
-            className={`ring-once rounded border-2 px-1 ${SEVERITY_CLASS[severity].box}`}
+            className={`ring-once rounded border-2 px-1 py-1.5 [box-decoration-break:clone] ${SEVERITY_CLASS[severity].box}`}
             style={{ "--delay": `${600 + piece.box * 250}ms` } as React.CSSProperties}
           >
             <sup

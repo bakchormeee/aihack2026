@@ -43,7 +43,7 @@ export default async function OfficialSolutionsPage({
   return (
     <section className="flex flex-col gap-6">
       <AutoRefresh active={active} />
-      <h1 className="text-xl font-semibold">Official solutions</h1>
+      <h1>Official solutions</h1>
 
       {status === "none" ? (
         <div className="flex flex-col gap-3">
