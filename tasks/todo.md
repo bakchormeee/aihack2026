@@ -70,7 +70,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
 
 ## Phase 4: Release (needs your go-ahead)
 
-- [ ] **P10: Back up, migrate, deploy, convert, verify** (S)
+- [x] **P10: Back up, migrate, deploy, convert, verify** (S)
   - Steps: copy the `mark` table to a backup table; apply migration A; push `main` (redeploys); once the new code is live, apply migration B; spot-check converted marks against the backup; mark one answer on the live site.
   - Rollback: restore scores and outcomes from the backup table and revert the release commits.
   - Verify: no mark above 5; every outcome matches the bands; a live mark shows /5 with boxes.
