@@ -116,8 +116,12 @@ export async function addDraftFiles(
   });
 }
 
-/** Removes a file from a draft. Returns its storage path so the caller can delete the stored object. */
-export async function removeDraftFile(userId: string, fileId: string): Promise<string> {
+/**
+ * Removes a file from a draft. Returns its storage path so the caller can delete the
+ * stored object, or null when another submission still uses the same stored file (a
+ * retry's draft shares the files of the attempt it was copied from).
+ */
+export async function removeDraftFile(userId: string, fileId: string): Promise<string | null> {
   const file = await requireSubmissionFile(userId, fileId);
 
   return db.transaction(async (tx) => {
@@ -128,7 +132,12 @@ export async function removeDraftFile(userId: string, fileId: string): Promise<s
       .for("update");
     if (submission.submittedAt) throw new SubmissionLockedError();
     await tx.delete(submissionFiles).where(eq(submissionFiles.id, fileId));
-    return file.path;
+    const [stillUsed] = await tx
+      .select({ id: submissionFiles.id })
+      .from(submissionFiles)
+      .where(eq(submissionFiles.path, file.path))
+      .limit(1);
+    return stillUsed ? null : file.path;
   });
 }
 

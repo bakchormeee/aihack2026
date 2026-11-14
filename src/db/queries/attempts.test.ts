@@ -9,6 +9,7 @@ import {
   hints,
   questions,
   sheets,
+  submissionFiles,
   submissions,
   users,
 } from "@/db/schema";
@@ -270,6 +271,94 @@ describe("startAttemptFor", () => {
     const { user, question } = await setup("s-none@test.local");
 
     expect((await startAttemptFor(user.id, question.id, "retry-now")).inheritedHintLevel).toBe(0);
+  });
+});
+
+describe("startAttemptFor copies the previous working", () => {
+  async function withWorking(email: string) {
+    const base = await setup(email);
+    const first = await openAttemptFor(base.user.id, base.question.id);
+    const [submission] = await db
+      .insert(submissions)
+      .values({ attemptId: first.id, text: "my working", submittedAt: new Date() })
+      .returning();
+    await db.insert(submissionFiles).values([
+      { submissionId: submission.id, path: "k/a.jpg", mime: "image/jpeg", position: 0 },
+      { submissionId: submission.id, path: "k/b.jpg", mime: "image/jpeg", position: 1 },
+    ]);
+    return { ...base, first, submission };
+  }
+  const draftOf = async (attemptId: string) => {
+    const [row] = await db.select().from(submissions).where(eq(submissions.attemptId, attemptId));
+    const files = row
+      ? await db
+          .select()
+          .from(submissionFiles)
+          .where(eq(submissionFiles.submissionId, row.id))
+          .orderBy(submissionFiles.position)
+      : [];
+    return { row, files };
+  };
+
+  it("retry-now starts a draft with the same typed text and the same files, in order", async () => {
+    const { user, question } = await withWorking("c-copy@test.local");
+
+    const retry = await startAttemptFor(user.id, question.id, "retry-now");
+
+    const { row, files } = await draftOf(retry.id);
+    expect(row.text).toBe("my working");
+    expect(row.submittedAt).toBeNull();
+    expect(row.markStatus).toBe("none");
+    expect(files.map((f) => [f.path, f.mime, f.position])).toEqual([
+      ["k/a.jpg", "image/jpeg", 0],
+      ["k/b.jpg", "image/jpeg", 1],
+    ]);
+  });
+
+  it("leaves the earlier submission and its files unchanged", async () => {
+    const { user, question, first, submission } = await withWorking("c-keep@test.local");
+
+    await startAttemptFor(user.id, question.id, "retry-now");
+
+    const before = await draftOf(first.id);
+    expect(before.row.id).toBe(submission.id);
+    expect(before.row.submittedAt).not.toBeNull();
+    expect(before.files).toHaveLength(2);
+  });
+
+  it("fresh starts with no working at all", async () => {
+    const { user, question } = await withWorking("c-fresh@test.local");
+
+    const fresh = await startAttemptFor(user.id, question.id, "fresh");
+
+    expect((await draftOf(fresh.id)).row).toBeUndefined();
+  });
+
+  it("copies nothing when the previous attempt has no working", async () => {
+    const { user, question } = await setup("c-none@test.local");
+    await openAttemptFor(user.id, question.id);
+
+    const retry = await startAttemptFor(user.id, question.id, "retry-now");
+
+    expect((await draftOf(retry.id)).row).toBeUndefined();
+  });
+
+  it("copies from the latest attempt, not an older one", async () => {
+    const { user, question, first } = await withWorking("c-latest@test.local");
+    const second = await startAttemptFor(user.id, question.id, "retry-now");
+    await db
+      .update(submissions)
+      .set({ text: "second try" })
+      .where(eq(submissions.attemptId, second.id));
+    await db
+      .update(attempts)
+      .set({ startedAt: new Date(Date.now() + 1000) })
+      .where(eq(attempts.id, second.id));
+    expect(first.id).not.toBe(second.id);
+
+    const third = await startAttemptFor(user.id, question.id, "retry-now");
+
+    expect((await draftOf(third.id)).row.text).toBe("second try");
   });
 });
 

@@ -55,7 +55,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: checks with the history, marking and summary tests updated to the new scale.
   - Files: `src/app/(app)/sheets/[sheetId]/solutions/page.tsx`, `src/components/attempt-card.tsx`, `src/db/queries/history.ts` (+ test), `src/db/queries/marking.ts` (+ test)
 
-- [ ] **P8: Retry starts from a copy of the previous working** (M)
+- [x] **P8: Retry starts from a copy of the previous working** (M)
   - Acceptance: "Retry now" and "Retry with hint N" give a draft with the previous typed text and the same files; the earlier attempt is unchanged; removing a copied file from the draft never deletes a stored object another submission uses; "Try again" from History still starts empty.
   - Verify: integration tests for all four rules.
   - Files: `src/db/queries/attempts.ts` (+ test), `src/db/queries/working.ts` (+ test), `src/app/(app)/questions/[questionId]/submit-actions.ts`

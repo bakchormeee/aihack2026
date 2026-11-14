@@ -217,14 +217,40 @@ describe("removeDraftFile", () => {
       user,
       attempts: [attempt],
     } = await setup("r-ok@test.local");
-    await addDraftFiles(user.id, attempt.id, [jpg(1), jpg(2)]);
+    await addDraftFiles(user.id, attempt.id, [jpg(201), jpg(202)]);
     const [first] = (await getWorkingFor(user.id, attempt.id)).files;
 
-    expect(await removeDraftFile(user.id, first.id)).toBe("k/1.jpg");
+    expect(await removeDraftFile(user.id, first.id)).toBe("k/201.jpg");
 
     expect((await getWorkingFor(user.id, attempt.id)).files.map((f) => f.path)).toEqual([
-      "k/2.jpg",
+      "k/202.jpg",
     ]);
+  });
+
+  it("returns null instead of a path when another submission still uses the stored file", async () => {
+    const {
+      user,
+      attempts: [attempt],
+    } = await setup("r-shared@test.local");
+    await addDraftFiles(user.id, attempt.id, [jpg(207)]);
+    const [original] = (await getWorkingFor(user.id, attempt.id)).files;
+    const [second] = await db
+      .insert(attempts)
+      .values({ userId: user.id, questionId: attempt.questionId, context: "sheet" })
+      .returning();
+    const [copy] = await db.insert(submissions).values({ attemptId: second.id }).returning();
+    await db
+      .insert(submissionFiles)
+      .values({ submissionId: copy.id, path: original.path, mime: original.mime, position: 0 });
+
+    expect(await removeDraftFile(user.id, original.id)).toBeNull();
+    const remaining = await db
+      .select()
+      .from(submissionFiles)
+      .where(eq(submissionFiles.path, original.path));
+    expect(remaining).toHaveLength(1); // the copy keeps its row
+
+    expect(await removeDraftFile(user.id, remaining[0].id)).toBe(original.path);
   });
 
   it("refuses once the working is submitted", async () => {

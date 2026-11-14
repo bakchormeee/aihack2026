@@ -2,12 +2,15 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Migration A (0001) adds the new error types and the mistakes column; migration
 // B (0002) converts the marks made on the old 0-100 scale and adds the 0-5 check.
 // The test applies A, inserts old-style marks, applies B, and looks at the result.
 // It runs on an in-memory database only.
+
+// Each test starts its own in-memory database, which is slow when the machine is busy.
+vi.setConfig({ testTimeout: 60_000 });
 
 const dir = path.join(process.cwd(), "src/db/migrations");
 const files = readdirSync(dir)

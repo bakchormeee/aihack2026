@@ -3,7 +3,15 @@
 import { and, asc, desc, eq, isNull, lte, notExists, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { attempts, hintReveals, hints, questions, sheets, submissions } from "@/db/schema";
+import {
+  attempts,
+  hintReveals,
+  hints,
+  questions,
+  sheets,
+  submissionFiles,
+  submissions,
+} from "@/db/schema";
 import { requireAttempt, requireQuestion } from "@/lib/auth/ownership";
 import type { HintLevel } from "@/lib/domain";
 import { attemptHintLevel } from "@/lib/marking/rules";
@@ -135,9 +143,45 @@ export async function openAttemptFor(
   });
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Gives the new attempt a draft that starts as a copy of the earlier attempt's working:
+ * the same typed text and the same stored files (shared, not duplicated). The earlier
+ * submission is not changed.
+ */
+async function copyWorking(tx: Tx, fromAttemptId: string, toAttemptId: string): Promise<void> {
+  const [source] = await tx
+    .select()
+    .from(submissions)
+    .where(eq(submissions.attemptId, fromAttemptId));
+  if (!source) return;
+  const files = await tx
+    .select()
+    .from(submissionFiles)
+    .where(eq(submissionFiles.submissionId, source.id))
+    .orderBy(asc(submissionFiles.position));
+  if (!source.text?.trim() && files.length === 0) return;
+
+  const [draft] = await tx
+    .insert(submissions)
+    .values({ attemptId: toAttemptId, text: source.text })
+    .returning();
+  if (files.length > 0)
+    await tx.insert(submissionFiles).values(
+      files.map((file) => ({
+        submissionId: draft.id,
+        path: file.path,
+        mime: file.mime,
+        position: file.position,
+      })),
+    );
+}
+
 /**
  * Always starts a new attempt. "retry-now" keeps the hints the student had
- * already seen on their latest attempt; "fresh" hides them all.
+ * already seen on their latest attempt and starts from a copy of its working; "fresh"
+ * hides every hint and starts with an empty draft.
  */
 export async function startAttemptFor(
   userId: string,
@@ -148,8 +192,9 @@ export async function startAttemptFor(
   await requireQuestion(userId, questionId);
 
   let inherited: HintLevel = 0;
+  let previous: Attempt | undefined;
   if (mode === "retry-now") {
-    const [previous] = await db
+    [previous] = await db
       .select()
       .from(attempts)
       .where(and(eq(attempts.userId, userId), eq(attempts.questionId, questionId)))
@@ -158,17 +203,20 @@ export async function startAttemptFor(
     if (previous) inherited = await currentHintLevel(previous);
   }
 
-  const [created] = await db
-    .insert(attempts)
-    .values({
-      userId,
-      questionId,
-      context: sessionId ? "revision" : "sheet",
-      revisionSessionId: sessionId ?? null,
-      inheritedHintLevel: inherited,
-    })
-    .returning();
-  return created;
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(attempts)
+      .values({
+        userId,
+        questionId,
+        context: sessionId ? "revision" : "sheet",
+        revisionSessionId: sessionId ?? null,
+        inheritedHintLevel: inherited,
+      })
+      .returning();
+    if (previous) await copyWorking(tx, previous.id, created.id);
+    return created;
+  });
 }
 
 /** Reveals the next hint (strictly in order) and records it. Returns the hint text. */

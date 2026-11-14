@@ -95,7 +95,7 @@ export async function removeWorkingFileAction(input: {
     .parse(input);
   try {
     const path = await removeDraftFile(user.id, fileId);
-    await deleteObject(path).catch(() => {});
+    if (path) await deleteObject(path).catch(() => {});
   } catch (error) {
     return friendly(error);
   }
