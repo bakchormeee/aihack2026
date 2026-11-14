@@ -65,7 +65,7 @@ async function setup(email: string, o: { target?: number; topicFilter?: "t1" | "
     await db.insert(marks).values({
       attemptId: a.id,
       basis: "ai",
-      score: outcome === "stuck" ? 0 : 50,
+      score: outcome === "stuck" ? 0 : outcome === "partial" ? 3 : 5,
       outcome,
       firstWrongStep: "step 2",
       feedback: "f",

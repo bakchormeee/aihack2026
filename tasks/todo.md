@@ -15,7 +15,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: checks; `npm test -- --coverage` keeps 100% on `src/lib/marking` and `src/lib/mastery`.
   - Files: `src/lib/domain.ts`, `src/lib/marking/rules.ts` (+ test), `src/lib/mastery/evidence.ts` (+ test), `src/lib/marking/labels.ts`, `src/lib/marking/math-check.ts` (+ test)
 
-- [ ] **P2: Migrations A and B, tested locally only** (S)
+- [x] **P2: Migrations A and B, tested locally only** (S)
   - Acceptance: A adds `arithmetic_slip`, `notation` and the `mistakes` column; B converts old-scale marks (only where `mistakes IS NULL`), recomputes outcomes and adds the 0–5 check. Both are tested on the in-memory database with sample old marks: boundary scores convert as specified, a new-style mark is left alone, the check rejects 6.
   - Verify: checks. **Neither migration is applied to Neon in this task.**
   - Files: `src/db/schema.ts`, `src/db/migrations/0001_*.sql`, `src/db/migrations/0002_*.sql` (+ meta), `src/db/migrations.test.ts`

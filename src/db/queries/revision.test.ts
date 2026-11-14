@@ -86,7 +86,7 @@ async function attempt(
     await db.insert(marks).values({
       attemptId: a.id,
       basis: "ai",
-      score: outcome === "full" ? 100 : outcome === "partial" ? 50 : 0,
+      score: outcome === "full" ? 5 : outcome === "partial" ? 3 : 0,
       outcome,
       feedback: "f",
       overallFeedback: "o",

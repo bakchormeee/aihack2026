@@ -57,7 +57,7 @@ async function mark(userId: string, questionId: string, createdAt = new Date()) 
   await db.insert(marks).values({
     attemptId: attempt.id,
     basis: "ai",
-    score: 95,
+    score: 5,
     outcome: "full",
     errorType: null,
     feedback: "f",

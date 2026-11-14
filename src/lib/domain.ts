@@ -48,3 +48,16 @@ export type HintLevel = 0 | 1 | 2 | 3;
 
 /** A background job in a waiting state for longer than this is shown as failed, with a retry. */
 export const STALE_JOB_MS = 3 * 60 * 1000;
+
+/** Where a mistake is in the student's working (SPEC-marking-v2.md). Box values are fractions 0-1 of the image. */
+export type MistakeLocation =
+  | { kind: "text" }
+  | {
+      kind: "image";
+      fileIndex: number;
+      box: { x: number; y: number; width: number; height: number };
+    }
+  | { kind: "pdf"; fileIndex: number; page: number };
+
+/** One mistake in a mark, in the order it occurs. `hint` says what to check, never the correction. */
+export type Mistake = { type: ErrorType; quote: string; hint: string; location: MistakeLocation };

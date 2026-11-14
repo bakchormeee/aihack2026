@@ -155,8 +155,8 @@ describe("getSheetHistory", () => {
       reveals: [1, 2],
       text: "first",
       marks: [
-        { score: 40, outcome: "partial", at: 5 },
-        { score: 95, outcome: "full", basis: "official", at: 50 },
+        { score: 2, outcome: "partial", at: 5 },
+        { score: 5, outcome: "full", basis: "official", at: 50 },
       ],
     });
     const a2 = await addAttempt(w.user.id, q1.id, {
@@ -164,7 +164,7 @@ describe("getSheetHistory", () => {
       seconds: 60,
       inherited: 0,
       files: [{ path: "u/x/a.png", mime: "image/png" }],
-      marks: [{ score: 100, outcome: "full", at: 25 }],
+      marks: [{ score: 5, outcome: "full", at: 25 }],
     });
     await addAttempt(w.user.id, q2.id, { startedAt: 30, submitted: false });
 
@@ -176,7 +176,7 @@ describe("getSheetHistory", () => {
     const first = history[0].attempts[0];
     expect(first.hintLevel).toBe(2);
     expect(first.secondsSpent).toBe(120);
-    expect(first.marks.map((m) => m.score)).toEqual([40, 95]);
+    expect(first.marks.map((m) => m.score)).toEqual([2, 5]);
     expect(first.current?.basis).toBe("official");
     expect(first.submission?.text).toBe("first");
     expect(history[0].attempts[1].submission?.files).toHaveLength(1);
@@ -216,7 +216,7 @@ describe("getSheetHistory", () => {
     const old = await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 1,
       reveals: [1, 2, 3],
-      marks: [{ score: 50, outcome: "partial", at: 3 }],
+      marks: [{ score: 3, outcome: "partial", at: 3 }],
     });
 
     const fresh = await startAttemptFor(w.user.id, w.qs[0].id, "fresh");
@@ -241,18 +241,18 @@ describe("getCourseSheetOverview", () => {
       startedAt: 1,
       seconds: 100,
       reveals: [1],
-      marks: [{ score: 40, outcome: "partial", at: 5 }],
+      marks: [{ score: 2, outcome: "partial", at: 5 }],
     });
     await addAttempt(w.user.id, q1.id, {
       startedAt: 10,
       seconds: 50,
       reveals: [1, 2],
-      marks: [{ score: 80, outcome: "partial", at: 15 }],
+      marks: [{ score: 4, outcome: "partial", at: 15 }],
     });
     await addAttempt(w.user.id, q2.id, {
       startedAt: 20,
       seconds: null,
-      marks: [{ score: 60, outcome: "partial", at: 25 }],
+      marks: [{ score: 3, outcome: "partial", at: 25 }],
     });
 
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
@@ -261,7 +261,7 @@ describe("getCourseSheetOverview", () => {
     expect(row.stats).toEqual({
       total: 3,
       submitted: 2,
-      averageScore: 70, // best per marked question: 80 and 60
+      averageScore: 4, // best per marked question: 4 and 3 (3.5 rounds up)
       hintsRevealed: 3,
       secondsSpent: 150,
       confirmed: false,
@@ -274,13 +274,13 @@ describe("getCourseSheetOverview", () => {
     await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 1,
       marks: [
-        { score: 95, outcome: "full", at: 5 },
-        { score: 30, outcome: "partial", basis: "official", at: 6 },
+        { score: 5, outcome: "full", at: 5 },
+        { score: 2, outcome: "partial", basis: "official", at: 6 },
       ],
     });
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
     expect(row.stats.confirmed).toBe(true);
-    expect(row.stats.averageScore).toBe(30);
+    expect(row.stats.averageScore).toBe(2);
     expect(row.heat.cells[0].outcome).toBe("partial");
   });
 
@@ -297,16 +297,16 @@ describe("getCourseSheetOverview", () => {
     await addAttempt(w.user.id, q.id, {
       startedAt: 1,
       reveals: [1, 2, 3],
-      marks: [{ score: 95, outcome: "full", at: 2 }],
+      marks: [{ score: 5, outcome: "full", at: 2 }],
     });
     await addAttempt(w.user.id, q.id, {
       startedAt: 5,
       reveals: [1],
-      marks: [{ score: 92, outcome: "full", at: 6 }],
+      marks: [{ score: 5, outcome: "full", at: 6 }],
     });
     await addAttempt(w.user.id, q.id, {
       startedAt: 9,
-      marks: [{ score: 10, outcome: "stuck", at: 10 }],
+      marks: [{ score: 1, outcome: "stuck", at: 10 }],
     });
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
     expect(row.heat.cells).toEqual([{ label: "1", outcome: "full", hintLevel: 1 }]);
@@ -317,7 +317,7 @@ describe("getCourseSheetOverview", () => {
     const other = await world("h-ovu-other@test.local");
     await addAttempt(other.user.id, w.qs[0].id, {
       startedAt: 1,
-      marks: [{ score: 90, outcome: "full", at: 2 }],
+      marks: [{ score: 5, outcome: "full", at: 2 }],
     });
     expect(await getCourseSheetOverview(other.user.id, w.course.id)).toEqual([]);
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
@@ -331,15 +331,15 @@ describe("listMistakes", () => {
     const [q1, q2, q3] = w.qs; // topics: Algebra, Calculus, Algebra
     await addAttempt(w.user.id, q1.id, {
       startedAt: 1,
-      marks: [{ score: 40, outcome: "partial", errorType: "method", feedback: "old", at: 2 }],
+      marks: [{ score: 2, outcome: "partial", errorType: "method", feedback: "old", at: 2 }],
     });
     await addAttempt(w.user.id, q2.id, {
       startedAt: 10,
-      marks: [{ score: 5, outcome: "stuck", errorType: "conceptual", feedback: "c", at: 11 }],
+      marks: [{ score: 0, outcome: "stuck", errorType: "conceptual", feedback: "c", at: 11 }],
     });
     await addAttempt(w.user.id, q3.id, {
       startedAt: 20,
-      marks: [{ score: 99, outcome: "full", errorType: null, at: 21 }],
+      marks: [{ score: 5, outcome: "full", errorType: null, at: 21 }],
     });
     // Unmarked attempt: not a mistake.
     await addAttempt(w.user.id, q3.id, { startedAt: 30, submitted: false });
@@ -363,8 +363,8 @@ describe("listMistakes", () => {
     const a = await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 40,
       marks: [
-        { score: 20, outcome: "stuck", at: 41 },
-        { score: 100, outcome: "full", basis: "official", at: 42 },
+        { score: 1, outcome: "stuck", at: 41 },
+        { score: 5, outcome: "full", basis: "official", at: 42 },
       ],
     });
     const { items } = await listMistakes(w.user.id, w.course.id, {});
@@ -409,7 +409,7 @@ describe("getSheetSummaryInput", () => {
     const w = await world("h-sum@test.local", ["1", "2", "3"]);
     await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 1,
-      marks: [{ score: 95, outcome: "full", at: 2 }],
+      marks: [{ score: 5, outcome: "full", at: 2 }],
     });
     await addAttempt(w.user.id, w.qs[1].id, { startedAt: 3, submitted: true }); // submitted, not marked
     const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
@@ -423,25 +423,23 @@ describe("getSheetSummaryInput", () => {
     await addAttempt(w.user.id, q1.id, {
       startedAt: 1,
       reveals: [1, 2, 3],
-      marks: [{ score: 95, outcome: "full", at: 2 }],
+      marks: [{ score: 5, outcome: "full", at: 2 }],
     });
     await addAttempt(w.user.id, q1.id, {
       startedAt: 10,
-      marks: [{ score: 95, outcome: "full", at: 11 }],
+      marks: [{ score: 5, outcome: "full", at: 11 }],
     });
     // q2: full with 2 hints
     await addAttempt(w.user.id, q2.id, {
       startedAt: 3,
       reveals: [1, 2],
-      marks: [{ score: 91, outcome: "full", at: 4 }],
+      marks: [{ score: 5, outcome: "full", at: 4 }],
     });
     // q3: partial (not solved)
     await addAttempt(w.user.id, q3.id, {
       startedAt: 5,
       reveals: [1],
-      marks: [
-        { score: 50, outcome: "partial", errorType: "algebra_slip", feedback: "slip", at: 6 },
-      ],
+      marks: [{ score: 3, outcome: "partial", errorType: "algebra_slip", feedback: "slip", at: 6 }],
     });
     // an unmarked later attempt does not replace the marked one
     await addAttempt(w.user.id, q3.id, { startedAt: 50, submitted: true });

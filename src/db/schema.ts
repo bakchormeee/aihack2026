@@ -34,6 +34,7 @@ import {
   SHEET_FILE_KINDS,
   SHEET_STATUSES,
   SOLUTIONS_STATUSES,
+  type Mistake,
 } from "@/lib/domain";
 
 const id = () =>
@@ -358,6 +359,8 @@ export const marks = pgTable(
     score: integer("score").notNull(),
     outcome: outcomeEnum("outcome").notNull(),
     errorType: errorTypeEnum("error_type"),
+    // Every mistake, boxed on the mark screen (Marking v2). Null only for marks made before it.
+    mistakes: jsonb("mistakes").$type<Mistake[]>(),
     firstWrongStep: text("first_wrong_step"),
     // Feedback anchored to the first wrong step.
     feedback: text("feedback").notNull(),
