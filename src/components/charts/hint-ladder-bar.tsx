@@ -25,7 +25,7 @@ export function HintLadderBar({ counts }: { counts: HintCounts }) {
   clean.forEach((n, i) => (datum[`l${i}`] = n));
 
   return (
-    <figure className="w-full">
+    <figure className="w-full min-w-0">
       <div
         role="img"
         aria-label={`Questions solved by hint level: ${clean

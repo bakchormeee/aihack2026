@@ -66,7 +66,7 @@ export function SkillMap({ nodes, links, hrefForTopic }: SkillMapProps) {
   };
 
   return (
-    <figure className="w-full">
+    <figure className="w-full min-w-0">
       <div ref={wrapRef} className="w-full">
         <svg
           width={width}

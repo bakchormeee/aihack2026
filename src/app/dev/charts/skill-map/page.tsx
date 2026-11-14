@@ -50,7 +50,7 @@ export default function SkillMapDevPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-3xl space-y-10 p-4">
+    <main className="mx-auto w-full min-w-0 max-w-3xl space-y-10 p-4">
       <h1 className="text-xl font-semibold">SkillMap</h1>
       {cases.map(([title, nodes, links]) => (
         <section key={title} className="space-y-2">

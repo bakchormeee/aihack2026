@@ -8,7 +8,7 @@ export default function HintRungsDevPage() {
   if (process.env.NODE_ENV === "production") notFound();
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 p-4">
+    <main className="mx-auto w-full min-w-0 max-w-2xl space-y-8 p-4">
       <h1 className="text-xl font-semibold">HintRungs and HintLadderBar</h1>
       <section className="space-y-3">
         <h2 className="font-medium">HintRungs</h2>
