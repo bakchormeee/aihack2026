@@ -200,7 +200,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/sheets/[sheetId]/edit/actions.ts` (+ test), `src/components/question-editor.tsx`
   - Depends on: M5
 
-- [ ] **M6: Question screen with ordered hints** (M) — SC 6
+- [x] **M6: Question screen with ordered hints** (M) — SC 6
   - Acceptance:
     - `openAttempt`, `startAttempt` and `revealNextHint` match C4; `openAttempt` is called from the browser after the page loads, never during rendering, and is idempotent.
     - The page shows the question, previous/next links from `getNextHref` and its sheet counterpart, `<HintRungs>`, and the hints revealed so far; hint text for unrevealed levels is never in the page data.

@@ -221,7 +221,7 @@ getVisibleSolution(userId: string, questionId: string, o?: { reviewMode?: boolea
   Promise<{ basis: MarkBasis; body: string } | null>
 
 // src/lib/navigation.ts
-getNextHref(i: { questionId: string; sessionId?: string }): Promise<string>
+getNextHref(i: { userId: string; questionId: string; sessionId?: string }): Promise<string>
 ```
 
 The question and mark pages read an optional `?session=<id>` query
