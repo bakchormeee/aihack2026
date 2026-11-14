@@ -261,7 +261,7 @@ describe("getCourseSheetOverview", () => {
     expect(row.stats).toEqual({
       total: 3,
       submitted: 2,
-      averageScore: 4, // best per marked question: 4 and 3 (3.5 rounds up)
+      averageScore: 3.5, // best per marked question: 4 and 3, to one decimal place
       hintsRevealed: 3,
       secondsSpent: 150,
       confirmed: false,
@@ -282,6 +282,20 @@ describe("getCourseSheetOverview", () => {
     expect(row.stats.confirmed).toBe(true);
     expect(row.stats.averageScore).toBe(2);
     expect(row.heat.cells[0].outcome).toBe("partial");
+  });
+
+  it("rounds the average to one decimal place", async () => {
+    const w = await world("h-dec@test.local", ["1", "2", "3"]);
+    for (const [index, score] of [3, 3, 4].entries()) {
+      await addAttempt(w.user.id, w.qs[index].id, {
+        startedAt: 1,
+        marks: [{ score, outcome: score === 4 ? "full" : "partial", at: 5 }],
+      });
+    }
+
+    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
+
+    expect(row.stats.averageScore).toBe(3.3); // 10 / 3 = 3.33...
   });
 
   it("has no average for an unmarked sheet", async () => {

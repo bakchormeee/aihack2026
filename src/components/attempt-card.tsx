@@ -85,7 +85,7 @@ export function AttemptCard({ attempt, number }: { attempt: AttemptRecord; numbe
             <li key={mark.id} className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={OUTCOME_VARIANT[mark.outcome]}>{OUTCOME_LABEL[mark.outcome]}</Badge>
-                <span>{mark.score}%</span>
+                <span>{mark.score}/5</span>
                 <Badge variant="outline">
                   {mark.basis === "official" ? "Official solution" : "AI mark"}
                   {mark.isDispute ? ", disputed" : ""}

@@ -148,11 +148,11 @@ async function ReviewCard({ item, userId }: { item: ReviewItem; userId: string }
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="font-semibold">Question {item.question.label}</h3>
         <Badge variant={item.mark.outcome === "full" ? "default" : "secondary"}>
-          {OUTCOME_LABEL[item.mark.outcome]} · {item.mark.score}/100
+          {OUTCOME_LABEL[item.mark.outcome]} · {item.mark.score}/5
         </Badge>
         {item.mark.outcomeChanged && item.earlierAi ? (
           <span className="text-muted-foreground text-xs">
-            Was {OUTCOME_LABEL[item.earlierAi.outcome]} ({item.earlierAi.score}/100) when marked
+            Was {OUTCOME_LABEL[item.earlierAi.outcome]} ({item.earlierAi.score}/5) when marked
             without the official solutions
           </span>
         ) : null}

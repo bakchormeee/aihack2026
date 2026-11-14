@@ -221,7 +221,7 @@ export function sheetStats(records: QuestionRecord[]): SheetStats {
     total: records.length,
     submitted,
     averageScore: scores.length
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
       : null,
     hintsRevealed,
     secondsSpent,

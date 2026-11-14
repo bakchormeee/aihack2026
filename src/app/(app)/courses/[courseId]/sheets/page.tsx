@@ -55,7 +55,7 @@ export default async function SheetsPage({ params }: PageProps<"/courses/[course
                       <Stat label="Submitted" value={`${stats.submitted} / ${stats.total}`} />
                       <Stat
                         label="Average score"
-                        value={stats.averageScore === null ? "–" : `${stats.averageScore}%`}
+                        value={stats.averageScore === null ? "–" : `${stats.averageScore}/5`}
                       />
                       <Stat label="Hints used" value={String(stats.hintsRevealed)} />
                       <Stat label="Time" value={formatDuration(stats.secondsSpent)} />

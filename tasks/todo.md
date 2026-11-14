@@ -50,7 +50,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
 
 ## Phase 3: Everything else (1 h 15 min)
 
-- [ ] **P7: Scores out of 5 everywhere else** (M)
+- [x] **P7: Scores out of 5 everywhere else** (M)
   - Acceptance: solutions review, attempt cards and the sheet list show /5; averages to one decimal ("3.4/5"); the review's ordering still works.
   - Verify: checks with the history, marking and summary tests updated to the new scale.
   - Files: `src/app/(app)/sheets/[sheetId]/solutions/page.tsx`, `src/components/attempt-card.tsx`, `src/db/queries/history.ts` (+ test), `src/db/queries/marking.ts` (+ test)
