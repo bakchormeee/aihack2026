@@ -17,7 +17,7 @@ import {
   topics,
 } from "@/db/schema";
 import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
-import type { ErrorType } from "@/lib/domain";
+import { STALE_JOB_MS, type ErrorType } from "@/lib/domain";
 import { currentMark } from "@/lib/marking/rules";
 import { timesSeen } from "@/lib/spot/rules";
 
@@ -171,4 +171,29 @@ export async function getMisconceptionJob(userId: string, courseId: string) {
     .from(misconceptionJobs)
     .where(and(eq(misconceptionJobs.userId, userId), eq(misconceptionJobs.courseId, courseId)));
   return job ?? null;
+}
+
+/** After a failed run, the next visit waits this long before trying again. */
+const RETRY_AFTER_FAILURE_MS = 2 * 60 * 1000;
+
+/**
+ * What the Revise page needs for a course: the misconceptions it may show (visible and
+ * still counting), whether the list is being brought up to date, and whether this visit
+ * should start that job (unread marks, and no live run or very recent failure).
+ */
+export async function getCourseMisconceptionState(userId: string, courseId: string) {
+  const [all, unread, job] = await Promise.all([
+    listMisconceptions(userId, courseId),
+    findUnreadMarks(userId, courseId),
+    getMisconceptionJob(userId, courseId),
+  ]);
+  const age = job ? Date.now() - job.statusUpdatedAt.getTime() : Infinity;
+  const running = job?.status === "building" && age < STALE_JOB_MS;
+  const failedJustNow = job?.status === "failed" && age < RETRY_AFTER_FAILURE_MS;
+  const shouldStart = unread.length > 0 && !running && !failedJustNow;
+  return {
+    visible: all.filter((m) => !m.hidden && m.timesSeen >= 1),
+    updating: running || shouldStart,
+    shouldStart,
+  };
 }

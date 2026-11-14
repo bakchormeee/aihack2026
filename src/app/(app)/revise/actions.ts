@@ -10,6 +10,7 @@ import {
   NoCandidatesError,
   requeueRevisionSession,
 } from "@/db/queries/revision";
+import { hideMisconception } from "@/db/queries/misconceptions";
 import { NotFoundError } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { buildRevisionSession } from "@/lib/pipeline/revision";
@@ -57,4 +58,15 @@ export async function retryRevisionAction(sessionId: string): Promise<void> {
     after(() => buildRevisionSession(sessionId));
   }
   revalidatePath(`/revise/${sessionId}`);
+}
+
+/** "Not me": hides a misconception so it is never planted or shown again. */
+export async function hideMisconceptionAction(misconceptionId: string): Promise<void> {
+  const user = await requireUser();
+  try {
+    await hideMisconception(user.id, misconceptionId);
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error;
+  }
+  revalidatePath("/revise");
 }

@@ -30,7 +30,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
   - Verify: checks; integration tests (first build from old and new marks, a dispute superseding a mark lowers times seen, hidden stays hidden, two runs at once); real-API grouping of your own mistakes read-only from Neon, printed for you to review.
   - Files: `src/lib/ai/group-misconceptions.ts` (+ test, fixtures), `src/lib/pipeline/misconceptions.ts` (+ test), `src/db/queries/misconceptions.ts` (+ test), `src/lib/pipeline/mark.ts`
 
-- [ ] **S4: Revise page: mode switch, common-errors list, "Not me"** (M)
+- [x] **S4: Revise page: mode switch, common-errors list, "Not me"** (M)
   - Acceptance: the page offers Long-form (unchanged) and Spot the error; spot mode shows optional topics, 5/10/15 questions and the course's list (sentence, times seen, last seen, one rendered example quote, "Not me"); with nothing to plant it explains why and disables start; opening the page starts a refresh when the course has unread marks and says the list is being updated.
   - Verify: checks; browser check on a local database at desktop and 375 px.
   - Files: `src/app/(app)/revise/page.tsx`, `src/components/revision-form.tsx`, `src/components/common-errors.tsx`, `src/app/(app)/revise/actions.ts`
