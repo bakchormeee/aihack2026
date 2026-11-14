@@ -11,7 +11,7 @@ import {
 // One signed-in student works through the parts of the app that the core-loop
 // test does not reach. The tests run in order and share the data of the ones
 // before them (a course, a sheet, a marked attempt, ...). AI answers come from
-// tests/fixtures/ai, so every mark is 60/100 (partly right).
+// tests/fixtures/ai, so every mark is 3/5 (partly right).
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
@@ -58,7 +58,7 @@ test("a mark can be disputed twice, keeping every earlier mark, and then no more
   questionUrl = page.url();
   await submitTypedWorking(page, "Integrating by parts, the integral is $-2$.");
   await page.getByRole("link", { name: "See the mark" }).click();
-  await expect(page.getByText("60/100")).toBeVisible();
+  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
   markUrl = page.url();
 
   const dispute = page.getByRole("button", { name: "I think this is right" });
@@ -77,7 +77,7 @@ test("a mark can be disputed twice, keeping every earlier mark, and then no more
   // The limit is enforced: no way to ask a third time.
   await expect(page.getByRole("button", { name: "I think this is right" })).toHaveCount(0);
   // Three marks are kept in the history of the attempt (the first and two disputes).
-  await expect(page.getByText(/60\/100 · Partly right/)).toHaveCount(3);
+  await expect(page.getByText(/3\/5 · Partly right/)).toHaveCount(3);
 });
 
 test("uploading the official solutions re-marks the answers and shows the review", async () => {
@@ -118,7 +118,7 @@ test("history lists the attempts and the hand-in export downloads a PDF", async 
   // The hand-in carries the student's working only: no marks, hints or feedback text.
   // (Typed working is drawn as an image, so any text in the file would be added by the export itself.)
   const raw = bytes.toString("latin1");
-  for (const forbidden of ["AI-marked", "60/100", "Partly right", "Hint 1", "Nudge", "Feedback"]) {
+  for (const forbidden of ["AI-marked", "3/5", "Partly right", "Hint 1", "Nudge", "Feedback"]) {
     expect(raw, `the PDF must not contain "${forbidden}"`).not.toContain(forbidden);
   }
 });

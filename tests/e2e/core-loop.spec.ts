@@ -45,19 +45,39 @@ test("sign in, upload a sheet, use a hint, submit working and see the mark", asy
   await expect(page.getByText("Hint 2 · Approach")).toBeHidden();
 
   // Type some working and submit it.
-  await page.getByLabel(/Type it/).fill("Using the product rule, $(fg)' = f'g + fg'$.");
+  // The recorded mark quotes these two pieces, so they get boxes on the mark screen.
+  const working =
+    "By parts, $\\int_0^{\\pi} \\sin x \\, dx = \\big[ \\cos x \\big]_0^{\\pi}$, so the integral is $-2$.";
+  await page.getByLabel(/Type it/).fill(working);
   await page.getByRole("button", { name: "Submit working" }).click();
   await expect(page.getByText("Your working has been submitted.")).toBeVisible();
 
   // The mark arrives, labelled as provisional AI marking.
   await page.getByRole("link", { name: "See the mark" }).click();
   await expect(page.getByText("AI-marked, provisional")).toBeVisible();
-  await expect(page.getByText("60/100")).toBeVisible();
-  await expect(page.getByText("Partly right")).toBeVisible();
+  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("Partly right").first()).toBeVisible();
+
+  // The marking scheme is there, with the current score highlighted.
+  await page.getByText("How marks out of 5 work").click();
+  await expect(page.locator('[aria-current="true"]')).toContainText("Right approach");
+
+  // Each mistake is boxed in the working: red for structural, amber for a careless slip,
+  // numbered like the list, and the list carries a hint beside each.
+  await expect(page.locator("[data-mistake]")).toHaveCount(2);
+  await expect(page.locator('[data-mistake="1"]')).toHaveAttribute("data-severity", "careless");
+  await expect(page.locator('[data-mistake="2"]')).toHaveAttribute("data-severity", "structural");
+  await expect(page.getByText("Careless slip", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Structural mistake", { exact: false }).first()).toBeVisible();
 
   // A partial mark does not unlock the worked solution.
   await expect(page.getByRole("heading", { name: "Worked solution" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible();
+
+  // Retrying opens a new draft that starts from the previous working.
+  await page.getByRole("button", { name: "Retry now" }).click();
+  await expect(page).toHaveURL(/\/questions\/[^/]+$/);
+  await expect(page.getByLabel(/Type it/)).toHaveValue(working);
 });
 
 test("a signed-out visitor is sent to sign in", async ({ page }) => {

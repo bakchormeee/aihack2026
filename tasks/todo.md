@@ -60,7 +60,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: integration tests for all four rules.
   - Files: `src/db/queries/attempts.ts` (+ test), `src/db/queries/working.ts` (+ test), `src/app/(app)/questions/[questionId]/submit-actions.ts`
 
-- [ ] **P9: End-to-end tests on the new marking** (S)
+- [x] **P9: End-to-end tests on the new marking** (S)
   - Acceptance: both end-to-end specs pass with the new fixture; added checks: the mark shows /5 and the scheme, a typed mistake is boxed, a retry opens with the previous working.
   - Verify: `npm run e2e`; full checks; `npm run build`.
   - Files: `tests/e2e/core-loop.spec.ts`, `tests/e2e/full-flow.spec.ts`
