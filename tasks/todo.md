@@ -188,13 +188,13 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/lib/pipeline/hints.ts` (+ test), `src/lib/pipeline/parse.ts`, `app/sheets/[sheetId]/actions.ts`
   - Depends on: M3, A3
 
-- [ ] **M5: Edit a parsed question** (M) — SC 4 (edit, delete) — may run beside M6
+- [x] **M5: Edit a parsed question** (M) — SC 4 (edit, delete) — may run beside M6
   - Acceptance: on the Edit tab the student can change label and topics of any question; body can be changed and the question deleted only while it has no attempt; a body change reruns `runHints`; changes persist after reload.
   - Verify: integration test that a body edit and a delete are rejected once an attempt exists; manual edit.
   - Files: `app/sheets/[sheetId]/edit/page.tsx`, `app/sheets/[sheetId]/edit/actions.ts` (+ test), `src/components/question-editor.tsx`
   - Depends on: M4
 
-- [ ] **M5b: Merge and split questions** (S) — *cuttable 2* — SC 4 (merge, split)
+- [x] **M5b: Merge and split questions** (S) — *cuttable 2* — SC 4 (merge, split)
   - Acceptance: two adjacent unattempted questions merge into one; one unattempted question splits at a chosen point; positions are renumbered and hints regenerate.
   - Verify: integration test of both actions; manual check.
   - Files: `app/sheets/[sheetId]/edit/actions.ts` (+ test), `src/components/question-editor.tsx`
