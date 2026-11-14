@@ -22,10 +22,15 @@ function format(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-type Props = { attemptId: string | null; initialSeconds: number };
+type Props = {
+  attemptId: string | null;
+  initialSeconds: number;
+  /** Receives a function that saves the time right now. Call it before submitting. */
+  registerFlush?: (flush: () => Promise<void>) => void;
+};
 
 /** Counts the time on this question. Pauses by itself when the tab loses focus. */
-export function AttemptTimer({ attemptId, initialSeconds }: Props) {
+export function AttemptTimer({ attemptId, initialSeconds, registerFlush }: Props) {
   const timer = useRef<TimerState | null>(null);
   const [seconds, setSeconds] = useState(initialSeconds);
   const [paused, setPaused] = useState(false);
@@ -42,6 +47,12 @@ export function AttemptTimer({ attemptId, initialSeconds }: Props) {
       lastSaved = value;
       void saveSeconds({ attemptId, seconds: value }).catch(() => {});
     };
+    registerFlush?.(async () => {
+      const value = current();
+      if (value <= lastSaved) return;
+      lastSaved = value;
+      await saveSeconds({ attemptId, seconds: value }).catch(() => {});
+    });
     const refresh = () => {
       setSeconds(current());
       setPaused(timer.current?.runningSince === null);
@@ -73,7 +84,7 @@ export function AttemptTimer({ attemptId, initialSeconds }: Props) {
       window.removeEventListener("pagehide", save);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [attemptId, initialSeconds]);
+  }, [attemptId, initialSeconds, registerFlush]);
 
   function toggle() {
     if (!timer.current) return;

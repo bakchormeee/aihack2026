@@ -11,7 +11,7 @@ import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
 
-import { retryHintsAction, retryParseAction, setTimerAction } from "./actions";
+import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
 
 // The retry button starts the background parse again, which can run for a few minutes.
 export const maxDuration = 300;
@@ -94,6 +94,20 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
             <Button type="submit">Prepare the hints again</Button>
           </form>
         </div>
+      ) : null}
+
+      {questions.length > 0 ? (
+        <form
+          action={submitAllAction.bind(null, sheet.id)}
+          className="flex flex-wrap items-center gap-3"
+        >
+          <Button type="submit" variant="outline">
+            Submit all drafts
+          </Button>
+          <span className="text-muted-foreground text-sm">
+            Submits the working you have written or attached on any question but not yet submitted.
+          </span>
+        </form>
       ) : null}
 
       {questions.length > 0 ? (

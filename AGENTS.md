@@ -33,5 +33,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   opens its own dev server under its own hostname: the coordinator uses
   `http://127.0.0.1:3000` (allowed in `next.config.ts`), track agents use
   `http://localhost:<their port>`. Never sign in on another agent's hostname.
+  Uploads go straight from the browser to R2, whose CORS rule only allows
+  `http://localhost:3000` and `http://localhost:3003`; other origins fail with
+  "Failed to fetch" on upload (not a bug in the code).
 - Render any question, hint, solution or feedback text with `<MathText>`.
 - Before reporting a task done: `npm run lint`, `npm run typecheck`, `npm test`.

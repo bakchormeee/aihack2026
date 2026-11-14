@@ -1,15 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { AttemptTimer } from "@/components/attempt-timer";
 import { HintRungs } from "@/components/charts/hint-rungs";
 import { DifficultyRating } from "@/components/difficulty-rating";
+import { WorkingInput } from "@/components/working-input";
 import { MathText } from "@/components/math-text";
 import { Button } from "@/components/ui/button";
 import type { HintLevel } from "@/lib/domain";
-import { openAttempt, revealNextHint } from "@/app/(app)/questions/[questionId]/actions";
+import {
+  openAttempt,
+  revealNextHint,
+  startAttempt,
+} from "@/app/(app)/questions/[questionId]/actions";
+import type { WorkingFile } from "@/app/(app)/questions/[questionId]/submit-actions";
 
 const HINT_NAMES = ["Nudge", "Approach", "Skeleton"] as const;
 
@@ -26,6 +33,10 @@ type Props = {
   timerEnabled: boolean;
   initialSeconds: number;
   initialRating: number | null;
+  initialText: string;
+  initialFiles: WorkingFile[];
+  /** True when the newest attempt's working has been submitted. */
+  submitted: boolean;
   prevHref: string | null;
   nextHref: string | null;
   children?: React.ReactNode;
@@ -41,6 +52,9 @@ export function QuestionView({
   timerEnabled,
   initialSeconds,
   initialRating,
+  initialText,
+  initialFiles,
+  submitted,
   prevHref,
   nextHref,
   children,
@@ -50,6 +64,12 @@ export function QuestionView({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const opened = useRef(false);
+  const flushTimer = useRef<() => Promise<void>>(async () => {});
+  // A stable function, so the timer's effect does not restart on every render.
+  const registerFlush = useCallback((flush: () => Promise<void>) => {
+    flushTimer.current = flush;
+  }, []);
+  const router = useRouter();
 
   useEffect(() => {
     if (attemptId || opened.current) return;
@@ -61,6 +81,14 @@ export function QuestionView({
   }, [attemptId, questionId, sessionId]);
 
   const level = Math.min(3, shown.length) as HintLevel;
+
+  function startNewAttempt() {
+    setError(null);
+    startTransition(async () => {
+      await startAttempt({ questionId, mode: "fresh", sessionId });
+      router.refresh();
+    });
+  }
 
   function reveal() {
     if (!attemptId) return;
@@ -99,7 +127,7 @@ export function QuestionView({
           </ol>
         ) : null}
 
-        {level < 3 ? (
+        {level < 3 && !submitted ? (
           <div className="flex flex-wrap items-center gap-3">
             <Button
               type="button"
@@ -118,7 +146,9 @@ export function QuestionView({
             )}
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm">All three hints are showing.</p>
+          <p className="text-muted-foreground text-sm">
+            {submitted ? "Hints are locked once you submit." : "All three hints are showing."}
+          </p>
         )}
         {error ? (
           <p role="alert" className="text-destructive text-sm">
@@ -128,13 +158,54 @@ export function QuestionView({
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        {timerEnabled ? (
-          <AttemptTimer attemptId={attemptId} initialSeconds={initialSeconds} />
-        ) : (
+        {!timerEnabled ? (
           <span />
+        ) : submitted ? (
+          <span className="text-muted-foreground text-sm">
+            Time spent: {Math.floor(initialSeconds / 60)}:
+            {String(initialSeconds % 60).padStart(2, "0")}
+          </span>
+        ) : (
+          <AttemptTimer
+            attemptId={attemptId}
+            initialSeconds={initialSeconds}
+            registerFlush={registerFlush}
+          />
         )}
         <DifficultyRating attemptId={attemptId} initialRating={initialRating} />
       </div>
+
+      <WorkingInput
+        // A new attempt starts with an empty draft, so remount to drop the old text.
+        key={attemptId ?? "none"}
+        attemptId={attemptId}
+        initialText={initialText}
+        initialFiles={initialFiles}
+        submitted={submitted}
+        beforeSubmit={() => flushTimer.current()}
+        onSubmitted={() => router.refresh()}
+      />
+
+      {submitted ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
+          <span>Your working has been submitted.</span>
+          <Link
+            href={`/questions/${questionId}/mark?attempt=${attemptId}${sessionId ? `&session=${sessionId}` : ""}`}
+            className="underline"
+          >
+            See the mark
+          </Link>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={startNewAttempt}
+            disabled={pending}
+          >
+            Start a new attempt
+          </Button>
+        </div>
+      ) : null}
 
       {children}
 

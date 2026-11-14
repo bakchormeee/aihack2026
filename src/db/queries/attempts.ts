@@ -15,6 +15,13 @@ export class HintsNotReadyError extends Error {
   }
 }
 
+export class AttemptClosedError extends Error {
+  constructor() {
+    super("This attempt has already been submitted. Start a new attempt to use more hints.");
+    this.name = "AttemptClosedError";
+  }
+}
+
 export class NoMoreHintsError extends Error {
   constructor() {
     super("All three hints have been shown.");
@@ -170,6 +177,8 @@ export async function revealNextHintFor(
   attemptId: string,
 ): Promise<{ level: 1 | 2 | 3; body: string }> {
   const attempt = await requireAttempt(userId, attemptId);
+  // A submitted attempt's hint level is part of its record and must not change afterwards.
+  if (!(await isOpen(attemptId))) throw new AttemptClosedError();
   const next = (await currentHintLevel(attempt)) + 1;
   if (next > 3) throw new NoMoreHintsError();
 
@@ -281,4 +290,26 @@ export async function setDifficultyRating(
 
   await db.update(attempts).set({ difficultyRating: rating }).where(eq(attempts.id, attemptId));
   return true;
+}
+
+/** The newest attempt on a question, submitted or not, or null. */
+export async function getLatestAttemptFor(
+  userId: string,
+  questionId: string,
+  sessionId?: string,
+): Promise<Attempt | null> {
+  await requireQuestion(userId, questionId);
+  const [latest] = await db
+    .select()
+    .from(attempts)
+    .where(
+      and(
+        eq(attempts.userId, userId),
+        eq(attempts.questionId, questionId),
+        sessionFilter(sessionId),
+      ),
+    )
+    .orderBy(desc(attempts.startedAt))
+    .limit(1);
+  return latest ?? null;
 }

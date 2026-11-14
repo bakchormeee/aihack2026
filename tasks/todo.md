@@ -215,7 +215,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/components/attempt-timer.tsx`, `src/lib/timer.ts` (+ test), `app/questions/[questionId]/timer-actions.ts`
   - Depends on: M6 (the page imports the component; M6's owner adds the one import when merging)
 
-- [ ] **M8: Attach and submit working** (M) — SC 7
+- [x] **M8: Attach and submit working** (M) — SC 7
   - Acceptance:
     - Working can be attached as up to 10 images, one PDF, or typed Markdown/LaTeX with a live `<MathText>` preview; it is saved as a draft submission on the attempt.
     - "Submit" sets `submitted_at`; a submitted submission can no longer be changed.

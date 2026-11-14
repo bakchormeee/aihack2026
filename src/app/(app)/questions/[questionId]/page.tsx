@@ -4,7 +4,8 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { QuestionView } from "@/components/question-view";
-import { findOpenAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
+import { getLatestAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
+import { getWorkingFor } from "@/db/queries/working";
 import { db } from "@/db";
 import { sheets } from "@/db/schema";
 import { orNotFound } from "@/lib/auth/guards";
@@ -26,7 +27,9 @@ export default async function QuestionPage({
 
   // The attempt is created by the browser (see QuestionView), never while rendering:
   // link prefetching would otherwise start attempts for questions nobody opened.
-  const attempt = await findOpenAttemptFor(user.id, questionId, sessionId);
+  // Once the newest attempt has been submitted, that attempt stays on screen.
+  const attempt = await getLatestAttemptFor(user.id, questionId, sessionId);
+  const working = attempt ? await getWorkingFor(user.id, attempt.id) : null;
   const visible = attempt ? await visibleHintsFor(user.id, attempt.id) : { level: 0, hints: [] };
   const query = sessionId ? `?session=${sessionId}` : "";
   const hintsReady = question.hintsStatus === "ready";
@@ -68,6 +71,9 @@ export default async function QuestionPage({
         timerEnabled={timerEnabled}
         initialSeconds={attempt?.secondsSpent ?? 0}
         initialRating={attempt?.difficultyRating ?? null}
+        initialText={working?.text ?? ""}
+        initialFiles={(working?.files ?? []).map((file) => ({ id: file.id, mime: file.mime }))}
+        submitted={working?.submittedAt != null}
         prevHref={neighbours.prevId ? `/questions/${neighbours.prevId}${query}` : null}
         nextHref={neighbours.nextId ? `/questions/${neighbours.nextId}${query}` : null}
       />

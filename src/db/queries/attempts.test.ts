@@ -15,7 +15,9 @@ import {
 import { NotFoundError } from "@/lib/auth/ownership";
 
 import {
+  getLatestAttemptFor,
   getSheetNeighbours,
+  AttemptClosedError,
   HintsNotReadyError,
   NoMoreHintsError,
   openAttemptFor,
@@ -161,6 +163,20 @@ describe("revealNextHintFor", () => {
     expect(
       await db.select().from(hintReveals).where(eq(hintReveals.attemptId, attempt.id)),
     ).toHaveLength(0);
+  });
+
+  it("refuses to reveal a hint on an attempt whose working was submitted", async () => {
+    const { user, question } = await setup("r-closed@test.local");
+    const attempt = await openAttemptFor(user.id, question.id);
+    await revealNextHintFor(user.id, attempt.id);
+    await db
+      .insert(submissions)
+      .values({ attemptId: attempt.id, text: "x", submittedAt: new Date() });
+
+    await expect(revealNextHintFor(user.id, attempt.id)).rejects.toBeInstanceOf(AttemptClosedError);
+    expect(
+      await db.select().from(hintReveals).where(eq(hintReveals.attemptId, attempt.id)),
+    ).toHaveLength(1);
   });
 
   it("refuses another user's attempt", async () => {
@@ -434,6 +450,37 @@ describe("setDifficultyRating", () => {
     const attempt = await openAttemptFor(owner.user.id, owner.question.id);
 
     await expect(setDifficultyRating(other.user.id, attempt.id, 3)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe("getLatestAttemptFor", () => {
+  it("is null when there is no attempt", async () => {
+    const { user, question } = await setup("l-none@test.local");
+
+    expect(await getLatestAttemptFor(user.id, question.id)).toBeNull();
+  });
+
+  it("returns the newest attempt even when it has been submitted", async () => {
+    const { user, question } = await setup("l-new@test.local");
+    const first = await openAttemptFor(user.id, question.id);
+    await db
+      .insert(submissions)
+      .values({ attemptId: first.id, text: "x", submittedAt: new Date() });
+
+    expect((await getLatestAttemptFor(user.id, question.id))?.id).toBe(first.id);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await startAttemptFor(user.id, question.id, "fresh");
+    expect((await getLatestAttemptFor(user.id, question.id))?.id).toBe(second.id);
+  });
+
+  it("refuses another user's question", async () => {
+    const owner = await setup("l-owner@test.local");
+    const other = await setup("l-other@test.local");
+
+    await expect(getLatestAttemptFor(other.user.id, owner.question.id)).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });
