@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { levelPercentages, rungStates, rungsLabel, sanitiseCounts, totalSolved } from "./hint-ladder";
+import {
+  levelPercentages,
+  rungStates,
+  rungsLabel,
+  sanitiseCounts,
+  totalSolved,
+} from "./hint-ladder";
 
 describe("hint ladder helpers", () => {
   it("fills rungs up to the revealed level", () => {
