@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
 
 import { retryRevisionAction } from "../actions";
+import { SpotSessionView } from "./spot-session";
 
 // The retry button builds the session again after the response, which can take minutes.
 export const maxDuration = 300;
@@ -19,6 +20,8 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
   const user = await requireUser();
   const { sessionId } = await params;
   const { session, items } = await orNotFound(getRevisionSession(user.id, sessionId));
+  if (session.mode === "spot_error")
+    return <SpotSessionView userId={user.id} sessionId={sessionId} />;
 
   const stuck = session.status === "building" && isStale(session.statusUpdatedAt);
   const building = session.status === "building" && !stuck;

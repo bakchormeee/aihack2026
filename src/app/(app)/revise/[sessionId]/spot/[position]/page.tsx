@@ -1,9 +1,16 @@
 import Link from "next/link";
 
 import { MathText } from "@/components/math-text";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { buttonVariants } from "@/components/ui/button";
 import { SpotAnswerForm } from "@/components/spot-answer-form";
-import { OUTCOME_LABEL } from "@/lib/marking/labels";
-import { loadSpotItem, startSpotAnswer } from "@/db/queries/spot";
+import { SpotReveal } from "@/components/spot-reveal";
+import {
+  getSpotSession,
+  loadSpotItem,
+  misconceptionDescriptions,
+  startSpotAnswer,
+} from "@/db/queries/spot";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireUser } from "@/lib/auth/session";
 
@@ -23,6 +30,12 @@ export default async function SpotQuestionPage({
   if (!answer) await startSpotAnswer(user.id, item.id);
   const answered = answer?.answeredAt !== null && answer?.answeredAt !== undefined;
   const sessionHref = `/revise/${session.id}`;
+  // The planted errors and their corrections are only sent to the browser once answered.
+  const descriptions = answered
+    ? await misconceptionDescriptions(item.planted.map((p) => p.misconceptionId))
+    : new Map<string, string>();
+  const count = answered ? (await getSpotSession(user.id, session.id)).items.length : 0;
+  const nextHref = item.position < count ? `${sessionHref}/spot/${item.position + 1}` : sessionHref;
 
   return (
     <section className="flex flex-col gap-4">
@@ -39,9 +52,29 @@ export default async function SpotQuestionPage({
         <MathText className="text-sm">{item.body}</MathText>
       </div>
 
-      {answered ? (
-        <p className="text-sm" role="status">
-          {answer?.outcome ? OUTCOME_LABEL[answer.outcome] : "Checking your answer…"}
+      {answered && answer && answer.outcome ? (
+        <>
+          <SpotReveal
+            lines={item.lines}
+            planted={item.planted.map((p) => ({
+              line: p.line,
+              whatsWrong: p.whatsWrong,
+              correctLine: p.correctLine,
+              misconception: descriptions.get(p.misconceptionId) ?? "",
+            }))}
+            ticked={answer.ticked}
+            judgements={answer.judgements}
+            noError={answer.noError}
+            outcome={answer.outcome}
+          />
+          <Link href={nextHref} className={buttonVariants({ className: "self-start" })}>
+            {item.position < count ? "Next question" : "Finish"}
+          </Link>
+        </>
+      ) : answered ? (
+        <p className="text-muted-foreground text-sm" role="status">
+          Checking your answer…
+          <AutoRefresh active />
         </p>
       ) : (
         <SpotAnswerForm sessionId={session.id} position={item.position} lines={item.lines} />

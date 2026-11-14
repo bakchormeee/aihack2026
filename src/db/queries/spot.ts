@@ -5,10 +5,10 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { listMisconceptions } from "@/db/queries/misconceptions";
 import { NoCandidatesError } from "@/db/queries/revision";
-import { revisionSessions, spotAnswers, spotItems, topics } from "@/db/schema";
+import { misconceptions, revisionSessions, spotAnswers, spotItems, topics } from "@/db/schema";
 import { NotFoundError, requireCourse, requireRevisionSession } from "@/lib/auth/ownership";
 import type { Outcome, SpotJudgement, SpotTick } from "@/lib/domain";
-import { rankMisconceptions } from "@/lib/spot/rules";
+import { missedMisconceptions, rankMisconceptions } from "@/lib/spot/rules";
 
 /** The student's misconceptions as the ranking rules want them. */
 export async function rankedMisconceptionsFor(
@@ -119,4 +119,55 @@ export async function releaseSpotAnswer(itemId: string): Promise<void> {
     .update(spotAnswers)
     .set({ answeredAt: null, secondsSpent: null, noError: false, ticked: [], judgements: [] })
     .where(eq(spotAnswers.itemId, itemId));
+}
+
+/** The descriptions of misconceptions, by id (hidden ones included: a planted one may be hidden later). */
+export async function misconceptionDescriptions(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ id: misconceptions.id, description: misconceptions.description })
+    .from(misconceptions)
+    .where(inArray(misconceptions.id, [...new Set(ids)]));
+  return new Map(rows.map((r) => [r.id, r.description]));
+}
+
+/**
+ * A spot-the-error session of the user's with its questions in order and how each was
+ * answered, and, once every question is answered, the common errors they missed.
+ */
+export async function getSpotSession(userId: string, sessionId: string) {
+  const session = await requireRevisionSession(userId, sessionId);
+  if (session.mode !== "spot_error") throw new NotFoundError();
+  const rows = await db
+    .select({ item: spotItems, answer: spotAnswers })
+    .from(spotItems)
+    .leftJoin(spotAnswers, eq(spotAnswers.itemId, spotItems.id))
+    .where(eq(spotItems.sessionId, sessionId))
+    .orderBy(spotItems.position);
+
+  const items = rows.map(({ item, answer }) => ({
+    position: item.position,
+    answered: answer?.answeredAt != null,
+    outcome: answer?.outcome ?? null,
+  }));
+
+  const missedIds = rows.flatMap(({ item, answer }) =>
+    answer?.answeredAt != null
+      ? missedMisconceptions(
+          item.planted,
+          answer.ticked.map((t) => t.line),
+          Object.fromEntries(answer.judgements.map((j) => [j.line, j.right])),
+        )
+      : [],
+  );
+  const descriptions = await misconceptionDescriptions(missedIds);
+  const counts = { full: 0, partial: 0, stuck: 0 };
+  for (const item of items) if (item.outcome) counts[item.outcome]++;
+  return {
+    session,
+    items,
+    done: items.length > 0 && items.every((i) => i.answered),
+    counts,
+    missed: [...new Set(missedIds)].map((id) => descriptions.get(id)!).filter(Boolean),
+  };
 }

@@ -141,3 +141,14 @@ export function checkAnswer(
   }
   return null;
 }
+
+/** The misconceptions of planted errors the student did not find and explain correctly. */
+export function missedMisconceptions(
+  planted: { line: number; misconceptionId: string }[],
+  ticked: number[],
+  explained: Record<number, boolean>,
+): string[] {
+  return planted
+    .filter((p) => !(ticked.includes(p.line) && explained[p.line] === true))
+    .map((p) => p.misconceptionId);
+}

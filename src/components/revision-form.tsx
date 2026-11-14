@@ -7,7 +7,11 @@ import { Label } from "@/components/ui/label";
 import { CommonErrors, type CommonError } from "@/components/common-errors";
 import { rankMisconceptions } from "@/lib/spot/rules";
 import { SPOT_QUESTION_COUNTS, type SessionMode } from "@/lib/domain";
-import { hideMisconceptionAction, startRevisionAction } from "@/app/(app)/revise/actions";
+import {
+  hideMisconceptionAction,
+  startRevisionAction,
+  startSpotSessionAction,
+} from "@/app/(app)/revise/actions";
 
 type CourseOption = {
   id: string;
@@ -58,7 +62,10 @@ export function RevisionForm({
   function submit() {
     setError(null);
     startTransition(async () => {
-      const result = await startRevisionAction({ courseId, targetMinutes: minutes, topicIds });
+      const result =
+        mode === "spot_error"
+          ? await startSpotSessionAction({ courseId, questionCount: count, topicIds })
+          : await startRevisionAction({ courseId, targetMinutes: minutes, topicIds });
       if (result?.error) setError(result.error);
     });
   }

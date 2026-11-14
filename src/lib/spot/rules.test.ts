@@ -5,6 +5,7 @@ import {
   checkAnswer,
   dealQuestions,
   judgeLines,
+  missedMisconceptions,
   rankMisconceptions,
   spotOutcome,
   timesSeen,
@@ -245,5 +246,23 @@ describe("checkAnswer", () => {
     expect(
       checkAnswer(5, { noError: false, ticked: [tick(2, "x".repeat(MAX_EXPLANATION + 1))] }),
     ).toMatch(/500/);
+  });
+});
+
+describe("missedMisconceptions", () => {
+  const planted = [
+    { line: 2, misconceptionId: "mA" },
+    { line: 4, misconceptionId: "mB" },
+  ];
+
+  it("lists the misconceptions of planted lines that were not found and explained right", () => {
+    expect(missedMisconceptions(planted, [2], { 2: true })).toEqual(["mB"]); // 4 not ticked
+    expect(missedMisconceptions(planted, [2, 4], { 2: true, 4: false })).toEqual(["mB"]); // 4 explained wrong
+    expect(missedMisconceptions(planted, [], {})).toEqual(["mA", "mB"]);
+  });
+
+  it("lists nothing when every planted error was found and explained right", () => {
+    expect(missedMisconceptions(planted, [2, 4], { 2: true, 4: true })).toEqual([]);
+    expect(missedMisconceptions([], [], {})).toEqual([]);
   });
 });

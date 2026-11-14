@@ -50,7 +50,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
   - Verify: checks; integration tests for the save and the one-answer rule; real-API judging of a right, a wrong and a reworded explanation.
   - Files: `src/lib/ai/judge-spot-answer.ts` (+ test, fixtures), `src/db/queries/spot.ts` (+ test), `src/app/(app)/revise/[sessionId]/spot/[position]/page.tsx`, `src/components/spot-answer-form.tsx`
 
-- [ ] **S7: Reveal and session summary** (S)
+- [x] **S7: Reveal and session summary** (S)
   - Acceptance: after answering, each planted error shows its line highlighted, what is wrong, the correct line and "Based on your common error: …"; wrongly ticked lines say "this line was correct"; each explanation shows the AI's verdict; "Next" moves on; the session page for a spot session lists its questions with outcomes and ends with a summary (counts and missed misconceptions); a long-form session page is unchanged.
   - Verify: checks; browser check at desktop and 375 px.
   - Files: `src/components/spot-reveal.tsx`, `src/app/(app)/revise/[sessionId]/page.tsx`, the spot question page
