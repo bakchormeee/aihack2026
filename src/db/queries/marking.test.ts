@@ -15,7 +15,12 @@ import {
 } from "@/db/schema";
 import { NotFoundError } from "@/lib/auth/ownership";
 
-import { getMarkScreenData, getVisibleSolution } from "./marking";
+import {
+  getMarkScreenData,
+  getRemarkProgress,
+  getSolutionsReview,
+  getVisibleSolution,
+} from "./marking";
 
 async function setup(email: string) {
   const [user] = await db.insert(users).values({ email }).returning();
@@ -284,5 +289,120 @@ describe("getVisibleSolution", () => {
       .values(mark(attempt.id, { score: 100, outcome: "full", errorType: null }));
 
     expect(await getVisibleSolution(user.id, question.id)).toBeNull();
+  });
+});
+
+describe("getSolutionsReview", () => {
+  async function sheetWith(email: string, n: number) {
+    const base = await setup(email);
+    const qs = [base.question];
+    for (let i = 2; i <= n; i++) {
+      const [q] = await db
+        .insert(questions)
+        .values({
+          courseId: base.question.courseId,
+          sheetId: base.question.sheetId,
+          position: i,
+          label: String(i),
+          body: "Q",
+          expectedMinutes: 5,
+        })
+        .returning();
+      qs.push(q);
+    }
+    return { ...base, qs, sheetId: base.question.sheetId! };
+  }
+
+  async function attemptWith(userId: string, questionId: string, markRows: object[], text = "w") {
+    const [attempt] = await db
+      .insert(attempts)
+      .values({ userId, questionId, context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({ attemptId: attempt.id, text, submittedAt: new Date() });
+    const base = Date.now() - 100000;
+    for (const [i, row] of markRows.entries()) {
+      await db
+        .insert(marks)
+        .values(mark(attempt.id, { ...row, createdAt: new Date(base + i * 1000) }));
+    }
+    return attempt;
+  }
+
+  it("lists changed marks first, then questions whose best outcome is not full", async () => {
+    const { user, qs, sheetId } = await sheetWith("rv-order@test.local", 4);
+    // Q1: ai full, official full: nothing to review.
+    await attemptWith(user.id, qs[0].id, [
+      { score: 95, outcome: "full" },
+      { basis: "official", score: 95, outcome: "full" },
+    ]);
+    // Q2: ai partial, official partial: not full, not changed.
+    const a2 = await attemptWith(user.id, qs[1].id, [
+      { score: 60 },
+      { basis: "official", score: 50, outcome: "partial" },
+    ]);
+    // Q3: ai full, official stuck: changed (comes first although it is later in the sheet).
+    const a3 = await attemptWith(user.id, qs[2].id, [
+      { score: 95, outcome: "full" },
+      { basis: "official", score: 10, outcome: "stuck", outcomeChanged: true },
+    ]);
+    // Q4: unmarked by the official solutions yet, ai stuck.
+    const a4 = await attemptWith(user.id, qs[3].id, [{ score: 5, outcome: "stuck" }]);
+
+    const review = await getSolutionsReview(user.id, sheetId);
+
+    expect(review.changed.map((i) => i.attemptId)).toEqual([a3.id]);
+    expect(review.changed[0].earlierAi).toEqual({ score: 95, outcome: "full" });
+    expect(review.changed[0].mark.basis).toBe("official");
+    expect(review.notFull.map((i) => i.attemptId)).toEqual([a2.id, a4.id]);
+  });
+
+  it("uses the best attempt of a question and shows it once", async () => {
+    const { user, qs, sheetId } = await sheetWith("rv-best@test.local", 1);
+    await attemptWith(user.id, qs[0].id, [{ score: 30 }]);
+    const good = await attemptWith(user.id, qs[0].id, [{ score: 70 }]);
+
+    expect((await getSolutionsReview(user.id, sheetId)).notFull.map((i) => i.attemptId)).toEqual([
+      good.id,
+    ]);
+
+    await attemptWith(user.id, qs[0].id, [{ score: 95, outcome: "full" }]);
+    const after = await getSolutionsReview(user.id, sheetId);
+    expect(after.notFull).toEqual([]);
+  });
+
+  it("does not list a changed attempt a second time, and ignores drafts", async () => {
+    const { user, qs, sheetId } = await sheetWith("rv-dup@test.local", 1);
+    const changed = await attemptWith(user.id, qs[0].id, [
+      { score: 95, outcome: "full" },
+      { basis: "official", score: 10, outcome: "stuck", outcomeChanged: true },
+    ]);
+    const [draft] = await db
+      .insert(attempts)
+      .values({ userId: user.id, questionId: qs[0].id, context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({ attemptId: draft.id });
+
+    const review = await getSolutionsReview(user.id, sheetId);
+    expect(review.changed.map((i) => i.attemptId)).toEqual([changed.id]);
+    expect(review.notFull).toEqual([]);
+  });
+
+  it("is not found for another user's sheet", async () => {
+    const { sheetId } = await sheetWith("rv-own@test.local", 1);
+    const [other] = await db.insert(users).values({ email: "rv-other@test.local" }).returning();
+
+    await expect(getSolutionsReview(other.id, sheetId)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRemarkProgress(other.id, sheetId)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("counts progress of the official re-mark", async () => {
+    const { user, qs, sheetId } = await sheetWith("rv-progress@test.local", 2);
+    await db
+      .insert(solutions)
+      .values(qs.map((q) => ({ questionId: q.id, basis: "official" as const, body: "S" })));
+    await attemptWith(user.id, qs[0].id, [{ score: 60 }, { basis: "official", score: 60 }]);
+    await attemptWith(user.id, qs[1].id, [{ score: 60 }]);
+
+    expect(await getRemarkProgress(user.id, sheetId)).toEqual({ total: 2, marked: 1 });
   });
 });

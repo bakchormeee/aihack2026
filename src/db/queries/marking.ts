@@ -13,8 +13,8 @@ import {
   submissionFiles,
   submissions,
 } from "@/db/schema";
-import { requireAttempt, requireQuestion } from "@/lib/auth/ownership";
-import type { HintLevel } from "@/lib/domain";
+import { requireAttempt, requireQuestion, requireSheet } from "@/lib/auth/ownership";
+import type { HintLevel, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark, isSolutionUnlocked } from "@/lib/marking/rules";
 
 export async function getMarkScreenData(userId: string, attemptId: string) {
@@ -110,4 +110,170 @@ export async function getVisibleSolution(
 
   const chosen = official ?? solutionRows.find((row) => row.basis === "ai");
   return chosen ? { basis: chosen.basis, body: chosen.body } : null;
+}
+
+export type ReviewItem = {
+  question: { id: string; label: string; body: string };
+  attemptId: string;
+  startedAt: Date;
+  text: string | null;
+  files: { id: string; mime: string }[];
+  /** The attempt's current mark (the official one once it exists). */
+  mark: { score: number; outcome: Outcome; basis: "ai" | "official"; outcomeChanged: boolean };
+  /** The latest AI mark, for comparison with an official one. */
+  earlierAi: { score: number; outcome: Outcome } | null;
+};
+
+const OUTCOME_RANK: Record<Outcome, number> = { stuck: 0, partial: 1, full: 2 };
+
+/**
+ * What the Solutions tab shows once the official solutions are in: first the
+ * attempts whose official outcome differs from the earlier AI outcome, then,
+ * for each remaining question, the best submitted attempt when its outcome is
+ * not full. Each list is in question order.
+ */
+export async function getSolutionsReview(
+  userId: string,
+  sheetId: string,
+): Promise<{ changed: ReviewItem[]; notFull: ReviewItem[] }> {
+  await requireSheet(userId, sheetId);
+  const sheetQuestions = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.sheetId, sheetId))
+    .orderBy(asc(questions.position));
+  if (sheetQuestions.length === 0) return { changed: [], notFull: [] };
+
+  const rows = await db
+    .select({ attempt: attempts, submission: submissions })
+    .from(attempts)
+    .innerJoin(submissions, eq(submissions.attemptId, attempts.id))
+    .where(
+      and(
+        eq(attempts.userId, userId),
+        inArray(
+          attempts.questionId,
+          sheetQuestions.map((q) => q.id),
+        ),
+        isNotNull(submissions.submittedAt),
+      ),
+    );
+  if (rows.length === 0) return { changed: [], notFull: [] };
+
+  const [allMarks, allFiles] = await Promise.all([
+    db
+      .select()
+      .from(marks)
+      .where(
+        inArray(
+          marks.attemptId,
+          rows.map((r) => r.attempt.id),
+        ),
+      ),
+    db
+      .select()
+      .from(submissionFiles)
+      .where(
+        inArray(
+          submissionFiles.submissionId,
+          rows.map((r) => r.submission.id),
+        ),
+      )
+      .orderBy(asc(submissionFiles.position)),
+  ]);
+
+  const items = rows.flatMap(({ attempt, submission }): ReviewItem[] => {
+    const own = allMarks.filter((m) => m.attemptId === attempt.id);
+    const current = currentMark(own);
+    const question = sheetQuestions.find((q) => q.id === attempt.questionId);
+    if (!current || !question) return [];
+    const ai = currentMark(own.filter((m) => m.basis === "ai"));
+    return [
+      {
+        question: { id: question.id, label: question.label, body: question.body },
+        attemptId: attempt.id,
+        startedAt: attempt.startedAt,
+        text: submission.text,
+        files: allFiles
+          .filter((f) => f.submissionId === submission.id)
+          .map((f) => ({ id: f.id, mime: f.mime })),
+        mark: {
+          score: current.score,
+          outcome: current.outcome,
+          basis: current.basis,
+          outcomeChanged: current.basis === "official" && current.outcomeChanged,
+        },
+        earlierAi: ai ? { score: ai.score, outcome: ai.outcome } : null,
+      },
+    ];
+  });
+
+  const position = (item: ReviewItem) => sheetQuestions.findIndex((q) => q.id === item.question.id);
+  const byQuestion = (a: ReviewItem, b: ReviewItem) => position(a) - position(b);
+
+  const changed = items.filter((item) => item.mark.outcomeChanged).sort(byQuestion);
+  const shown = new Set(changed.map((item) => item.attemptId));
+
+  const notFull = sheetQuestions.flatMap((question) => {
+    const mine = items.filter((item) => item.question.id === question.id);
+    // The best attempt: highest outcome, then highest score, then the latest.
+    const best = mine.reduce<(typeof mine)[number] | null>((top, item) => {
+      if (!top) return item;
+      const diff =
+        OUTCOME_RANK[item.mark.outcome] - OUTCOME_RANK[top.mark.outcome] ||
+        item.mark.score - top.mark.score ||
+        item.startedAt.getTime() - top.startedAt.getTime();
+      return diff > 0 ? item : top;
+    }, null);
+    return best && best.mark.outcome !== "full" && !shown.has(best.attemptId) ? [best] : [];
+  });
+
+  return { changed, notFull };
+}
+
+/** How far the official re-mark has got: submitted attempts with an official solution, and how many already have an official mark from this upload. */
+export async function getRemarkProgress(
+  userId: string,
+  sheetId: string,
+): Promise<{ total: number; marked: number }> {
+  const sheet = await requireSheet(userId, sheetId);
+  const official = await db
+    .select({ id: solutions.questionId })
+    .from(solutions)
+    .innerJoin(questions, eq(solutions.questionId, questions.id))
+    .where(and(eq(questions.sheetId, sheetId), eq(solutions.basis, "official")));
+  if (official.length === 0) return { total: 0, marked: 0 };
+
+  const rows = await db
+    .select({ attemptId: attempts.id })
+    .from(attempts)
+    .innerJoin(submissions, eq(submissions.attemptId, attempts.id))
+    .where(
+      and(
+        eq(attempts.userId, userId),
+        inArray(
+          attempts.questionId,
+          official.map((o) => o.id),
+        ),
+        isNotNull(submissions.submittedAt),
+      ),
+    );
+  if (rows.length === 0) return { total: 0, marked: 0 };
+  const officialMarks = await db
+    .select({ attemptId: marks.attemptId, createdAt: marks.createdAt })
+    .from(marks)
+    .where(
+      and(
+        eq(marks.basis, "official"),
+        inArray(
+          marks.attemptId,
+          rows.map((r) => r.attemptId),
+        ),
+      ),
+    );
+  const since = sheet.solutionsUploadedAt;
+  const marked = new Set(
+    officialMarks.filter((m) => !since || m.createdAt >= since).map((m) => m.attemptId),
+  );
+  return { total: rows.length, marked: marked.size };
 }
