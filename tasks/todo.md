@@ -167,7 +167,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/courses/page.tsx`, `app/courses/actions.ts`, `src/db/queries/courses.ts` (+ test)
   - Depends on: F3, F4
 
-- [ ] **M2: Upload a sheet into a course** (S)
+- [x] **M2: Upload a sheet into a course** (S)
   - Acceptance: the Sheets tab has an upload form that requires a title; the confirm action verifies the stored keys, creates `sheet` (status `parsing`) and `sheet_file` rows, and redirects to the sheet overview; the tab lists the course's sheets with title and status.
   - Verify: manual upload of a PDF and of three images; a rejected oversize file shows a message.
   - Files: `app/courses/[courseId]/sheets/page.tsx`, `app/courses/[courseId]/sheets/actions.ts`, `src/db/queries/sheets.ts`
