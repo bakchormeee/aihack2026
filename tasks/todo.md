@@ -15,7 +15,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
   - Verify: checks; `npm test -- --coverage` with `src/lib/spot` added to the 100% folders.
   - Files: `src/lib/spot/rules.ts` (+ test), `src/lib/domain.ts`, `src/lib/mastery/evidence.ts` (+ test), `vitest.config.mts`
 
-- [ ] **S2: Migration C, tested locally only** (S)
+- [x] **S2: Migration C, tested locally only** (S)
   - Acceptance: adds `misconception`, `misconception_source`, `misconception_mark`, `misconception_job`, `spot_item`, `spot_answer`; adds `mode` (default `long_form`) and `question_count` to `revision_session`; makes `target_minutes` nullable. Tested on the in-memory database: existing sessions read as long-form; a spot session saves without minutes; deleting a session deletes its spot items and answers.
   - Verify: checks. **Not applied to Neon in this task.**
   - Files: `src/db/schema.ts`, `src/db/migrations/0003_*.sql` (+ meta), `src/db/migrations.test.ts`

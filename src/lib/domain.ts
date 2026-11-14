@@ -65,3 +65,15 @@ export type MistakeLocation =
 
 /** One mistake in a mark, in the order it occurs. `hint` says what to check, never the correction. */
 export type Mistake = { type: ErrorType; quote: string; hint: string; location: MistakeLocation };
+
+/** One error planted in a flawed solution (SPEC-spot-the-error.md). Lines are numbered from 1. */
+export type PlantedError = {
+  line: number;
+  misconceptionId: string;
+  whatsWrong: string;
+  correctLine: string;
+};
+/** A line the student ticked, with their explanation of what is wrong. */
+export type SpotTick = { line: number; explanation: string };
+/** The AI's verdict on the explanation of one ticked planted line. */
+export type SpotJudgement = { line: number; right: boolean; comment: string };

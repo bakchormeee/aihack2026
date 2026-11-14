@@ -30,11 +30,15 @@ import {
   OUTCOMES,
   QUESTION_SOURCES,
   REVISION_ITEM_SOURCES,
+  SESSION_MODES,
   SESSION_STATUSES,
   SHEET_FILE_KINDS,
   SHEET_STATUSES,
   SOLUTIONS_STATUSES,
   type Mistake,
+  type PlantedError,
+  type SpotJudgement,
+  type SpotTick,
 } from "@/lib/domain";
 
 const id = () =>
@@ -52,6 +56,7 @@ export const sheetStatusEnum = pgEnum("sheet_status", SHEET_STATUSES);
 export const solutionsStatusEnum = pgEnum("solutions_status", SOLUTIONS_STATUSES);
 export const hintsStatusEnum = pgEnum("hints_status", HINTS_STATUSES);
 export const markStatusEnum = pgEnum("mark_status", MARK_STATUSES);
+export const sessionModeEnum = pgEnum("session_mode", SESSION_MODES);
 export const sessionStatusEnum = pgEnum("session_status", SESSION_STATUSES);
 export const sheetFileKindEnum = pgEnum("sheet_file_kind", SHEET_FILE_KINDS);
 export const questionSourceEnum = pgEnum("question_source", QUESTION_SOURCES);
@@ -257,7 +262,10 @@ export const revisionSessions = pgTable("revision_session", {
   courseId: text("course_id")
     .notNull()
     .references(() => courses.id, { onDelete: "cascade" }),
-  targetMinutes: integer("target_minutes").notNull(),
+  // Long-form sessions are sized in minutes, spot-the-error sessions in questions.
+  targetMinutes: integer("target_minutes"),
+  mode: sessionModeEnum("mode").notNull().default("long_form"),
+  questionCount: integer("question_count"),
   // Null means all topics of the course.
   topicIds: jsonb("topic_ids").$type<string[]>(),
   status: sessionStatusEnum("status").notNull().default("building"),
@@ -382,4 +390,114 @@ export const sheetSummaries = pgTable("sheet_summary", {
     .$type<{ wentWell: string[]; wasHard: string[]; nextSteps: string[] }>()
     .notNull(),
   generatedAt: createdAt("generated_at"),
+});
+
+// ── Common errors and spot-the-error (SPEC-spot-the-error.md) ──
+
+/** One recurring error of one student in one course, in words. Times seen is computed on read. */
+export const misconceptions = pgTable(
+  "misconception",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    errorType: errorTypeEnum("error_type").notNull(),
+    createdAt: createdAt(),
+    // "Not me": a hidden misconception is never planted or shown.
+    hiddenAt: instant("hidden_at"),
+  },
+  (t) => [index("misconception_course_idx").on(t.userId, t.courseId)],
+);
+
+/** A mistake placed in a misconception. Old marks have one source, at index 0, from the first wrong step. */
+export const misconceptionSources = pgTable(
+  "misconception_source",
+  {
+    misconceptionId: text("misconception_id")
+      .notNull()
+      .references(() => misconceptions.id, { onDelete: "cascade" }),
+    markId: text("mark_id")
+      .notNull()
+      .references(() => marks.id, { onDelete: "cascade" }),
+    mistakeIndex: integer("mistake_index").notNull(),
+    attemptId: text("attempt_id")
+      .notNull()
+      .references(() => attempts.id, { onDelete: "cascade" }),
+    topicIds: jsonb("topic_ids").$type<string[]>().notNull(),
+    quote: text("quote").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.markId, t.mistakeIndex] }),
+    index("misconception_source_misconception_idx").on(t.misconceptionId),
+  ],
+);
+
+/** Marks the grouping job has read, so it only sends new ones. */
+export const misconceptionMarks = pgTable("misconception_mark", {
+  markId: text("mark_id")
+    .primaryKey()
+    .references(() => marks.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  courseId: text("course_id")
+    .notNull()
+    .references(() => courses.id, { onDelete: "cascade" }),
+  processedAt: createdAt("processed_at"),
+});
+
+/** The claim on a course's grouping job: building while it runs, ready or failed after. */
+export const misconceptionJobs = pgTable(
+  "misconception_job",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    status: sessionStatusEnum("status").notNull().default("building"),
+    statusUpdatedAt: createdAt("status_updated_at"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.courseId] })],
+);
+
+/** A question of a spot-the-error session: a worked solution as numbered lines, with 0-2 planted errors. */
+export const spotItems = pgTable(
+  "spot_item",
+  {
+    id: id(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => revisionSessions.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    body: text("body").notNull(),
+    lines: jsonb("lines").$type<string[]>().notNull(),
+    planted: jsonb("planted").$type<PlantedError[]>().notNull(),
+    topicIds: jsonb("topic_ids").$type<string[]>().notNull(),
+    expectedMinutes: integer("expected_minutes").notNull().default(3),
+  },
+  (t) => [uniqueIndex("spot_item_session_position_unique").on(t.sessionId, t.position)],
+);
+
+/** The student's one answer to a spot-the-error question. `answeredAt` is null until they answer. */
+export const spotAnswers = pgTable("spot_answer", {
+  itemId: text("item_id")
+    .primaryKey()
+    .references(() => spotItems.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startedAt: createdAt("started_at"),
+  answeredAt: instant("answered_at"),
+  secondsSpent: integer("seconds_spent"),
+  noError: boolean("no_error").notNull().default(false),
+  ticked: jsonb("ticked").$type<SpotTick[]>().notNull().default([]),
+  judgements: jsonb("judgements").$type<SpotJudgement[]>().notNull().default([]),
+  outcome: outcomeEnum("outcome"),
 });
