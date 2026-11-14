@@ -154,6 +154,36 @@ describe("runMark (ai)", () => {
     });
   });
 
+  it("asks for the course's common errors to be refreshed after saving a mark, for this student and course", async () => {
+    const { attempt, submission } = await setup("m-refresh@test.local");
+    const refresh = vi.fn(async () => {});
+
+    await runMark({ submissionId: submission.id, basis: "ai" }, { ...okIo(), refresh });
+
+    const [row] = await db.select().from(attempts).where(eq(attempts.id, attempt.id));
+    const [q] = await db.select().from(questions).where(eq(questions.id, row.questionId));
+    expect(refresh).toHaveBeenCalledWith(row.userId, q.courseId);
+    expect(await marksOf(attempt.id)).toHaveLength(1);
+  });
+
+  it("keeps the mark and the done status when the refresh fails", async () => {
+    const { attempt, submission } = await setup("m-refresh-fail@test.local");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await runMark(
+      { submissionId: submission.id, basis: "ai" },
+      {
+        ...okIo(),
+        refresh: async () => {
+          throw new Error("grouping down");
+        },
+      },
+    );
+
+    expect(await marksOf(attempt.id)).toHaveLength(1);
+    expect(await statusOf(submission.id)).toBe("done");
+  });
+
   it("sends the question, the AI solution, the typed text and the photos to the marker", async () => {
     const { submission } = await setup("m-input@test.local", { files: 2 });
     const mark = vi.fn(async () => result());

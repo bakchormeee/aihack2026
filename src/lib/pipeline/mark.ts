@@ -11,9 +11,20 @@ import { STALE_JOB_MS, type MarkBasis } from "@/lib/domain";
 import { currentMark, outcomeFromScore } from "@/lib/marking/rules";
 import { getObjectBytes } from "@/lib/storage";
 
-export type MarkIo = { readFile: (key: string) => Promise<Buffer>; mark: typeof markAttempt };
+import { refreshMisconceptions } from "./misconceptions";
 
-const defaultIo: MarkIo = { readFile: getObjectBytes, mark: markAttempt };
+export type MarkIo = {
+  readFile: (key: string) => Promise<Buffer>;
+  mark: typeof markAttempt;
+  /** Brings the course's list of common errors up to date after a mark is saved. */
+  refresh?: (userId: string, courseId: string) => Promise<void>;
+};
+
+const defaultIo: MarkIo = {
+  readFile: getObjectBytes,
+  mark: markAttempt,
+  refresh: (userId, courseId) => refreshMisconceptions(userId, courseId),
+};
 
 export type MarkInput = { submissionId: string; basis: MarkBasis; disputeReason?: string };
 export type ClaimedMark = MarkInput & { submission: typeof submissions.$inferSelect };
@@ -124,6 +135,13 @@ export async function performMark(claim: ClaimedMark, io: MarkIo = defaultIo): P
         outcomeChanged: basis === "official" && before !== null && before.outcome !== outcome,
       });
     });
+
+    // The mark is saved; a failure here must not turn it into a failed marking.
+    try {
+      await io.refresh?.(attempt.userId, question.courseId);
+    } catch (error) {
+      console.error(`refreshing common errors after marking ${submissionId} failed`, error);
+    }
   } catch (error) {
     console.error(`marking submission ${submissionId} failed`, error);
     await db

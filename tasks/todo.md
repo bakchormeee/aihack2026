@@ -25,7 +25,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
 
 ## Phase 2: Common-errors memory (1 h 30 min)
 
-- [ ] **S3: Grouping mistakes into misconceptions, refreshed after each mark** (M)
+- [x] **S3: Grouping mistakes into misconceptions, refreshed after each mark** (M)
   - Acceptance: `groupMisconceptions` (schema, LaTeX check, one retry, fixtures) places numbered mistakes into existing or new misconceptions; `refreshMisconceptions` claims the course, sends only unread marks' mistakes (old marks as type + first wrong step), saves sources, marks them read, ignores unknown ids and numbers, never revives a hidden misconception, and is safe to run twice; `performMark` schedules it after saving a mark; `listMisconceptions` returns visible ones with times seen, topics, last seen and one example quote; `hideMisconception` refuses another user's.
   - Verify: checks; integration tests (first build from old and new marks, a dispute superseding a mark lowers times seen, hidden stays hidden, two runs at once); real-API grouping of your own mistakes read-only from Neon, printed for you to review.
   - Files: `src/lib/ai/group-misconceptions.ts` (+ test, fixtures), `src/lib/pipeline/misconceptions.ts` (+ test), `src/db/queries/misconceptions.ts` (+ test), `src/lib/pipeline/mark.ts`
