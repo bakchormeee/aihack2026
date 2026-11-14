@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { MarkingScheme, MistakeList } from "@/components/mistake-list";
+import { WorkingWithBoxes } from "@/components/working-with-boxes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SolutionPanel } from "@/components/solution-panel";
@@ -135,6 +136,17 @@ export default async function MarkPage({
                 : "AI-marked, provisional"}
             </span>
           </div>
+
+          {current.mistakes && current.mistakes.length > 0 && submission?.text?.trim() ? (
+            <div className="flex flex-col gap-2 rounded-lg border p-4">
+              <h2 className="text-base font-semibold">Your working</h2>
+              <p className="text-muted-foreground text-xs">
+                Red is a structural mistake, amber a careless slip. The numbers match the list
+                below.
+              </p>
+              <WorkingWithBoxes text={submission.text} mistakes={current.mistakes} />
+            </div>
+          ) : null}
 
           {current.mistakes && current.mistakes.length > 0 ? (
             <div className="flex flex-col gap-2">

@@ -35,7 +35,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: checks; browser check on a real mark.
   - Files: `src/app/(app)/questions/[questionId]/mark/page.tsx`, `src/components/mistake-list.tsx`
 
-- [ ] **P5: Boxes on typed working** (S)
+- [x] **P5: Boxes on typed working** (S)
   - Acceptance: the typed working is shown with each quote boxed red or amber and numbered to match the list; a quote not found in the text stays in the list only; maths in the working still renders.
   - Verify: unit tests for finding quotes (exact, extra spaces, not found, overlapping); browser check.
   - Files: `src/lib/marking/locate-quotes.ts` (+ test), `src/components/working-with-boxes.tsx`, mark page
