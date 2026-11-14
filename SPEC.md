@@ -1,7 +1,7 @@
 # Spec: Problem Sheet Companion (working title)
 
-Status: draft for discussion. Items marked **[ASSUMPTION]** are my defaults and
-should be confirmed; open questions are collected in section 10.
+Status: draft v2. Decisions confirmed so far are listed in section 10 along with
+the questions still open. Items marked **[ASSUMPTION]** are unconfirmed defaults.
 
 ## 1. Objective
 
@@ -16,9 +16,9 @@ The app turns each problem sheet into a tracked learning loop:
 
 ### Target user
 
-A university/A-level student doing weekly problem sheets in a quantitative
-subject (maths, physics, CS theory, engineering). **[ASSUMPTION]** Single
-student, self-serve; no tutor or class view in v1.
+A student doing weekly problem sheets in maths (v1), extending later to other
+maths-heavy sciences. Each student has their own account; the app is intended
+to be rolled out to many students. No tutor or class view in v1.
 
 ### Success criteria
 
@@ -55,11 +55,24 @@ student, self-serve; no tutor or class view in v1.
    feedback anchored to the step where the working first goes wrong, plus an
    error type (conceptual / method / algebra slip / misread question /
    incomplete).
-   If the student uploads the official mark scheme, marking uses it; otherwise
-   the app marks against its own worked solution and labels the result as
-   AI-marked. Student can dispute a mark ("I think this is right"), which
-   triggers a re-mark and is logged.
+   Official solutions are released about a week after the sheet, so marking
+   has two phases:
+   - **Provisional** (immediately): marked against the app's own worked
+     solution, labelled "AI-marked, provisional". Mastery is updated with
+     reduced weight.
+   - **Confirmed** (when official solutions are uploaded): every attempt on
+     the sheet is re-marked against the official solution, changed marks are
+     flagged, and mastery is updated at full weight.
+   Student can dispute a mark ("I think this is right"), which triggers a
+   re-mark and is logged.
 7. **Sheet summary**: shown when all questions are submitted.
+8. **Solutions week** (about 7 days later): student uploads the official
+   solutions and gets a short review session - confirmed marks, the official
+   method side by side with their own working for each non-full question, and
+   one retry or variant per mistake. This doubles as the first spaced review.
+
+The worked solution (AI or official) for a question stays locked until the
+student has submitted an attempt or revealed all three hints.
 
 ### 2.2 Reviewing history
 
@@ -169,9 +182,11 @@ Seamlessness:
 
 ### v1 (hackathon MVP)
 
+- Accounts (email or Google sign-in); all data scoped per user.
 - Upload and parse sheet; topic tagging; editable parse.
 - Three-level hints with tracking.
-- Submit working (image/PDF/typed), AI marking with outcome, error type, feedback.
+- Submit working (image/PDF/typed), provisional AI marking with outcome, error type, feedback.
+- Official solutions upload, re-mark, and solutions-week review.
 - Timer and difficulty rating.
 - History: sheet list, sheet detail with past submissions, sheet summary.
 - Weakness model and revision session (retry + variant questions).
@@ -181,25 +196,26 @@ Seamlessness:
 
 - Probe questions, exam-date scheduling, forgetting forecast, mock exams.
 - Visualisations 5-10, phone QR capture, Anki export, syllabus import.
-- Multi-user accounts, tutor/class view.
+- Shared class sheets (one upload, classmates join by code), tutor/class view.
 
 ### Out of scope
 
 - Being an authoritative grader: marks are formative feedback, always labelled AI-marked.
 - Proctoring or cheating detection.
-- Live tutoring chat (hints are structured, not open-ended chat) **[ASSUMPTION]**.
+- Live tutoring chat: hints are exactly three structured levels in v1.
+- Subjects other than maths in v1.
 
-## 7. Technical approach **[ASSUMPTION - empty repo, nothing decided]**
+## 7. Technical approach (stack confirmed)
 
 | Layer | Choice | Reason |
 |---|---|---|
 | App | Next.js (App Router) + TypeScript | one deployable for UI and API |
 | UI | Tailwind + shadcn/ui, KaTeX for maths | fast to build, good maths rendering |
 | Charts | D3 for the skill map, Recharts for the rest | custom graph plus standard charts |
-| Data | SQLite via Drizzle ORM | zero setup; swappable for Postgres |
-| Files | local disk in dev, object storage later | uploads of sheets and working |
+| Data | Postgres via Drizzle ORM (hosted, e.g. Neon/Supabase) | multi-user from day one |
+| Files | object storage (S3-compatible), private per user | uploads of sheets and working |
 | AI | Claude API with PDF and image input, structured JSON output | reads handwriting and typeset maths directly |
-| Auth | none in v1 (single local user) | fastest route to a demo |
+| Auth | Auth.js with email magic link and Google | accounts without building password handling |
 
 AI calls (each returns schema-validated JSON):
 
@@ -215,19 +231,22 @@ the final answer.
 
 ### Data model (core tables)
 
-- `course` (id, name, exam_date)
+- `user` (id, email, name)
+- `course` (id, user_id, name, exam_date)
 - `topic` (id, course_id, name, parent_id) and `topic_prereq` (topic_id, prereq_id)
-- `sheet` (id, course_id, title, file_path, uploaded_at)
+- `sheet` (id, course_id, title, file_path, uploaded_at, official_solutions_path, solutions_uploaded_at)
 - `question` (id, sheet_id, label, body_latex, expected_minutes, source: original | variant, parent_question_id)
 - `question_topic` (question_id, topic_id)
 - `hint` (id, question_id, level, body)
 - `attempt` (id, question_id, started_at, seconds_spent, difficulty_rating, context: sheet | revision)
 - `hint_reveal` (attempt_id, hint_id, revealed_at)
 - `submission` (id, attempt_id, file_path | text)
-- `mark` (id, attempt_id, outcome, score, error_type, feedback_json, disputed)
-- `topic_mastery` (topic_id, mastery, confidence, updated_at)
+- `mark` (id, attempt_id, basis: ai | official, outcome, score, error_type, feedback_json, disputed)
+- `topic_mastery` (user_id, topic_id, mastery, confidence, updated_at)
 
-Attempts are append-only; a retry is a new attempt, so history is never lost.
+Attempts and marks are append-only; a retry is a new attempt and a re-mark is
+a new mark row, so history is never lost. Every query is filtered by the
+signed-in user.
 
 ### Project structure
 
@@ -265,18 +284,31 @@ npm run db:migrate  apply migrations
   validate AI output against schemas; keep the API key server-side.
 - Ask first: schema changes after data exists; adding dependencies; changing
   the mastery formula.
-- Never: reveal the final answer in hints 1-2; overwrite or delete past
-  attempts; commit secrets or uploaded student work.
+- Never: reveal the final answer in hints 1-2; show a worked solution before
+  an attempt or all hints; expose one user's uploads or marks to another;
+  overwrite or delete past attempts; commit secrets or uploaded student work.
 
-## 10. Open questions
+## 10. Decisions and open questions
 
-1. Which subjects first? Maths-heavy sheets need the strongest LaTeX and
-   handwriting handling; essay-style subjects would change marking entirely.
-2. Will students usually have official solutions to upload, or is AI-only
-   marking the normal case?
-3. Web app only, or is phone-first capture essential for the demo?
-4. Single user for the hackathon, or are accounts needed?
-5. Is the stack in section 7 acceptable, or is there a team preference?
-6. Should hints stay strictly structured (3 levels), or is a follow-up
-   "ask about this hint" chat wanted?
-7. Timer: automatic, manual, or self-reported time only?
+Confirmed:
+
+- v1 is maths only.
+- Official solutions exist but arrive a week later; AI marking is provisional until then.
+- User accounts are required.
+- Stack in section 7 accepted.
+- Exactly three hint levels; worked solutions locked behind attempt or hints.
+
+Open:
+
+1. Are the sheets assessed (count for credit, or handed in to a tutor)? If so,
+   hints and marking before the hand-in deadline may breach course rules.
+2. Where does the student work - on paper with the app beside them, or in the
+   app? This decides whether the timer and per-question flow are realistic.
+3. Does a tutor already mark the sheets? If so, should tutor marks be
+   enterable and override AI marks?
+4. Do classmates share the same sheet? If so, one parse and one set of hints
+   per sheet should be shared rather than regenerated per student.
+5. Should provisional AI marks be shown as right/wrong, or only as "check
+   this step" until official solutions confirm?
+6. What is the hackathon demo date and what must be live by then?
+7. Who pays for AI usage once other students join (per-user limits)?
