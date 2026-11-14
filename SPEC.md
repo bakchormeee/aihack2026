@@ -107,7 +107,7 @@ with variants, and the skill map.
 
 ### `accounts`
 
-- Sign-in by Google or by email magic link (Auth.js). No passwords.
+- Sign-in by Google (Auth.js). No passwords. Email magic-link sign-in was cut for time (first item of the cut order) and is deferred.
 - Every table row is owned, directly or through its parent, by one user.
   Every server-side read and write filters by the signed-in user's id.
 - Uploaded files are private. They are served only through short-lived signed
@@ -329,7 +329,7 @@ Versions are the latest stable at scaffold time, pinned exactly in
 | PDF export | `pdf-lib` and `html-to-image`, both in the browser |
 | Data | PostgreSQL (Neon) through Drizzle ORM **[A]** |
 | Files | S3-compatible object storage (Cloudflare R2), private bucket, signed URLs for upload and download, through `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` **[A]** |
-| Auth | Auth.js v5: Google provider and email magic link (Resend) **[A]** |
+| Auth | Auth.js v5: Google provider (email magic link via Resend deferred) **[A]** |
 | AI | Claude API through `@anthropic-ai/sdk`, PDF and image input, structured output |
 | Hosting | Vercel **[A]** |
 | Tests | Vitest (unit, contract, integration on an in-memory PGlite database), Playwright (end to end) |
@@ -525,7 +525,7 @@ All of V1 must work live in the hackathon demo, with real AI calls and no
 seeded or mocked data.
 
 `accounts`
-1. A new user can sign in with Google and with an email magic link.
+1. A new user can sign in with Google. (The email magic-link half of this criterion was cut and is deferred.)
 2. A signed-in user requesting another user's sheet, question, attempt or file
    URL receives "not found".
 
@@ -613,6 +613,7 @@ Each of these was not stated by you. Correct any of them before approval.
 | Subjects other than maths | V1 prompts and marking are tuned for maths only |
 | Native mobile app | The responsive web app covers phone use in V1 |
 | Deleting courses or sheets | Not needed for the loop; avoids deleting history |
+| Email magic-link sign-in | Cut first, as planned, to save time; Google sign-in covers V1 (needs a Resend key and a verified sending domain) |
 | Tutor or class view; tutor-entered marks | V1 is single-student; confirmed decision |
 | Shared class sheets, join by code, reuse of one parse across students | Each student uploads their own in V1; confirmed decision |
 | Per-user AI usage limits | Not needed for the demo; confirmed decision |
