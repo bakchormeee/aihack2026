@@ -4,7 +4,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
 
 **How to read a task**
 
-- **Checks** = `npm run lint`, `npx tsc --noEmit` and `npm test` all pass.
+- **Checks** = `npm run lint`, `npm run typecheck` and `npm test` all pass.
   Every task must pass the checks; they are not repeated below.
 - **Files** = the only files the task may create or edit. `…/` means any
   file in that folder. Frozen files (plan.md, decision 2) are never edited.
@@ -45,7 +45,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
   - Only if F3b is kept: a Resend key and a verified sending domain.
   - Verify: `npm run db:migrate` succeeds after F2; Google sign-in works after F3.
 
-- [ ] **F1: Scaffold, tooling and all dependencies** (M)
+- [x] **F1: Scaffold, tooling and all dependencies** (M)
   - Acceptance:
     - Next.js (App Router, TypeScript strict, Tailwind, `src/` folder) runs with `npm run dev`.
     - Every dependency is installed and pinned: `next-auth`, `@auth/drizzle-adapter`, `drizzle-orm`, `drizzle-kit`, `postgres`, `@electric-sql/pglite`, `zod`, `@anthropic-ai/sdk`, `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `katex`, `react-markdown`, `remark-math`, `rehype-katex`, `d3`, `recharts`, `pdf-lib`, `html-to-image`, `vitest`, `@vitest/coverage-v8`, `@playwright/test`, `tsx`, `prettier`; shadcn/ui components button, card, input, textarea, label, select, tabs, badge, dialog, progress, skeleton, sonner.

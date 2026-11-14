@@ -1,0 +1,9 @@
+.next
+node_modules
+coverage
+package-lock.json
+src/db/migrations
+tests/fixtures
+playwright-report
+test-results
+*.md

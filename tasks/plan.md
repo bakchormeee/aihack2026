@@ -326,7 +326,7 @@ and up to four after it (R, H, V-revision, V-charts).
 3. **Never edit `tasks/` or `SPEC.md`.** Report completion to the
    coordinator, who ticks the box.
 4. **One commit per task**, with the task id in the message. Before
-   reporting, run `npm run lint`, `npx tsc --noEmit` and `npm test` in the
+   reporting, run `npm run lint`, `npm run typecheck` and `npm test` in the
    worktree.
 5. **Sign in with the test sign-in**, using a user name unique to the track
    (for example `track-h@test.local`), so that tracks sharing the
