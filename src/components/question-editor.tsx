@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { MathText } from "@/components/math-text";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteQuestionAction,
+  mergeQuestionsAction,
   saveBodyAction,
   saveDetailsAction,
+  splitQuestionAction,
   type EditResult,
 } from "@/app/(app)/sheets/[sheetId]/edit/actions";
 
@@ -26,9 +28,17 @@ type Props = {
   };
   courseTopics: string[];
   attempted: boolean;
+  nextQuestionId: string | null;
+  nextAttempted: boolean;
 };
 
-export function QuestionEditor({ question, courseTopics, attempted }: Props) {
+export function QuestionEditor({
+  question,
+  courseTopics,
+  attempted,
+  nextQuestionId,
+  nextAttempted,
+}: Props) {
   const [label, setLabel] = useState(question.label);
   const [selected, setSelected] = useState(question.topics);
   const [newTopic, setNewTopic] = useState("");
@@ -36,6 +46,7 @@ export function QuestionEditor({ question, courseTopics, attempted }: Props) {
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const has = (name: string) => selected.some((s) => s.toLowerCase() === name.toLowerCase());
   const options = [
@@ -43,6 +54,7 @@ export function QuestionEditor({ question, courseTopics, attempted }: Props) {
     ...selected.filter((s) => !courseTopics.some((c) => c.toLowerCase() === s.toLowerCase())),
   ];
   const canEditBody = !attempted;
+  const canMerge = canEditBody && nextQuestionId !== null && !nextAttempted;
 
   function run(work: () => Promise<EditResult>, done: string) {
     setMessage(null);
@@ -174,6 +186,7 @@ export function QuestionEditor({ question, courseTopics, attempted }: Props) {
         </label>
         <Textarea
           id={`body-${question.id}`}
+          ref={bodyRef}
           value={body}
           disabled={!canEditBody}
           onChange={(event) => setBody(event.target.value)}
@@ -181,6 +194,10 @@ export function QuestionEditor({ question, courseTopics, attempted }: Props) {
         />
         {canEditBody ? (
           <>
+            <p className="text-muted-foreground text-xs">
+              Click in the text where a new question should start, then press &ldquo;Split
+              here&rdquo;.
+            </p>
             <details className="text-sm">
               <summary className="text-muted-foreground cursor-pointer">Preview</summary>
               <div className="pt-2">
@@ -200,6 +217,37 @@ export function QuestionEditor({ question, courseTopics, attempted }: Props) {
               >
                 Save text
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending || body !== question.body}
+                title={body !== question.body ? "Save the text first" : undefined}
+                onClick={() => {
+                  const index = bodyRef.current?.selectionStart ?? 0;
+                  run(
+                    () => splitQuestionAction({ questionId: question.id, index }),
+                    "Question split in two.",
+                  );
+                }}
+              >
+                Split here
+              </Button>
+              {canMerge ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() =>
+                    run(
+                      () =>
+                        mergeQuestionsAction({ firstId: question.id, secondId: nextQuestionId! }),
+                      "Merged with the next question.",
+                    )
+                  }
+                >
+                  Merge with next
+                </Button>
+              ) : null}
               {confirmDelete ? (
                 <>
                   <Button

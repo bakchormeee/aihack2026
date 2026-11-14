@@ -51,7 +51,7 @@ export default async function EditQuestionsPage({ params }: PageProps<"/sheets/[
         <p className="text-muted-foreground text-sm">This sheet has no questions.</p>
       ) : (
         <ol className="flex flex-col gap-2">
-          {questions.map((question) => (
+          {questions.map((question, index) => (
             <li
               key={[
                 question.id,
@@ -70,6 +70,10 @@ export default async function EditQuestionsPage({ params }: PageProps<"/sheets/[
                 }}
                 courseTopics={courseTopics.map((topic) => topic.name)}
                 attempted={attempted.has(question.id)}
+                nextQuestionId={questions[index + 1]?.id ?? null}
+                nextAttempted={
+                  questions[index + 1] ? attempted.has(questions[index + 1].id) : false
+                }
               />
             </li>
           ))}

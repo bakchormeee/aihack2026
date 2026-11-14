@@ -170,3 +170,109 @@ export async function deleteQuestion(userId: string, questionId: string) {
     await renumber(tx, question.sheetId!);
   });
 }
+
+/**
+ * Joins two adjacent questions into the first: bodies joined by a blank line,
+ * first label kept, union of topics, expected minutes added. Returns the id of
+ * the question whose hints must be generated again.
+ */
+export async function mergeQuestions(userId: string, firstId: string, secondId: string) {
+  if (firstId === secondId) throw new EditRuleError("Pick two different questions.");
+  await owned(userId, firstId, secondId);
+  return db.transaction(async (tx) => {
+    const first = await lockQuestion(tx, firstId);
+    const second = await lockQuestion(tx, secondId);
+    if (first.sheetId !== second.sheetId || second.position !== first.position + 1) {
+      throw new EditRuleError("Only neighbouring questions can be merged.");
+    }
+    await assertUnattempted(tx, [firstId, secondId], "merged");
+
+    const secondTopics = await tx
+      .select({ topicId: questionTopics.topicId })
+      .from(questionTopics)
+      .where(eq(questionTopics.questionId, secondId));
+    if (secondTopics.length > 0) {
+      await tx
+        .insert(questionTopics)
+        .values(secondTopics.map(({ topicId }) => ({ questionId: firstId, topicId })))
+        .onConflictDoNothing();
+    }
+    await tx
+      .update(questions)
+      .set({
+        body: `${first.body.trim()}\n\n${second.body.trim()}`,
+        expectedMinutes: first.expectedMinutes + second.expectedMinutes,
+        hintsStatus: "pending",
+        hintsStatusUpdatedAt: new Date(),
+      })
+      .where(eq(questions.id, firstId));
+    await tx.delete(questions).where(eq(questions.id, secondId));
+    await renumber(tx, first.sheetId!);
+    return firstId;
+  });
+}
+
+/**
+ * Cuts the body at character `index` into two questions. The first keeps the
+ * label; the second gets the label plus "b" and follows it. Both keep the
+ * topics and share the expected minutes (rounded up, at least 1 each).
+ * Returns both ids; their hints must be generated again.
+ */
+export async function splitQuestion(userId: string, questionId: string, index: number) {
+  await owned(userId, questionId);
+  return db.transaction(async (tx) => {
+    const question = await lockQuestion(tx, questionId);
+    await assertUnattempted(tx, [questionId], "split");
+    if (!Number.isInteger(index) || index < 1 || index >= question.body.length) {
+      throw new EditRuleError("Choose a point inside the question text.");
+    }
+    const head = question.body.slice(0, index).trim();
+    const tail = question.body.slice(index).trim();
+    if (!head || !tail) throw new EditRuleError("Both parts need some text.");
+
+    const sheetId = question.sheetId!;
+    await tx
+      .update(questions)
+      .set({ position: sql`${questions.position} + 1` })
+      .where(
+        and(eq(questions.sheetId, sheetId), sql`${questions.position} > ${question.position}`),
+      );
+    const minutes = Math.max(1, Math.ceil(question.expectedMinutes / 2));
+    const now = new Date();
+    const [created] = await tx
+      .insert(questions)
+      .values({
+        courseId: question.courseId,
+        sheetId,
+        position: question.position + 1,
+        label: `${question.label}b`,
+        body: tail,
+        expectedMinutes: minutes,
+        source: question.source,
+        hintsStatus: "pending",
+        hintsStatusUpdatedAt: now,
+      })
+      .returning({ id: questions.id });
+    await tx
+      .update(questions)
+      .set({
+        body: head,
+        expectedMinutes: minutes,
+        hintsStatus: "pending",
+        hintsStatusUpdatedAt: now,
+      })
+      .where(eq(questions.id, questionId));
+
+    const tags = await tx
+      .select({ topicId: questionTopics.topicId })
+      .from(questionTopics)
+      .where(eq(questionTopics.questionId, questionId));
+    if (tags.length > 0) {
+      await tx
+        .insert(questionTopics)
+        .values(tags.map(({ topicId }) => ({ questionId: created.id, topicId })));
+    }
+    await renumber(tx, sheetId);
+    return [questionId, created.id] as const;
+  });
+}

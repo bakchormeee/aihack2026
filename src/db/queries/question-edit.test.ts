@@ -18,6 +18,8 @@ import {
   EditRuleError,
   deleteQuestion,
   listCourseTopics,
+  mergeQuestions,
+  splitQuestion,
   topicNamesSchema,
   updateBody,
   updateLabelAndTopics,
@@ -92,13 +94,15 @@ describe("ownership", () => {
   it("gives not-found to another user for every action", async () => {
     const a = await setup("owner@test.local");
     const b = await setup("other@test.local");
-    const [q1] = a.qs;
+    const [q1, q2] = a.qs;
     const bad = NotFoundError;
     await expect(
       updateLabelAndTopics(b.user.id, q1.id, { label: "x", topicNames: ["Algebra"] }),
     ).rejects.toThrow(bad);
     await expect(updateBody(b.user.id, q1.id, "hacked")).rejects.toThrow(bad);
     await expect(deleteQuestion(b.user.id, q1.id)).rejects.toThrow(bad);
+    await expect(mergeQuestions(b.user.id, q1.id, q2.id)).rejects.toThrow(bad);
+    await expect(splitQuestion(b.user.id, q1.id, 3)).rejects.toThrow(bad);
     await expect(listCourseTopics(b.user.id, a.sheet.id)).rejects.toThrow(bad);
     expect((await sheetRows(a.sheet.id)).map((q) => q.body)).toEqual([
       "First question",
@@ -112,12 +116,14 @@ describe("sheet status", () => {
   it("rejects every edit while the sheet is not ready", async () => {
     const s = await setup("parsing@test.local");
     await db.update(sheets).set({ status: "parsing" }).where(eq(sheets.id, s.sheet.id));
-    const [q1] = s.qs;
+    const [q1, q2] = s.qs;
     await expect(
       updateLabelAndTopics(s.user.id, q1.id, { label: "x", topicNames: ["Algebra"] }),
     ).rejects.toThrow(EditRuleError);
     await expect(updateBody(s.user.id, q1.id, "new")).rejects.toThrow(EditRuleError);
     await expect(deleteQuestion(s.user.id, q1.id)).rejects.toThrow(EditRuleError);
+    await expect(mergeQuestions(s.user.id, q1.id, q2.id)).rejects.toThrow(EditRuleError);
+    await expect(splitQuestion(s.user.id, q1.id, 3)).rejects.toThrow(EditRuleError);
   });
 });
 
@@ -218,6 +224,95 @@ describe("delete", () => {
     const s = await setup("attempted-delete@test.local");
     await attempt(s.user.id, s.qs[1].id);
     await expect(deleteQuestion(s.user.id, s.qs[1].id)).rejects.toThrow(EditRuleError);
+    expect(await sheetRows(s.sheet.id)).toHaveLength(3);
+  });
+});
+
+describe("merge", () => {
+  it("joins adjacent questions, keeps first label, unions topics, renumbers, resets hints", async () => {
+    const s = await setup("merge@test.local");
+    const id = await mergeQuestions(s.user.id, s.qs[0].id, s.qs[1].id);
+    expect(id).toBe(s.qs[0].id);
+    const rows = await sheetRows(s.sheet.id);
+    expect(rows.map((q) => [q.position, q.label])).toEqual([
+      [1, "1"],
+      [2, "3"],
+    ]);
+    expect(rows[0].body).toBe("First question\n\nSecond question");
+    expect(rows[0].hintsStatus).toBe("pending");
+    expect(rows[0].expectedMinutes).toBe(20);
+    expect(await topicNames(rows[0].id)).toEqual(["Algebra", "Logic"]);
+    expect(await db.select().from(questions).where(eq(questions.id, s.qs[1].id))).toHaveLength(0);
+  });
+
+  it("rejects questions that are not adjacent or are in the wrong order", async () => {
+    const s = await setup("merge-gap@test.local");
+    await expect(mergeQuestions(s.user.id, s.qs[0].id, s.qs[2].id)).rejects.toThrow(EditRuleError);
+    await expect(mergeQuestions(s.user.id, s.qs[1].id, s.qs[0].id)).rejects.toThrow(EditRuleError);
+  });
+
+  it("rejects questions of two different sheets", async () => {
+    const s = await setup("merge-sheets@test.local");
+    const [other] = await db
+      .insert(sheets)
+      .values({ courseId: s.course.id, title: "S2", status: "ready" })
+      .returning();
+    const [q] = await db
+      .insert(questions)
+      .values({
+        courseId: s.course.id,
+        sheetId: other.id,
+        position: 2,
+        label: "1",
+        body: "x",
+        expectedMinutes: 5,
+      })
+      .returning();
+    await expect(mergeQuestions(s.user.id, s.qs[0].id, q.id)).rejects.toThrow(EditRuleError);
+  });
+
+  it("is rejected when either question has an attempt", async () => {
+    const s = await setup("attempted-merge@test.local");
+    await attempt(s.user.id, s.qs[1].id);
+    await expect(mergeQuestions(s.user.id, s.qs[0].id, s.qs[1].id)).rejects.toThrow(EditRuleError);
+    await expect(mergeQuestions(s.user.id, s.qs[1].id, s.qs[2].id)).rejects.toThrow(EditRuleError);
+    expect(await sheetRows(s.sheet.id)).toHaveLength(3);
+  });
+});
+
+describe("split", () => {
+  it("cuts the body, labels the second 'b', keeps topics, renumbers, resets hints", async () => {
+    const s = await setup("split@test.local", ["Part one. Part two.", "Second", "Third"]);
+    const [firstId, secondId] = await splitQuestion(s.user.id, s.qs[0].id, 10);
+    expect(firstId).toBe(s.qs[0].id);
+    const rows = await sheetRows(s.sheet.id);
+    expect(rows.map((q) => [q.position, q.label])).toEqual([
+      [1, "1"],
+      [2, "1b"],
+      [3, "2"],
+      [4, "3"],
+    ]);
+    expect(rows[0].body).toBe("Part one.");
+    expect(rows[1].body).toBe("Part two.");
+    expect(rows[1].id).toBe(secondId);
+    expect(rows[0].hintsStatus).toBe("pending");
+    expect(rows[1].hintsStatus).toBe("pending");
+    expect(await topicNames(rows[0].id)).toEqual(["Algebra"]);
+    expect(await topicNames(rows[1].id)).toEqual(["Algebra"]);
+  });
+
+  it("rejects an index outside the text or leaving an empty half", async () => {
+    const s = await setup("split-bad@test.local", ["abc   ", "Second"]);
+    await expect(splitQuestion(s.user.id, s.qs[0].id, 0)).rejects.toThrow(EditRuleError);
+    await expect(splitQuestion(s.user.id, s.qs[0].id, 6)).rejects.toThrow(EditRuleError);
+    await expect(splitQuestion(s.user.id, s.qs[0].id, 3)).rejects.toThrow(EditRuleError);
+    await expect(splitQuestion(s.user.id, s.qs[0].id, 1.5)).rejects.toThrow(EditRuleError);
+  });
+
+  it("is rejected once the question has an attempt", async () => {
+    const s = await setup("attempted-split@test.local");
+    await attempt(s.user.id, s.qs[0].id);
+    await expect(splitQuestion(s.user.id, s.qs[0].id, 3)).rejects.toThrow(EditRuleError);
     expect(await sheetRows(s.sheet.id)).toHaveLength(3);
   });
 });

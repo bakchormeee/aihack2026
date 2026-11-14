@@ -10,6 +10,8 @@ import {
   bodySchema,
   deleteQuestion,
   labelSchema,
+  mergeQuestions,
+  splitQuestion,
   topicNamesSchema,
   updateBody,
   updateLabelAndTopics,
@@ -80,4 +82,18 @@ export async function deleteQuestionAction(input: unknown): Promise<EditResult> 
     await deleteQuestion(userId, questionId);
     return [];
   });
+}
+
+export async function mergeQuestionsAction(input: unknown): Promise<EditResult> {
+  const parsed = z.object({ firstId: id, secondId: id }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Check the input." };
+  const { firstId, secondId } = parsed.data;
+  return run(firstId, async (userId) => [await mergeQuestions(userId, firstId, secondId)]);
+}
+
+export async function splitQuestionAction(input: unknown): Promise<EditResult> {
+  const parsed = z.object({ questionId: id, index: z.number().int().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Choose a point inside the question text." };
+  const { questionId, index } = parsed.data;
+  return run(questionId, async (userId) => [...(await splitQuestion(userId, questionId, index))]);
 }
