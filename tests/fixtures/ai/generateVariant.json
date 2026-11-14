@@ -1,0 +1,9 @@
+{
+  "body": "Evaluate\n\n$$\\int_0^{\\pi/2} x \\sin x \\, dx.$$",
+  "solution": "Integrate by parts with $u = x$ and $dv = \\sin x \\, dx$, so that $du = dx$ and $v = -\\cos x$. Then\n\n$$\\int_0^{\\pi/2} x \\sin x \\, dx = \\big[ -x \\cos x \\big]_0^{\\pi/2} + \\int_0^{\\pi/2} \\cos x \\, dx.$$\n\nThe boundary term is $-\\tfrac{\\pi}{2} \\cos \\tfrac{\\pi}{2} + 0 = 0$, and\n\n$$\\int_0^{\\pi/2} \\cos x \\, dx = \\big[ \\sin x \\big]_0^{\\pi/2} = 1.$$\n\nHence $\\int_0^{\\pi/2} x \\sin x \\, dx = 1$.",
+  "finalAnswer": "$\\int_0^{\\pi/2} x \\sin x \\, dx = 1$",
+  "hint1": "The integrand is a product of a polynomial and a trigonometric function. Think about **integration by parts**.",
+  "hint2": "Use $\\int u \\, dv = uv - \\int v \\, du$. Take $u = x$, because it becomes simpler when differentiated, and $dv = \\sin x \\, dx$. Start by finding $v$, and take care with its sign.",
+  "hint3": "Outline:\n\n1. Set $u = x$ and $dv = \\sin x \\, dx$; find $du$ and $v$.\n2. Write the integral as $\\big[ uv \\big]_0^{\\pi/2} - \\int_0^{\\pi/2} v \\, du$.\n3. Evaluate the boundary term at both limits.\n4. Integrate the remaining trigonometric function between the limits.\n5. Combine the two terms, watching the signs.",
+  "expectedMinutes": 8
+}
