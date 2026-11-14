@@ -89,7 +89,7 @@ export function QuestionEditor({
     selected.some((s) => !question.topics.includes(s));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3 sm:p-4">
+    <div className="bg-card flex flex-col gap-3 rounded-lg border p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium">Question {question.label}</span>
         <span className="text-muted-foreground text-xs">

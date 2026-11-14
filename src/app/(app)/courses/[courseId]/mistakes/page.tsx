@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ERROR_LABEL, OUTCOME_LABEL, OUTCOME_VARIANT } from "@/components/attempt-card";
 import { MathText } from "@/components/math-text";
+import { EmptyState, PageHeader, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { listMistakes } from "@/db/queries/history";
 import { orNotFound } from "@/lib/auth/guards";
@@ -44,8 +45,8 @@ export default async function MistakeLogPage({
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{course.name}: mistake log</h1>
+    <section className="flex flex-col gap-5">
+      <PageHeader title={`${course.name}: mistake log`} />
 
       <nav aria-label="Filter by topic" className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted-foreground">Topic:</span>
@@ -79,19 +80,19 @@ export default async function MistakeLogPage({
       </nav>
 
       {items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <EmptyState>
           {topicId || errorType
             ? "No mistakes match this filter."
             : "No mistakes yet. Attempts that are not fully right will appear here."}
-        </p>
+        </EmptyState>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <RuledList>
           {items.map((item) => (
-            <li key={item.attemptId} className="flex flex-col gap-2 rounded-lg border p-3">
+            <li key={item.attemptId} className="flex flex-col gap-2 px-5 py-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <Link
                   href={`/questions/${item.questionId}/mark?attempt=${item.attemptId}`}
-                  className="font-medium underline"
+                  className="font-heading text-base font-medium underline-offset-4 hover:underline"
                 >
                   {item.sheet ? `${item.sheet.title}, ` : "Revision question "}
                   Question {item.label}
@@ -110,7 +111,7 @@ export default async function MistakeLogPage({
               {item.feedback ? <MathText className="text-sm">{item.feedback}</MathText> : null}
             </li>
           ))}
-        </ul>
+        </RuledList>
       )}
     </section>
   );
@@ -130,8 +131,10 @@ function FilterLink({
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-full border px-3 py-1",
-        active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted",
+        "inline-flex h-8 items-center rounded-md border px-3 transition-colors",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-card hover:border-foreground/40",
       )}
     >
       {children}

@@ -34,7 +34,10 @@ export function AttemptCard({ attempt, number }: { attempt: AttemptRecord; numbe
   const submission = attempt.submission;
   const submitted = submission?.submittedAt != null;
   return (
-    <article className="flex flex-col gap-3 rounded-lg border p-3" aria-label={`Attempt ${number}`}>
+    <article
+      className="flex flex-col gap-3 bg-card rounded-lg border p-5"
+      aria-label={`Attempt ${number}`}
+    >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <h3 className="font-medium">Attempt {number}</h3>
         <span className="text-muted-foreground">{dateFormat.format(attempt.startedAt)}</span>

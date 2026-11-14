@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { topics } from "@/db/schema";
 import { listCourses } from "@/db/queries/courses";
 import { listRetryCandidates } from "@/db/queries/revision";
+import { EmptyState, PageHeader, Panel } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
 import { RevisionForm } from "@/components/revision-form";
@@ -40,21 +41,29 @@ export default async function RevisionPage({ searchParams }: PageProps<"/revise"
   const wantedTopic = one(query.topic);
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Revision</h1>
+    <section className="flex flex-col gap-6">
+      <PageHeader
+        title="Revision"
+        description="Retry what went wrong and try fresh variants, weakest topics first."
+      />
       {options.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Create a course and mark some work first.{" "}
-          <Link href="/courses" className={buttonVariants({ variant: "link" })}>
-            Go to courses
-          </Link>
-        </p>
+        <EmptyState
+          action={
+            <Link href="/courses" className={buttonVariants({ variant: "outline" })}>
+              Go to courses
+            </Link>
+          }
+        >
+          Create a course and mark some work first.
+        </EmptyState>
       ) : (
-        <RevisionForm
-          courses={options}
-          initialCourseId={initialCourseId!}
-          initialTopicId={wantedTopic ?? null}
-        />
+        <Panel className="sm:max-w-xl">
+          <RevisionForm
+            courses={options}
+            initialCourseId={initialCourseId!}
+            initialTopicId={wantedTopic ?? null}
+          />
+        </Panel>
       )}
     </section>
   );

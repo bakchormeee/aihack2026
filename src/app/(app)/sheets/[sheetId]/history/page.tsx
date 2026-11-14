@@ -39,7 +39,10 @@ export default async function HistoryPage({ params }: PageProps<"/sheets/[sheetI
       ) : (
         <ul className="flex flex-col gap-4">
           {history.map((record) => (
-            <li key={record.question.id} className="flex flex-col gap-3 rounded-lg border p-4">
+            <li
+              key={record.question.id}
+              className="flex flex-col gap-3 bg-card rounded-lg border p-5"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="font-medium">Question {record.question.label}</h2>

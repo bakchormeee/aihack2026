@@ -56,7 +56,7 @@ export default async function OfficialSolutionsPage({
       ) : null}
 
       {active ? (
-        <div className="flex flex-col gap-1 rounded-lg border p-4" aria-live="polite">
+        <div className="flex flex-col gap-1 bg-card rounded-lg border p-5" aria-live="polite">
           <p className="text-sm font-medium">
             {status === "extracting"
               ? "Reading the official solutions…"
@@ -67,7 +67,7 @@ export default async function OfficialSolutionsPage({
       ) : null}
 
       {stuck || status === "failed" ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
+        <div role="alert" className="flex flex-col items-start gap-3 bg-card rounded-lg border p-5">
           <p className="text-sm">
             {stuck
               ? "This is taking longer than expected."
@@ -82,7 +82,7 @@ export default async function OfficialSolutionsPage({
       {status === "done" ? <Review sheetId={sheetId} userId={user.id} /> : null}
 
       {status === "done" || status === "failed" ? (
-        <details className="rounded-lg border p-4">
+        <details className="bg-card rounded-lg border p-5">
           <summary className="cursor-pointer text-sm font-medium">
             Upload different official solutions
           </summary>
@@ -144,7 +144,7 @@ function ReviewList({
 async function ReviewCard({ item, userId }: { item: ReviewItem; userId: string }) {
   const solution = await getVisibleSolution(userId, item.question.id, { reviewMode: true });
   return (
-    <article className="flex flex-col gap-3 rounded-lg border p-4">
+    <article className="flex flex-col gap-3 bg-card rounded-lg border p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="font-semibold">Question {item.question.label}</h3>
         <Badge variant={item.mark.outcome === "full" ? "default" : "secondary"}>

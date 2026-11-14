@@ -54,7 +54,7 @@ export function RevisionForm({
 
   return (
     <form
-      className="flex flex-col gap-5 sm:max-w-lg"
+      className="flex flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -115,7 +115,10 @@ export function RevisionForm({
       ) : null}
 
       {available === 0 ? (
-        <p role="status" className="text-muted-foreground rounded-lg border p-3 text-sm">
+        <p
+          role="status"
+          className="text-muted-foreground bg-muted/40 rounded-md border p-3 text-sm"
+        >
           Nothing to revise yet{topicIds.length ? " for these topics" : " in this course"}. Revision
           picks questions you got wrong, got only partly right, or solved with hint 2 or 3. Submit
           and get some work marked first.

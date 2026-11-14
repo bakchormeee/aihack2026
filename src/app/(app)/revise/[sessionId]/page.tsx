@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
+import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,21 +27,16 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
   const doneCount = items.filter((item) => item.done).length;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-6">
       <AutoRefresh active={building} />
-      <div>
-        <Link
-          href={`/courses/${session.courseId}`}
-          className="text-muted-foreground text-sm underline"
-        >
-          Course
-        </Link>
-        <h1 className="text-xl font-semibold">Revision session, {session.targetMinutes} minutes</h1>
-      </div>
+      <PageHeader
+        back={{ href: `/courses/${session.courseId}`, label: "Course" }}
+        title={`Revision session, ${session.targetMinutes} minutes`}
+      />
 
       {building ? (
         <div className="flex flex-col gap-3" aria-live="polite">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground">
             Choosing questions and writing fresh variants. This takes a minute.
           </p>
           <Skeleton className="h-16 w-full" />
@@ -49,33 +45,45 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
       ) : null}
 
       {session.status === "failed" || stuck ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
-          <p className="text-sm">
+        <Panel role="alert" className="flex flex-col items-start gap-3">
+          <p>
             {stuck ? "Building this session is taking too long." : "Building this session failed."}
           </p>
           <form action={retryRevisionAction.bind(null, session.id)}>
             <Button type="submit">Try again</Button>
           </form>
-        </div>
+        </Panel>
       ) : null}
 
       {session.status === "ready" ? (
         <>
-          <p className="text-muted-foreground text-sm">
-            {doneCount} of {items.length} done.
-          </p>
-          <ol className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-muted-foreground tabular-nums">
+              {doneCount} of {items.length} done.
+            </p>
+            {next ? (
+              <Link
+                href={`/questions/${next.questionId}?session=${session.id}`}
+                className={buttonVariants()}
+              >
+                {doneCount === 0 ? "Start" : "Continue"}
+              </Link>
+            ) : (
+              <p className="font-medium">All done. Well done.</p>
+            )}
+          </div>
+          <RuledList>
             {items.map((item) => (
               <li key={item.position}>
                 <Link
                   href={`/questions/${item.questionId}?session=${session.id}`}
-                  className="hover:bg-muted flex flex-col gap-1 rounded-lg border p-3"
+                  className={`${RULED_ROW_LINK} gap-1.5`}
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">
+                    <span className="font-heading text-lg font-medium">
                       {item.position}.{" "}
                       {item.source === "variant" ? "New variant" : `Retry ${item.label}`}
-                      <span className="text-muted-foreground text-sm font-normal">
+                      <span className="text-muted-foreground font-sans text-sm font-normal">
                         {" "}
                         · about {item.expectedMinutes} min
                       </span>
@@ -95,17 +103,7 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
                 </Link>
               </li>
             ))}
-          </ol>
-          {next ? (
-            <Link
-              href={`/questions/${next.questionId}?session=${session.id}`}
-              className={buttonVariants({ className: "self-start" })}
-            >
-              {doneCount === 0 ? "Start" : "Continue"}
-            </Link>
-          ) : (
-            <p className="text-sm font-medium">All done. Well done.</p>
-          )}
+          </RuledList>
         </>
       ) : null}
     </section>

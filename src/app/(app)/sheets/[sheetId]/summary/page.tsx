@@ -32,7 +32,7 @@ export default async function SummaryPage({ params }: PageProps<"/sheets/[sheetI
         </p>
       ) : (
         <>
-          <div className="flex flex-col gap-2 rounded-lg border p-4">
+          <div className="flex flex-col gap-2 bg-card rounded-lg border p-5">
             <h2 className="font-medium">Questions solved, by hints used</h2>
             <HintLadderBar counts={state.ladder} />
           </div>
@@ -46,7 +46,10 @@ export default async function SummaryPage({ params }: PageProps<"/sheets/[sheetI
           ) : null}
 
           {state.kind === "failed" ? (
-            <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
+            <div
+              role="alert"
+              className="flex flex-col items-start gap-3 bg-card rounded-lg border p-5"
+            >
               <p className="text-sm">The summary could not be prepared.</p>
               <form action={retrySummaryAction.bind(null, sheetId)}>
                 <Button type="submit" variant="outline" size="sm">
@@ -71,7 +74,7 @@ export default async function SummaryPage({ params }: PageProps<"/sheets/[sheetI
 
 function Points({ title, points }: { title: string; points: string[] }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
+    <div className="flex flex-col gap-2 bg-card rounded-lg border p-5">
       <h2 className="font-medium">{title}</h2>
       {points.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nothing to report.</p>

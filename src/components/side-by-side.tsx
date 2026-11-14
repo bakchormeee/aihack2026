@@ -17,7 +17,7 @@ export function SideBySide({
 }): ReactNode {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <section className="flex flex-col gap-2 rounded-lg border p-4">
+      <section className="flex flex-col gap-2 bg-card rounded-lg border p-5">
         <h3 className="text-sm font-semibold">
           {solution?.basis === "official" ? "Official solution" : "Worked solution"}
         </h3>
@@ -29,7 +29,7 @@ export function SideBySide({
           </p>
         )}
       </section>
-      <section className="flex flex-col gap-2 rounded-lg border p-4">
+      <section className="flex flex-col gap-2 bg-card rounded-lg border p-5">
         <h3 className="text-sm font-semibold">Your working</h3>
         {text?.trim() ? <MathText className="text-sm">{text}</MathText> : null}
         {files.map((file, index) =>

@@ -1,3 +1,4 @@
+import { EmptyState, PageHeader, Panel } from "@/components/page-parts";
 import { ProgressChart } from "@/components/progress-chart";
 import { getCourseEvents, getCourseMastery } from "@/db/queries/mastery";
 import { orNotFound } from "@/lib/auth/guards";
@@ -16,21 +17,23 @@ export default async function ProgressPage({ params }: PageProps<"/courses/[cour
   const withData = topics.filter((t) => t.series.length > 0);
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{course.name}: progress</h1>
+    <section className="flex flex-col gap-6">
+      <PageHeader title={`${course.name}: progress`} />
       {withData.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <EmptyState>
           Nothing to show yet. Mastery over time appears once some of your work has been marked.
-        </p>
+        </EmptyState>
       ) : (
-        <ProgressChart
-          topics={withData.map((t) => ({
-            id: t.id,
-            name: t.name,
-            series: t.series.map((p) => ({ at: p.at.toISOString(), mastery: p.mastery })),
-          }))}
-          events={events.map((e) => ({ at: e.at.toISOString(), kind: e.kind, label: e.label }))}
-        />
+        <Panel>
+          <ProgressChart
+            topics={withData.map((t) => ({
+              id: t.id,
+              name: t.name,
+              series: t.series.map((p) => ({ at: p.at.toISOString(), mastery: p.mastery })),
+            }))}
+            events={events.map((e) => ({ at: e.at.toISOString(), kind: e.kind, label: e.label }))}
+          />
+        </Panel>
       )}
     </section>
   );
