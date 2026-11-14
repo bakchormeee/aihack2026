@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
+import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,17 +39,12 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
   );
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-6">
       <AutoRefresh active={reading || hintsPending} />
-      <div>
-        <Link
-          href={`/courses/${sheet.courseId}/sheets`}
-          className="text-muted-foreground text-sm underline"
-        >
-          All sheets
-        </Link>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">{sheet.title}</h1>
+      <PageHeader
+        back={{ href: `/courses/${sheet.courseId}/sheets`, label: "All sheets" }}
+        title={sheet.title}
+        actions={
           <form
             action={setTimerAction.bind(null, sheet.id, !sheet.timerEnabled)}
             className="flex items-center gap-2"
@@ -60,8 +56,8 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
               Turn {sheet.timerEnabled ? "off" : "on"}
             </Button>
           </form>
-        </div>
-      </div>
+        }
+      />
 
       {reading ? (
         <div className="flex flex-col gap-3" aria-live="polite">
@@ -75,8 +71,8 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
       ) : null}
 
       {sheet.status === "failed" || stuck ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
-          <p className="text-sm">
+        <Panel role="alert" className="flex flex-col items-start gap-3">
+          <p>
             {stuck
               ? "This is taking longer than expected."
               : (sheet.error ?? "We could not read this sheet.")}
@@ -84,16 +80,16 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
           <form action={retryParseAction.bind(null, sheet.id)}>
             <Button type="submit">Try again</Button>
           </form>
-        </div>
+        </Panel>
       ) : null}
 
       {hintsStuck ? (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
-          <p className="text-sm">Hints could not be prepared for some questions.</p>
+        <Panel role="alert" className="flex flex-col items-start gap-3">
+          <p>Hints could not be prepared for some questions.</p>
           <form action={retryHintsAction.bind(null, sheet.id)}>
             <Button type="submit">Prepare the hints again</Button>
           </form>
-        </div>
+        </Panel>
       ) : null}
 
       {questions.length > 0 ? (
@@ -111,24 +107,23 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
       ) : null}
 
       {questions.length > 0 ? (
-        <ol className="flex flex-col gap-3">
+        <RuledList>
           {questions.map((question) => (
             <li key={question.id}>
-              <Link
-                href={`/questions/${question.id}`}
-                className="hover:bg-muted flex flex-col gap-2 rounded-lg border p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">Question {question.label}</span>
-                  <span className="text-muted-foreground text-xs">
+              <Link href={`/questions/${question.id}`} className={`${RULED_ROW_LINK} gap-3 py-5`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-heading text-lg font-medium">
+                    Question {question.label}
+                  </span>
+                  <span className="text-muted-foreground shrink-0 text-xs">
                     about {question.expectedMinutes} min · {HINTS_LABEL[question.hintsStatus]}
                   </span>
                 </div>
                 <div
                   className={
                     question.body.length > 280
-                      ? "max-h-32 overflow-hidden text-sm [mask-image:linear-gradient(to_bottom,black_65%,transparent)]"
-                      : "text-sm"
+                      ? "max-h-32 overflow-hidden [mask-image:linear-gradient(to_bottom,black_65%,transparent)]"
+                      : undefined
                   }
                 >
                   <MathText>{question.body}</MathText>
@@ -143,7 +138,7 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
               </Link>
             </li>
           ))}
-        </ol>
+        </RuledList>
       ) : null}
     </section>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { TopicPanel } from "@/components/topic-panel";
 import { getCourseMastery } from "@/db/queries/mastery";
@@ -19,14 +20,17 @@ export default async function CoursePage({
 
   if (sheets.length === 0) {
     return (
-      <section className="flex flex-col items-start gap-3">
-        <h1 className="text-xl font-semibold">{course.name}</h1>
-        <p className="text-muted-foreground text-sm">
+      <section className="flex flex-col gap-6">
+        <PageHeader title={course.name} />
+        <EmptyState
+          action={
+            <Link href={`/courses/${course.id}/sheets`} className={buttonVariants()}>
+              Upload a sheet
+            </Link>
+          }
+        >
           Upload your first problem sheet to build the skill map for this course.
-        </p>
-        <Link href={`/courses/${course.id}/sheets`} className={buttonVariants()}>
-          Upload a sheet
-        </Link>
+        </EmptyState>
       </section>
     );
   }
@@ -36,18 +40,19 @@ export default async function CoursePage({
   const selected = topics.find((t) => t.id === (Array.isArray(rawTopic) ? rawTopic[0] : rawTopic));
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{course.name}</h1>
+    <section className="flex flex-col gap-6">
+      <PageHeader
+        title={course.name}
+        description={
+          topics.length > 0
+            ? "Colour shows mastery, size shows attempts, faded means little evidence yet. Select a topic."
+            : undefined
+        }
+      />
       {topics.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No topics yet. They appear once a sheet has been read.
-        </p>
+        <EmptyState>No topics yet. They appear once a sheet has been read.</EmptyState>
       ) : (
-        <>
-          <p className="text-muted-foreground text-sm">
-            Colour shows mastery, size shows attempts, faded means little evidence yet. Select a
-            topic.
-          </p>
+        <Panel className="p-3 sm:p-4">
           <TopicPanel
             courseId={course.id}
             nodes={topics.map((t) => ({
@@ -59,16 +64,12 @@ export default async function CoursePage({
             }))}
             links={prereqs.map((p) => ({ source: p.prereqId, target: p.topicId }))}
           />
-        </>
+        </Panel>
       )}
       {selected ? (
-        <div
-          id="topic-actions"
-          className="flex scroll-mt-4 flex-col gap-2 rounded-lg border p-4"
-          aria-live="polite"
-        >
-          <h2 className="font-medium">{selected.name}</h2>
-          <p className="text-muted-foreground text-sm">
+        <Panel id="topic-actions" className="flex scroll-mt-20 flex-col gap-3" aria-live="polite">
+          <SectionTitle>{selected.name}</SectionTitle>
+          <p className="text-muted-foreground">
             {selected.mastery === null
               ? "No marked attempts yet."
               : `Mastery ${Math.round(selected.mastery * 100)}% from ${selected.attempts} ${selected.attempts === 1 ? "attempt" : "attempts"}.`}
@@ -87,7 +88,7 @@ export default async function CoursePage({
               Revise this topic
             </Link>
           </div>
-        </div>
+        </Panel>
       ) : null}
     </section>
   );
