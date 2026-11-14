@@ -242,7 +242,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/db/queries/marking.ts` (+ test), `app/questions/[questionId]/mark/page.tsx`, `src/components/solution-panel.tsx`, `src/components/question-view.tsx`
   - Depends on: M9
 
-- [ ] **M11: End-to-end test of the core loop** (S)
+- [x] **M11: End-to-end test of the core loop** (S)
   - Acceptance: one Playwright test, with test sign-in and `AI_FIXTURES=1`, creates a course, uploads a sheet, reveals a hint, submits typed working and sees a provisional mark.
   - Verify: `npm run e2e` passes locally.
   - Files: `tests/e2e/core-loop.spec.ts`, `tests/e2e/helpers.ts`

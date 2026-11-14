@@ -36,5 +36,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   Uploads go straight from the browser to R2, whose CORS rule only allows
   `http://localhost:3000` and `http://localhost:3003`; other origins fail with
   "Failed to fetch" on upload (not a bug in the code).
+- End-to-end tests: `npm run e2e` (port 3003, recorded AI answers, test sign-in, own build
+  folder `.next-e2e`). If Playwright's own browser is not installed, set
+  `E2E_BROWSER_PATH` to a Chromium or headless-shell you already have. Each run creates
+  one `e2e-<time>@test.local` user in the real database.
 - Render any question, hint, solution or feedback text with `<MathText>`.
 - Before reporting a task done: `npm run lint`, `npm run typecheck`, `npm test`.

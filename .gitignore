@@ -50,3 +50,6 @@ next-env.d.ts
 # uploaded student work must never be committed
 /uploads/
 /demo-sheets/
+
+# end-to-end test build
+/.next-e2e/
