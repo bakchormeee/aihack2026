@@ -1,0 +1,13 @@
+{
+  "solutions": [
+    {
+      "questionId": "q1",
+      "found": true,
+      "body": ""
+    },
+    {
+      "label": "2",
+      "body": "$$\\int_0^{\\pi} x \\cos x \\, dx = -2.$$"
+    }
+  ]
+}
