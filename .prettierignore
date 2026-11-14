@@ -7,3 +7,4 @@ tests/fixtures
 playwright-report
 test-results
 *.md
+.claude
