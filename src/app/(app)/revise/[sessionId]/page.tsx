@@ -84,7 +84,11 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
                       {item.done ? "Done" : "To do"}
                     </Badge>
                   </span>
-                  <span className="text-muted-foreground text-sm">Because {item.reason}.</span>
+                  <span className="text-muted-foreground text-sm">
+                    {item.source === "variant"
+                      ? `${item.reason.charAt(0).toUpperCase()}${item.reason.slice(1)}.`
+                      : `Because ${item.reason}.`}
+                  </span>
                   <span className="line-clamp-2 text-sm">
                     <MathText>{item.body}</MathText>
                   </span>
