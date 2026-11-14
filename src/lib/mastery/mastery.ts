@@ -41,7 +41,8 @@ export function replayMastery(
   // Decision: a clock before the last attempt counts as zero days, not negative decay.
   const days = last ? Math.max(0, (now.getTime() - last.at.getTime()) / MS_PER_DAY) : 0;
   const confidence =
-    Math.min(1, totalWeight / WEIGHT_FOR_FULL_CONFIDENCE) * 0.5 ** (days / CONFIDENCE_HALF_LIFE_DAYS);
+    Math.min(1, totalWeight / WEIGHT_FOR_FULL_CONFIDENCE) *
+    0.5 ** (days / CONFIDENCE_HALF_LIFE_DAYS);
 
   return {
     mastery,

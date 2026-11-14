@@ -15,7 +15,10 @@ export function currentMark<M extends { basis: MarkBasis; createdAt: Date }>(mar
   const latest = (basis: MarkBasis) =>
     marks
       .filter((m) => m.basis === basis)
-      .reduce<M | null>((best, m) => (best === null || m.createdAt > best.createdAt ? m : best), null);
+      .reduce<M | null>(
+        (best, m) => (best === null || m.createdAt > best.createdAt ? m : best),
+        null,
+      );
   return latest("official") ?? latest("ai");
 }
 

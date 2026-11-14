@@ -89,14 +89,25 @@ describe("isSolutionUnlocked", () => {
     expect(isSolutionUnlocked({ ...base, maxHintLevelRevealed: 2 })).toBe(false));
   it("unlocks in review mode with a submitted attempt and an official solution", () =>
     expect(
-      isSolutionUnlocked({ ...base, reviewMode: true, hasSubmittedAttempt: true, hasOfficialSolution: true }),
+      isSolutionUnlocked({
+        ...base,
+        reviewMode: true,
+        hasSubmittedAttempt: true,
+        hasOfficialSolution: true,
+      }),
     ).toBe(true));
   it("stays locked in review mode with no submitted attempt", () =>
-    expect(isSolutionUnlocked({ ...base, reviewMode: true, hasOfficialSolution: true })).toBe(false));
+    expect(isSolutionUnlocked({ ...base, reviewMode: true, hasOfficialSolution: true })).toBe(
+      false,
+    ));
   it("stays locked in review mode with no official solution", () =>
-    expect(isSolutionUnlocked({ ...base, reviewMode: true, hasSubmittedAttempt: true })).toBe(false));
+    expect(isSolutionUnlocked({ ...base, reviewMode: true, hasSubmittedAttempt: true })).toBe(
+      false,
+    ));
   it("a submitted attempt and official solution do not unlock outside review mode", () =>
-    expect(isSolutionUnlocked({ ...base, hasSubmittedAttempt: true, hasOfficialSolution: true })).toBe(false));
+    expect(
+      isSolutionUnlocked({ ...base, hasSubmittedAttempt: true, hasOfficialSolution: true }),
+    ).toBe(false));
 });
 
 describe("canDispute", () => {

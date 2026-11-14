@@ -46,9 +46,9 @@ describe("evidenceScore", () => {
     expect(evidenceScore(attempt({ secondsSpent: null }))).toBe(1);
   });
   it("combines outcome, hints and time", () => {
-    expect(evidenceScore(attempt({ outcome: "partial", hintLevel: 2, secondsSpent: 99999 }))).toBeCloseTo(
-      0.5 * 0.6 * 0.9,
-    );
+    expect(
+      evidenceScore(attempt({ outcome: "partial", hintLevel: 2, secondsSpent: 99999 })),
+    ).toBeCloseTo(0.5 * 0.6 * 0.9);
   });
 });
 
@@ -80,7 +80,12 @@ describe("replayMastery", () => {
   });
 
   it("SC14: confidence halves after 30 days without attempts", () => {
-    const attempts = [attempt({ basis: "official" }), attempt({ basis: "official" }), attempt({ basis: "official" }), attempt({ basis: "official" })];
+    const attempts = [
+      attempt({ basis: "official" }),
+      attempt({ basis: "official" }),
+      attempt({ basis: "official" }),
+      attempt({ basis: "official" }),
+    ];
     const fresh = replayMastery(attempts, T0).confidence;
     const later = replayMastery(attempts, new Date(T0.getTime() + 30 * DAY)).confidence;
     expect(fresh).toBe(1);
@@ -116,7 +121,11 @@ describe("replayMastery", () => {
   });
 
   it("confidence grows with total weight and caps at 1", () => {
-    const n = (k: number) => replayMastery(Array.from({ length: k }, () => attempt()), T0).confidence;
+    const n = (k: number) =>
+      replayMastery(
+        Array.from({ length: k }, () => attempt()),
+        T0,
+      ).confidence;
     expect(n(1)).toBeCloseTo(0.125); // 0.5 / 4
     expect(n(8)).toBe(1); // 4 / 4
     expect(n(20)).toBe(1);
