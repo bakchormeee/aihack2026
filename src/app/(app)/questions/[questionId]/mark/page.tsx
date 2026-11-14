@@ -70,6 +70,12 @@ export default async function MarkPage({
   const marking = submission?.submittedAt && !current && submission.markStatus === "pending";
   const stuck = marking && isStale(submission.markStatusUpdatedAt);
   const waiting = marking && !stuck;
+  // A dispute or the official re-mark is running while an earlier mark is shown.
+  const remarking =
+    submission?.submittedAt &&
+    current &&
+    submission.markStatus === "pending" &&
+    !isStale(submission.markStatusUpdatedAt);
   const failed =
     submission?.submittedAt &&
     !current &&
@@ -77,7 +83,7 @@ export default async function MarkPage({
 
   return (
     <section className="flex flex-col gap-6">
-      <AutoRefresh active={Boolean(waiting)} />
+      <AutoRefresh active={Boolean(waiting || remarking)} />
       <div>
         <Link href={back} className="text-muted-foreground text-sm underline">
           Back to question {question.label}
@@ -100,6 +106,12 @@ export default async function MarkPage({
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
+      ) : null}
+
+      {remarking ? (
+        <p className="text-muted-foreground text-sm" aria-live="polite">
+          Marking again… the earlier mark stays below until the new one is ready.
+        </p>
       ) : null}
 
       {failed ? (
