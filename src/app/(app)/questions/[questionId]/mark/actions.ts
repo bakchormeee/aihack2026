@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
+import { DisputeRefusedError, startDispute } from "@/db/queries/marking";
 import {
   NoMoreHintsError,
   HintsNotReadyError,
@@ -11,6 +12,7 @@ import {
   startAttemptFor,
 } from "@/db/queries/attempts";
 import { getWorkingFor } from "@/db/queries/working";
+import { NotFoundError, requireAttempt } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { claimMark, performMark } from "@/lib/pipeline/mark";
 
@@ -49,4 +51,31 @@ export async function retryWithNextHintAction(
     if (!(error instanceof NoMoreHintsError || error instanceof HintsNotReadyError)) throw error;
   }
   redirect(questionHref(questionId, sessionId));
+}
+
+export type DisputeResult = { error?: string };
+
+/** "I think this is right": marks the attempt again, with the optional reason, keeping the earlier marks. */
+export async function disputeAction(
+  questionId: string,
+  attemptId: string,
+  _previous: DisputeResult,
+  formData: FormData,
+): Promise<DisputeResult> {
+  const user = await requireUser();
+  const raw = formData.get("reason");
+  const reason = typeof raw === "string" && raw.trim() !== "" ? raw : undefined;
+  try {
+    // The attempt must belong to this question as well as to the user.
+    const attempt = await requireAttempt(user.id, attemptId);
+    if (attempt.questionId !== questionId) return { error: "Attempt not found." };
+    const claim = await startDispute(user.id, attemptId, reason);
+    after(() => performMark(claim));
+  } catch (error) {
+    if (error instanceof DisputeRefusedError) return { error: error.message };
+    if (error instanceof NotFoundError) return { error: "Attempt not found." };
+    throw error;
+  }
+  revalidatePath(`/questions/${questionId}/mark`);
+  return {};
 }

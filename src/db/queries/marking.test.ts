@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "@/db";
@@ -20,7 +21,10 @@ import {
   getRemarkProgress,
   getSolutionsReview,
   getVisibleSolution,
+  DisputeRefusedError,
+  startDispute,
 } from "./marking";
+import { performMark } from "@/lib/pipeline/mark";
 
 async function setup(email: string) {
   const [user] = await db.insert(users).values({ email }).returning();
@@ -404,5 +408,109 @@ describe("getSolutionsReview", () => {
     await attemptWith(user.id, qs[1].id, [{ score: 60 }]);
 
     expect(await getRemarkProgress(user.id, sheetId)).toEqual({ total: 2, marked: 1 });
+  });
+});
+
+describe("startDispute", () => {
+  const io = (score: number) => ({
+    readFile: async () => Buffer.from("x"),
+    mark: async () => ({
+      score,
+      errorType: "method" as const,
+      firstWrongStep: "s",
+      feedback: "f",
+      overallFeedback: "o",
+    }),
+  });
+
+  async function marked(email: string) {
+    const base = await setup(email);
+    await db.insert(solutions).values({ questionId: base.question.id, basis: "ai", body: "S" });
+    await db.insert(submissions).values({
+      attemptId: base.attempt.id,
+      text: "w",
+      submittedAt: new Date(),
+      markStatus: "done",
+    });
+    await db
+      .insert(marks)
+      .values(mark(base.attempt.id, { createdAt: new Date(Date.now() - 5000) }));
+    return base;
+  }
+  const allMarks = (attemptId: string) =>
+    db.select().from(marks).where(eq(marks.attemptId, attemptId));
+
+  it("adds a flagged mark with the reason and keeps the earlier one", async () => {
+    const { user, attempt } = await marked("dp-basic@test.local");
+
+    const claim = await startDispute(user.id, attempt.id, "  step 3 is correct  ");
+    await performMark(claim, io(95));
+
+    const rows = await allMarks(attempt.id);
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((m) => m.isDispute)).toHaveLength(1);
+    const disputed = rows.find((m) => m.isDispute)!;
+    expect(disputed).toMatchObject({
+      basis: "ai",
+      score: 95,
+      disputeReason: "step 3 is correct",
+    });
+    expect(rows.find((m) => !m.isDispute)!.score).toBe(60);
+  });
+
+  it("accepts a dispute with no reason", async () => {
+    const { user, attempt } = await marked("dp-noreason@test.local");
+
+    await performMark(await startDispute(user.id, attempt.id, undefined), io(60));
+
+    const [disputed] = (await allMarks(attempt.id)).filter((m) => m.isDispute);
+    expect(disputed.disputeReason).toBeNull();
+  });
+
+  it("refuses a third dispute on the server", async () => {
+    const { user, attempt } = await marked("dp-limit@test.local");
+    for (let i = 0; i < 2; i++) {
+      await performMark(await startDispute(user.id, attempt.id, `try ${i}`), io(60));
+    }
+
+    await expect(startDispute(user.id, attempt.id, "again")).rejects.toBeInstanceOf(
+      DisputeRefusedError,
+    );
+    expect(await allMarks(attempt.id)).toHaveLength(3);
+  });
+
+  it("keeps the basis of the current mark", async () => {
+    const { user, attempt, question } = await marked("dp-basis@test.local");
+    await db.insert(solutions).values({ questionId: question.id, basis: "official", body: "O" });
+    await db.insert(marks).values(mark(attempt.id, { basis: "official", score: 40 }));
+
+    await performMark(await startDispute(user.id, attempt.id, "r"), io(80));
+
+    const disputed = (await allMarks(attempt.id)).find((m) => m.isDispute)!;
+    expect(disputed.basis).toBe("official");
+  });
+
+  it("refuses a reason over 300 characters, an unsubmitted attempt and another user's attempt", async () => {
+    const { user, attempt } = await marked("dp-bad@test.local");
+    await expect(startDispute(user.id, attempt.id, "x".repeat(301))).rejects.toBeInstanceOf(
+      DisputeRefusedError,
+    );
+
+    const fresh = await setup("dp-draft@test.local");
+    await expect(startDispute(fresh.user.id, fresh.attempt.id, "r")).rejects.toBeInstanceOf(
+      DisputeRefusedError,
+    );
+
+    const [other] = await db.insert(users).values({ email: "dp-other@test.local" }).returning();
+    await expect(startDispute(other.id, attempt.id, "r")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("refuses while the attempt is already being marked", async () => {
+    const { user, attempt } = await marked("dp-busy@test.local");
+    await startDispute(user.id, attempt.id, "first");
+
+    await expect(startDispute(user.id, attempt.id, "second")).rejects.toBeInstanceOf(
+      DisputeRefusedError,
+    );
   });
 });

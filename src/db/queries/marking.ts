@@ -1,6 +1,7 @@
 // Marks, as shown on the mark screen (tasks M9, M10 and the R track add to this file).
 
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db";
 import {
@@ -15,7 +16,8 @@ import {
 } from "@/db/schema";
 import { requireAttempt, requireQuestion, requireSheet } from "@/lib/auth/ownership";
 import type { HintLevel, Outcome } from "@/lib/domain";
-import { attemptHintLevel, currentMark, isSolutionUnlocked } from "@/lib/marking/rules";
+import { attemptHintLevel, canDispute, currentMark, isSolutionUnlocked } from "@/lib/marking/rules";
+import { claimMark, type ClaimedMark } from "@/lib/pipeline/mark";
 
 export async function getMarkScreenData(userId: string, attemptId: string) {
   const attempt = await requireAttempt(userId, attemptId);
@@ -276,4 +278,56 @@ export async function getRemarkProgress(
     officialMarks.filter((m) => !since || m.createdAt >= since).map((m) => m.attemptId),
   );
   return { total: rows.length, marked: marked.size };
+}
+
+export const DISPUTE_REASON_MAX = 300;
+
+/** The optional one-line reason for a dispute: trimmed, at most 300 characters. */
+export const disputeReasonSchema = z.string().trim().max(DISPUTE_REASON_MAX).optional();
+
+export class DisputeRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DisputeRefusedError";
+  }
+}
+
+/**
+ * Starts a dispute ("I think this is right") of the attempt's current mark:
+ * claims a new mark with the same basis and the reason. Pass the result to
+ * performMark. At most two disputes per attempt, counted here on the server.
+ * Throws NotFoundError for another user's attempt and DisputeRefusedError
+ * when the dispute is not allowed.
+ */
+export async function startDispute(
+  userId: string,
+  attemptId: string,
+  reason: string | undefined,
+): Promise<ClaimedMark> {
+  await requireAttempt(userId, attemptId);
+  const parsed = disputeReasonSchema.safeParse(reason);
+  if (!parsed.success) {
+    throw new DisputeRefusedError(`Keep the reason to ${DISPUTE_REASON_MAX} characters.`);
+  }
+
+  const [submission] = await db
+    .select()
+    .from(submissions)
+    .where(eq(submissions.attemptId, attemptId));
+  const all = await db.select().from(marks).where(eq(marks.attemptId, attemptId));
+  const current = currentMark(all);
+  if (!submission?.submittedAt || !current) {
+    throw new DisputeRefusedError("There is no mark to dispute yet.");
+  }
+  if (!canDispute(all.filter((mark) => mark.isDispute).length)) {
+    throw new DisputeRefusedError("You have already disputed this attempt twice.");
+  }
+
+  const claim = await claimMark({
+    submissionId: submission.id,
+    basis: current.basis,
+    disputeReason: parsed.data ?? "",
+  });
+  if (!claim) throw new DisputeRefusedError("This attempt is being marked. Please wait.");
+  return claim;
 }
