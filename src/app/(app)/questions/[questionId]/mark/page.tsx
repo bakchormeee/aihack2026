@@ -174,7 +174,7 @@ export default async function MarkPage({
             </div>
           ) : current.firstWrongStep ? (
             <div className="rounded-lg border p-4">
-              <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+              <p className="text-muted-foreground mb-1 text-xs font-medium">
                 Where it first goes wrong
               </p>
               <MathText className="text-sm">{current.firstWrongStep}</MathText>
@@ -182,12 +182,12 @@ export default async function MarkPage({
           ) : null}
 
           <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Feedback</p>
+            <p className="text-muted-foreground mb-1 text-xs font-medium">Feedback</p>
             <MathText className="text-sm">{current.feedback}</MathText>
           </div>
 
           <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Overall</p>
+            <p className="text-muted-foreground mb-1 text-xs font-medium">Overall</p>
             <MathText className="text-sm">{current.overallFeedback}</MathText>
           </div>
 

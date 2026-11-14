@@ -40,7 +40,7 @@ export function MistakeList({ mistakes }: { mistakes: Mistake[] }) {
               {index + 1}
             </span>
             <div className="flex min-w-0 flex-col gap-1 text-sm">
-              <p className="text-xs font-medium uppercase">
+              <p className="text-xs font-medium">
                 {SEVERITY_LABEL[severity]} · {ERROR_LABEL[mistake.type]}
                 {place ? ` · ${place}` : ""}
               </p>

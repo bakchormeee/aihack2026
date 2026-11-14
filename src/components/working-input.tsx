@@ -177,7 +177,7 @@ export function WorkingInput({
         </p>
         {text.trim() ? (
           <div className="rounded-lg border p-3">
-            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Preview</p>
+            <p className="text-muted-foreground mb-1 text-xs font-medium">Preview</p>
             <MathText className="text-sm">{text}</MathText>
           </div>
         ) : null}

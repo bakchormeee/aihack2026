@@ -120,7 +120,7 @@ export function QuestionView({
           <ol className="flex flex-col gap-2">
             {shown.map((hint) => (
               <li key={hint.level} className="rounded-lg border p-3">
-                <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+                <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Hint {hint.level} · {HINT_NAMES[hint.level - 1]}
                 </p>
                 <MathText className="text-sm">{hint.body}</MathText>
