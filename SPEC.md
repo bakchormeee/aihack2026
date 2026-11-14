@@ -1,7 +1,8 @@
 # Spec: Problem Sheet Companion — V1
 
 Status: approved on 14 November 2026, including the assumptions marked **[A]**
-and the cut order. No code exists yet.
+and the cut order. Amended the same day after the plan audit (see
+`tasks/plan.md`, "Spec amendments"). No code exists yet.
 
 ## Objective
 
@@ -20,6 +21,13 @@ The app turns each sheet into a tracked learning loop:
 A student doing weekly maths problem sheets, with their own account. The app
 is for the student's own learning: sheets are not treated as assessed work, so
 hints and marking are available at any time. There is no tutor or class view.
+
+### Platform
+
+A responsive web app, used in a browser on a laptop, tablet or phone. There
+is no native mobile app. Every screen must be usable at a width of 375 px, so
+that a student can photograph their working with a phone and upload it from
+the phone's browser.
 
 ### User stories
 
@@ -114,6 +122,11 @@ with variants, and the skill map.
   changed later only while the sheet has no attempts.
 - Upload accepts one PDF (max 20 MB, max 30 pages) or up to 10 images
   (JPEG, PNG or WebP, max 10 MB each), by file picker or drag-and-drop. **[A]**
+- Every image (sheet, solutions or working) is resized in the browser before
+  upload to at most 2000 px on its long edge and saved as JPEG, so that phone
+  photos stay within the AI input limits. Files are uploaded from the browser
+  directly to object storage with a short-lived signed URL; the server then
+  checks the stored file's owner, type and size before using it.
 - **Parse** (`parseSheet`) runs in the background. The sheet has a status:
   `parsing`, `ready` or `failed`. A failed parse shows an error and a retry button.
 - Parse output, per question: label (e.g. "3"), body in Markdown with LaTeX,
@@ -126,8 +139,10 @@ with variants, and the skill map.
 - **Editable parse**: before or after starting, the student can edit a
   question's body, label and topics, merge two adjacent questions, split one
   question at a chosen point, or delete a question. Editing the body of a
-  question regenerates its hints and worked solution. Questions that already
-  have an attempt cannot be merged, split or deleted.
+  question regenerates its hints and worked solution. Once a question has an
+  attempt, only its label and topics can be edited: its body cannot be
+  changed and it cannot be merged, split or deleted, because recorded hint
+  reveals and marks refer to the original text and hints.
 - **Hints and worked solution** (`generateHints`) are generated for every
   question as soon as parsing finishes, so that a reveal is instant. If a hint
   is requested before it is ready, the button shows a loading state.
@@ -155,6 +170,9 @@ with variants, and the skill map.
   - images (JPEG, PNG, WebP; up to 10 per submission),
   - one PDF,
   - typed text in Markdown with LaTeX (`$…$`), with a live rendered preview.
+- Working attached to an attempt is saved as a **draft** until it is
+  submitted. An attempt has at most one submission, and a submitted
+  submission cannot be changed.
 - On submit the student may give a difficulty rating of 1–5 (one tap, skippable).
 - "Submit all" on the sheet overview submits every question that has working
   attached but not yet submitted. Uploading one file for the whole sheet and
@@ -206,8 +224,9 @@ with variants, and the skill map.
 
 ### `mastery`
 
-Mastery is always computed from the attempt history by pure functions; the
-`topic_mastery` table is only a cache.
+Mastery is always computed from the attempt history by pure functions, each
+time it is read. Nothing about mastery is stored, so it can never disagree
+with the marks.
 
 For one student and one topic, take every marked attempt on a question tagged
 with that topic, in time order, using each attempt's current mark:
@@ -297,16 +316,16 @@ Versions are the latest stable at scaffold time, pinned exactly in
 |---|---|
 | Runtime | Node.js 22 LTS, npm |
 | App | Next.js 15+ (App Router), React 19, TypeScript 5 in strict mode |
-| UI | Tailwind CSS 4, shadcn/ui, KaTeX for maths |
+| UI | Tailwind CSS 4, shadcn/ui, KaTeX for maths; `react-markdown` with `remark-math` and `rehype-katex` to render question, hint and feedback text |
 | Charts | D3 7 for the skill map; Recharts for the other three |
 | Validation | Zod for all AI outputs and all request bodies |
 | PDF export | `pdf-lib` and `html-to-image`, both in the browser |
 | Data | PostgreSQL (Neon) through Drizzle ORM **[A]** |
-| Files | S3-compatible object storage (Cloudflare R2), private bucket, signed URLs **[A]** |
+| Files | S3-compatible object storage (Cloudflare R2), private bucket, signed URLs for upload and download, through `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` **[A]** |
 | Auth | Auth.js v5: Google provider and email magic link (Resend) **[A]** |
 | AI | Claude API through `@anthropic-ai/sdk`, PDF and image input, structured output |
 | Hosting | Vercel **[A]** |
-| Tests | Vitest (unit, contract), Playwright (end to end) |
+| Tests | Vitest (unit, contract, integration on an in-memory PGlite database), Playwright (end to end) |
 
 ### AI calls
 
@@ -332,10 +351,11 @@ server-side after the request returns, and the page polls a status field.
 
 ### Data model
 
-- `user` (id, email, name)
+- `user` (id, email, name), plus the `account`, `session` and
+  `verification_token` tables that the Auth.js Drizzle adapter requires
 - `course` (id, user_id, name)
 - `topic` (id, course_id, name, parent_id), `topic_prereq` (topic_id, prereq_id)
-- `sheet` (id, course_id, title, status, timer_enabled, uploaded_at, solutions_uploaded_at)
+- `sheet` (id, course_id, title, status: parsing | ready | failed, status_updated_at, error nullable, timer_enabled, uploaded_at, solutions_status: none | extracting | remarking | done | failed, solutions_uploaded_at)
 - `sheet_file` (id, sheet_id, kind: sheet | official_solutions, path, mime, position)
 - `question` (id, course_id, sheet_id nullable, position, label, body, expected_minutes, source: original | variant, parent_question_id, hints_status)
 - `question_topic` (question_id, topic_id)
@@ -343,13 +363,17 @@ server-side after the request returns, and the page polls a status field.
 - `solution` (id, question_id, basis: ai | official, body)
 - `attempt` (id, user_id, question_id, context: sheet | revision, revision_session_id nullable, started_at, seconds_spent nullable, inherited_hint_level, difficulty_rating nullable)
 - `hint_reveal` (attempt_id, hint_id, revealed_at)
-- `submission` (id, attempt_id, text nullable, submitted_at), `submission_file` (id, submission_id, path, mime, position)
+- `submission` (id, attempt_id unique, text nullable, submitted_at nullable — null means draft, mark_status: none | pending | done | failed), `submission_file` (id, submission_id, path, mime, position)
 - `mark` (id, attempt_id, basis: ai | official, score, outcome, error_type, first_wrong_step, feedback, is_dispute, dispute_reason, outcome_changed, created_at)
 - `sheet_summary` (sheet_id, body_json, generated_at)
-- `revision_session` (id, user_id, course_id, target_minutes, created_at), `revision_item` (session_id, question_id, position, source: retry | variant, reason)
-- `topic_mastery` (user_id, topic_id, mastery, confidence, updated_at) — cache only
+- `revision_session` (id, user_id, course_id, target_minutes, status: building | ready | failed, created_at), `revision_item` (session_id, question_id, position, source: retry | variant, reason)
 
-Attempts, submissions, hint reveals and marks are append-only.
+Unique constraints: `topic` (course_id, lower(name)); `hint` (question_id,
+level); `hint_reveal` (attempt_id, hint_id); `solution` (question_id, basis);
+`submission` (attempt_id).
+
+Attempts, submitted submissions, hint reveals and marks are append-only.
+There is no delete for courses or sheets in V1.
 
 ## Commands
 
@@ -370,7 +394,7 @@ Migrate:        npm run db:migrate               # drizzle-kit migrate
 
 Environment variables, listed in `.env.example` and never committed with
 values: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
-`AUTH_RESEND_KEY`, `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_FIXTURES`,
+`AUTH_RESEND_KEY`, `ENABLE_TEST_SIGN_IN`, `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_FIXTURES`,
 `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
 
 ## Project Structure
@@ -449,9 +473,14 @@ export function evidenceScore(attempt: MarkedAttempt): number {
 |---|---|---|---|
 | Unit | Vitest | `src/lib/mastery/`, `src/lib/marking/` (evidence, mastery replay, priority, queue building, current mark, solution lock, outcome thresholds) | 100% line coverage of these two folders |
 | Contract | Vitest | Each AI call: recorded fixture responses parse against the Zod schema; invalid output triggers one retry then a failure; hint-leak check | Every AI call has a passing and a failing fixture |
-| Integration | Vitest | Ownership: each query helper returns nothing for another user's ids | One test per query helper |
+| Integration | Vitest on in-memory PGlite with the real migrations | Ownership: each `require…` helper rejects another user's ids | One test per helper |
 | End to end | Playwright | The flows listed under Success Criteria, with `AI_FIXTURES=1` so that AI calls return recorded responses | All pass before the demo |
 | Manual | — | Real AI calls on three real sheets and on handwriting photos of good, average and poor quality | Checked once per module that uses AI |
+
+Google sign-in cannot be automated, so a **test sign-in** exists for Playwright
+and for agents checking their work: it signs in as a named test user without
+Google. It works only when `NODE_ENV` is not `production` and
+`ENABLE_TEST_SIGN_IN=1`; this variable is never set on Vercel.
 
 Tests never call the real Claude API. Fixtures contain synthetic sheets and
 working only, never real student uploads. `npm run lint`, `npx tsc --noEmit`
@@ -480,6 +509,7 @@ and `npm test` must pass before every commit.
   - update or delete an attempt, submission, hint reveal or mark;
   - commit secrets, `.env` files or uploaded student work;
   - call the real Claude API from automated tests;
+  - enable the test sign-in in production;
   - remove or skip a failing test without approval.
 
 ## Success Criteria
@@ -574,6 +604,8 @@ Each of these was not stated by you. Correct any of them before approval.
 | Item | Why deferred |
 |---|---|
 | Subjects other than maths | V1 prompts and marking are tuned for maths only |
+| Native mobile app | The responsive web app covers phone use in V1 |
+| Deleting courses or sheets | Not needed for the loop; avoids deleting history |
 | Tutor or class view; tutor-entered marks | V1 is single-student; confirmed decision |
 | Shared class sheets, join by code, reuse of one parse across students | Each student uploads their own in V1; confirmed decision |
 | Per-user AI usage limits | Not needed for the demo; confirmed decision |
