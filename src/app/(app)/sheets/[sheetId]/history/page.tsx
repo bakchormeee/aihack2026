@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { AttemptCard } from "@/components/attempt-card";
+import { ExportButton } from "@/components/export-button";
 import { MathText } from "@/components/math-text";
 import { Button } from "@/components/ui/button";
 import { getSheetHistory } from "@/db/queries/history";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { buildHandInInput } from "@/lib/export/hand-in";
 
 import { tryAgainAction } from "./actions";
 
@@ -18,7 +20,20 @@ export default async function HistoryPage({ params }: PageProps<"/sheets/[sheetI
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{sheet.title}: history</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">{sheet.title}: history</h1>
+        {history.length > 0 ? (
+          <ExportButton
+            title={sheet.title}
+            questions={buildHandInInput(
+              history.map((record) => ({
+                label: record.question.label,
+                attempts: record.attempts,
+              })),
+            )}
+          />
+        ) : null}
+      </div>
       {history.length === 0 ? (
         <p className="text-muted-foreground text-sm">This sheet has no questions yet.</p>
       ) : (
