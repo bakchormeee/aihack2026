@@ -71,6 +71,28 @@ describe("getSpotSession", () => {
     expect(view.counts).toEqual({ full: 1, partial: 0, stuck: 0 });
   });
 
+  it("treats an answer that was taken but never judged as unanswered once it is stale", async () => {
+    const w = await setup("gs-abandoned@test.local");
+    const [i1] = await w.item(1, []);
+    const [i2] = await w.item(2, []);
+    const now = new Date("2026-11-14T12:00:00Z");
+    const unjudged = (itemId: string, minutesAgo: number) => ({
+      itemId,
+      userId: w.user.id,
+      answeredAt: new Date(now.getTime() - minutesAgo * 60_000),
+      noError: true,
+    });
+    await db.insert(spotAnswers).values([unjudged(i1.id, 1), unjudged(i2.id, 4)]);
+
+    const view = await getSpotSession(w.user.id, w.session.id, now);
+
+    expect(view.items).toEqual([
+      { position: 1, answered: true, outcome: null },
+      { position: 2, answered: false, outcome: null },
+    ]);
+    expect(view.done).toBe(false);
+  });
+
   it("is done once every question is answered, with counts and the common errors that were missed", async () => {
     const w = await setup("gs-done@test.local");
     const [i1] = await w.item(1, [{ line: 2, misconceptionId: w.a.id }]);

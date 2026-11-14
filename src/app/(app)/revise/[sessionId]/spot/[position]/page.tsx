@@ -7,6 +7,7 @@ import { SpotAnswerForm } from "@/components/spot-answer-form";
 import { SpotReveal } from "@/components/spot-reveal";
 import {
   getSpotSession,
+  isAnswered,
   loadSpotItem,
   misconceptionDescriptions,
   startSpotAnswer,
@@ -28,13 +29,15 @@ export default async function SpotQuestionPage({
   );
   // The time spent counts from the first visit to the question.
   if (!answer) await startSpotAnswer(user.id, item.id);
-  const answered = answer?.answeredAt !== null && answer?.answeredAt !== undefined;
+  // An answer the server never finished judging counts as not given (see isAnswered).
+  const answered = isAnswered(answer);
   const sessionHref = `/revise/${session.id}`;
   // The planted errors and their corrections are only sent to the browser once answered.
   const descriptions = answered
     ? await misconceptionDescriptions(item.planted.map((p) => p.misconceptionId))
     : new Map<string, string>();
-  const count = answered ? (await getSpotSession(user.id, session.id)).items.length : 0;
+  // Fewer questions than asked for exist when some could not be written.
+  const count = (await getSpotSession(user.id, session.id)).items.length;
   const nextHref = item.position < count ? `${sessionHref}/spot/${item.position + 1}` : sessionHref;
 
   return (
@@ -44,7 +47,7 @@ export default async function SpotQuestionPage({
           Back to the session
         </Link>
         <h1 className="text-xl font-semibold">
-          Spot the error: question {item.position} of {session.questionCount}
+          Spot the error: question {item.position} of {count}
         </h1>
       </div>
 

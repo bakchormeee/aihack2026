@@ -233,6 +233,45 @@ describe("answerSpotItem", () => {
     expect(retry).toEqual({ ok: true, outcome: "full" });
   });
 
+  it("lets the student answer again when an answer was taken but never judged (the server died)", async () => {
+    const w = await setup("sa-abandoned@test.local");
+    const now = new Date("2026-11-14T12:00:00Z");
+    const takenAt = (minutesAgo: number) =>
+      db
+        .insert(spotAnswers)
+        .values({
+          itemId: w.item.id,
+          userId: w.user.id,
+          startedAt: new Date(now.getTime() - 10 * 60_000),
+          answeredAt: new Date(now.getTime() - minutesAgo * 60_000),
+          ticked: [tick(1)],
+        })
+        .onConflictDoUpdate({
+          target: spotAnswers.itemId,
+          set: { answeredAt: new Date(now.getTime() - minutesAgo * 60_000) },
+        });
+    const submit = () =>
+      answerSpotItem(
+        w.user.id,
+        w.session.id,
+        1,
+        { noError: false, ticked: [tick(3)] },
+        { judge: verdicts({ 3: true }) },
+        now,
+      );
+
+    // Still being judged a minute ago: not taken over.
+    await takenAt(1);
+    expect(await submit()).toMatchObject({ ok: false, error: expect.stringMatching(/already/i) });
+
+    // Taken four minutes ago and never judged: abandoned, so the new answer replaces it.
+    await takenAt(4);
+    expect(await submit()).toEqual({ ok: true, outcome: "full" });
+    const row = await answerRow(w.item.id);
+    expect(row.ticked).toEqual([tick(3)]);
+    expect(row.secondsSpent).toBe(600);
+  });
+
   it("records the time spent from when the question was opened", async () => {
     const w = await setup("sa-time@test.local");
     await db

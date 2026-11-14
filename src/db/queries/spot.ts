@@ -1,13 +1,14 @@
 // Spot-the-error sessions, questions and answers (SPEC-spot-the-error.md).
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { listMisconceptions } from "@/db/queries/misconceptions";
 import { NoCandidatesError } from "@/db/queries/revision";
 import { misconceptions, revisionSessions, spotAnswers, spotItems, topics } from "@/db/schema";
 import { NotFoundError, requireCourse, requireRevisionSession } from "@/lib/auth/ownership";
-import type { Outcome, SpotJudgement, SpotTick } from "@/lib/domain";
+import { STALE_JOB_MS, type Outcome, type SpotJudgement, type SpotTick } from "@/lib/domain";
+import { isStale } from "@/lib/pipeline/stale";
 import { missedMisconceptions, rankMisconceptions } from "@/lib/spot/rules";
 
 /** The student's misconceptions as the ranking rules want them. */
@@ -75,6 +76,26 @@ export async function loadSpotItem(userId: string, sessionId: string, position: 
   return { session, item, answer: answer ?? null };
 }
 
+/**
+ * True when an answer was taken but never judged and has waited too long: the server
+ * died while the AI was judging it. Such an answer counts as not given, so the student
+ * can answer again.
+ */
+export function isAbandoned(
+  answer: { answeredAt: Date | null; outcome: Outcome | null } | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return !!answer && answer.outcome === null && isStale(answer.answeredAt, now);
+}
+
+/** True when the student's answer stands: given, and judged or still being judged. */
+export function isAnswered(
+  answer: { answeredAt: Date | null; outcome: Outcome | null } | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return !!answer && answer.answeredAt !== null && !isAbandoned(answer, now);
+}
+
 /** Records that the student has opened the question; the clock for time spent starts here. */
 export async function startSpotAnswer(userId: string, itemId: string): Promise<void> {
   await db.insert(spotAnswers).values({ itemId, userId }).onConflictDoNothing();
@@ -83,6 +104,7 @@ export async function startSpotAnswer(userId: string, itemId: string): Promise<v
 /**
  * Takes the student's one answer: saves their lines and explanations and the time spent.
  * Returns false when the question was already answered, so a double submit changes nothing.
+ * An abandoned answer (see isAbandoned) is replaced.
  */
 export async function claimSpotAnswer(
   itemId: string,
@@ -99,7 +121,18 @@ export async function claimSpotAnswer(
       noError: a.noError,
       ticked: a.ticked,
     })
-    .where(and(eq(spotAnswers.itemId, itemId), isNull(spotAnswers.answeredAt)))
+    .where(
+      and(
+        eq(spotAnswers.itemId, itemId),
+        or(
+          isNull(spotAnswers.answeredAt),
+          and(
+            isNull(spotAnswers.outcome),
+            lt(spotAnswers.answeredAt, new Date(now.getTime() - STALE_JOB_MS)),
+          ),
+        ),
+      ),
+    )
     .returning({ itemId: spotAnswers.itemId });
   return claimed.length > 0;
 }
@@ -135,7 +168,7 @@ export async function misconceptionDescriptions(ids: string[]): Promise<Map<stri
  * A spot-the-error session of the user's with its questions in order and how each was
  * answered, and, once every question is answered, the common errors they missed.
  */
-export async function getSpotSession(userId: string, sessionId: string) {
+export async function getSpotSession(userId: string, sessionId: string, now: Date = new Date()) {
   const session = await requireRevisionSession(userId, sessionId);
   if (session.mode !== "spot_error") throw new NotFoundError();
   const rows = await db
@@ -147,12 +180,12 @@ export async function getSpotSession(userId: string, sessionId: string) {
 
   const items = rows.map(({ item, answer }) => ({
     position: item.position,
-    answered: answer?.answeredAt != null,
+    answered: isAnswered(answer, now),
     outcome: answer?.outcome ?? null,
   }));
 
   const missedIds = rows.flatMap(({ item, answer }) =>
-    answer?.answeredAt != null
+    answer && isAnswered(answer, now)
       ? missedMisconceptions(
           item.planted,
           answer.ticked.map((t) => t.line),
