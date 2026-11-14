@@ -1,0 +1,7 @@
+{
+  "hint1": "This is an integral of a product of two different kinds of function, a polynomial and a trigonometric function. Think about **integration by parts**.",
+  "hint2": "Use integration by parts, $\\int u \\, dv = uv - \\int v \\, du$. Choose $u$ to be the factor that becomes simpler when differentiated: start with $u = x$ and $dv = \\cos x \\, dx$.",
+  "hint3": "Outline:\n\n1. Set $u = x$ and $dv = \\cos x \\, dx$, and find $du$ and $v$.\n2. Substitute into $\\int_0^{\\pi} u \\, dv = \\big[ uv \\big]_0^{\\pi} - \\int_0^{\\pi} v \\, du$.\n3. Evaluate the boundary term at $x = \\pi$ and at $x = 0$.\n4. Integrate the remaining trigonometric function and evaluate it between the limits.\n5. Add the two contributions.",
+  "solution": "Let $u = x$ and $dv = \\cos x \\, dx$, so that $du = dx$ and $v = \\sin x$. Then\n\n$$\\int_0^{\\pi} x \\cos x \\, dx = \\big[ x \\sin x \\big]_0^{\\pi} - \\int_0^{\\pi} \\sin x \\, dx.$$\n\nThe boundary term is $\\pi \\sin \\pi - 0 = 0$. For the remaining integral,\n\n$$\\int_0^{\\pi} \\sin x \\, dx = \\big[ -\\cos x \\big]_0^{\\pi} = 1 + 1 = 2.$$\n\nHence\n\n$$\\int_0^{\\pi} x \\cos x \\, dx = 0 - 2 = -2.$$",
+  "finalAnswer": "$\\int_0^{\\pi} x \\cos x \\, dx = -2$"
+}

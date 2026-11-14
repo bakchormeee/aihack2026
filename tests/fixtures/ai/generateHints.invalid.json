@@ -1,0 +1,6 @@
+{
+  "hint1": "Think about **integration by parts** for $\\int_0^{\\pi} x \\cos x \\, dx$.",
+  "hint2": "",
+  "solution": "Let $u = x$ and $dv = \\cos x \\, dx$.",
+  "finalAnswer": "$-2$"
+}
