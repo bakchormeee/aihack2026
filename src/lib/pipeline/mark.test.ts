@@ -21,8 +21,15 @@ type MarkResult = Awaited<ReturnType<MarkIo["mark"]>>;
 
 const result = (o: Partial<MarkResult> = {}): MarkResult => ({
   score: 3,
-  errorType: "algebra_slip",
-  firstWrongStep: "line 3",
+  mistakes: [
+    { type: "algebra_slip", quote: "line 3", hint: "Check the sign.", location: { kind: "text" } },
+    {
+      type: "incomplete",
+      quote: "line 5",
+      hint: "Is that the whole answer?",
+      location: { kind: "text" },
+    },
+  ],
   feedback: "Sign slip in line 3.",
   overallFeedback: "Good method.",
   ...o,
@@ -98,6 +105,7 @@ describe("runMark (ai)", () => {
       outcome: "partial",
       errorType: "algebra_slip",
       firstWrongStep: "line 3",
+      mistakes: result().mistakes,
       feedback: "Sign slip in line 3.",
       overallFeedback: "Good method.",
       isDispute: false,
@@ -116,12 +124,34 @@ describe("runMark (ai)", () => {
   ] as const)("a score of %i is %s", async (score, outcome) => {
     const { attempt, submission } = await setup(`m-score-${score}@test.local`);
 
-    await runMark(
-      { submissionId: submission.id, basis: "ai" },
-      okIo({ score, errorType: null, firstWrongStep: null }),
-    );
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score, mistakes: [] }));
 
     expect((await marksOf(attempt.id))[0].outcome).toBe(outcome);
+  });
+
+  it("a mark with no mistakes saves an empty list, not null, and no error type", async () => {
+    const { attempt, submission } = await setup("m-empty@test.local");
+
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 5, mistakes: [] }));
+
+    expect((await marksOf(attempt.id))[0]).toMatchObject({
+      mistakes: [],
+      errorType: null,
+      firstWrongStep: null,
+    });
+  });
+
+  it("a 4 is correct, so it keeps its careless slips in the list but has no error type", async () => {
+    const { attempt, submission } = await setup("m-four@test.local");
+    const slip = result().mistakes.slice(0, 1);
+
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 4, mistakes: slip }));
+
+    expect((await marksOf(attempt.id))[0]).toMatchObject({
+      outcome: "full",
+      mistakes: slip,
+      errorType: null,
+    });
   });
 
   it("sends the question, the AI solution, the typed text and the photos to the marker", async () => {
@@ -277,7 +307,7 @@ describe("runMark (dispute and official)", () => {
 
     await runMark(
       { submissionId: submission.id, basis: "ai", disputeReason: "I used a different method" },
-      okIo({ score: 5, errorType: null, firstWrongStep: null }),
+      okIo({ score: 5, mistakes: [] }),
     );
 
     const all = await marksOf(attempt.id);
@@ -303,10 +333,7 @@ describe("runMark (dispute and official)", () => {
 
   it("an official mark uses the official solution and flags a changed outcome", async () => {
     const { attempt, submission } = await setup("o-changed@test.local");
-    await runMark(
-      { submissionId: submission.id, basis: "ai" },
-      okIo({ score: 5, errorType: null, firstWrongStep: null }),
-    );
+    await runMark({ submissionId: submission.id, basis: "ai" }, okIo({ score: 5, mistakes: [] }));
     const mark = vi.fn(async () => result({ score: 2 }));
 
     await runMark({ submissionId: submission.id, basis: "official" }, { ...okIo(), mark });

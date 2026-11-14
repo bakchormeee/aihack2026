@@ -113,8 +113,10 @@ export async function performMark(claim: ClaimedMark, io: MarkIo = defaultIo): P
         basis,
         score: result.score,
         outcome,
-        errorType: outcome === "full" ? null : result.errorType,
-        firstWrongStep: outcome === "full" ? null : result.firstWrongStep,
+        mistakes: result.mistakes,
+        // The first mistake summarises a wrong answer for the history lists; a correct one has none.
+        errorType: outcome === "full" ? null : (result.mistakes[0]?.type ?? null),
+        firstWrongStep: outcome === "full" ? null : (result.mistakes[0]?.quote ?? null),
         feedback: result.feedback,
         overallFeedback: result.overallFeedback,
         isDispute: disputeReason !== undefined,

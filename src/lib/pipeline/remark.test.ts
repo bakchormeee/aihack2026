@@ -28,8 +28,7 @@ import {
 type MarkResult = Awaited<ReturnType<MarkIo["mark"]>>;
 const markResult = (score: number): MarkResult => ({
   score,
-  errorType: "method",
-  firstWrongStep: "line 2",
+  mistakes: [{ type: "method", quote: "line 2", hint: "h", location: { kind: "text" } }],
   feedback: "f",
   overallFeedback: "o",
 });

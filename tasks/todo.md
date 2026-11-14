@@ -25,7 +25,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
 
 ## Phase 2: Marking and the mark screen (2 h)
 
-- [ ] **P3: The new marker, end to end in the pipeline** (M)
+- [x] **P3: The new marker, end to end in the pipeline** (M)
   - Acceptance: the marker returns a 0–5 score, an ordered list of mistakes (type, quote, hint, location) and hints-only feedback, with all maths in `$…$`; a reply that fails the schema or the LaTeX check is asked for once more; `performMark` saves the score, the outcome from the new bands, the mistakes, and the first mistake's type; disputes and official re-marks use it unchanged; the mastery query passes the score. Fixtures rewritten in the new shape and hints-only.
   - Verify: checks; contract tests (valid fixture, invalid fixture, a fixture with LaTeX outside `$…$` is rejected, a fixture that states the correction fails a hints-only test); one real-API mark of a typed answer, timed.
   - Files: `src/lib/ai/mark-attempt.ts` (+ test), `tests/fixtures/ai/markAttempt*.json`, `src/lib/pipeline/mark.ts` (+ test), `src/db/queries/mastery.ts`

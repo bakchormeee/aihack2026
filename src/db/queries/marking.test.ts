@@ -410,8 +410,9 @@ describe("startDispute", () => {
     readFile: async () => Buffer.from("x"),
     mark: async () => ({
       score,
-      errorType: "method" as const,
-      firstWrongStep: "s",
+      mistakes: [
+        { type: "method" as const, quote: "s", hint: "h", location: { kind: "text" as const } },
+      ],
       feedback: "f",
       overallFeedback: "o",
     }),

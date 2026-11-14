@@ -1,7 +1,15 @@
 {
-  "score": 140,
-  "errorType": "careless",
-  "firstWrongStep": "You wrote $\\int_0^{\\pi} \\sin x \\, dx = \\big[ \\cos x \\big]_0^{\\pi}$.",
+  "score": 7,
+  "mistakes": [
+    {
+      "type": "careless",
+      "quote": "$a_n$",
+      "hint": "Check the sign.",
+      "fileIndex": null,
+      "page": null,
+      "box": null
+    }
+  ],
   "feedback": "An antiderivative of $\\sin x$ is $-\\cos x$.",
   "outcome": "partial"
 }
