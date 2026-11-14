@@ -62,7 +62,11 @@ export default async function CoursePage({
         </>
       )}
       {selected ? (
-        <div className="flex flex-col gap-2 rounded-lg border p-4" aria-live="polite">
+        <div
+          id="topic-actions"
+          className="flex scroll-mt-4 flex-col gap-2 rounded-lg border p-4"
+          aria-live="polite"
+        >
           <h2 className="font-medium">{selected.name}</h2>
           <p className="text-muted-foreground text-sm">
             {selected.mastery === null

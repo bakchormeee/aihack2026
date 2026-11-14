@@ -24,7 +24,10 @@ export function TopicPanel({
     <SkillMap
       nodes={nodes}
       links={links}
-      hrefForTopic={(topicId) => `/courses/${courseId}?topic=${encodeURIComponent(topicId)}`}
+      // The #topic-actions anchor scrolls the topic's links into view below the map.
+      hrefForTopic={(topicId) =>
+        `/courses/${courseId}?topic=${encodeURIComponent(topicId)}#topic-actions`
+      }
     />
   );
 }
