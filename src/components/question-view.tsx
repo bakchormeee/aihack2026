@@ -96,6 +96,8 @@ export function QuestionView({
     startTransition(async () => {
       const result = await revealNextHint({ attemptId });
       if (!result.ok) return setError(result.error);
+      // The third hint unlocks the worked solution, which the server renders.
+      if (result.level === 3) router.refresh();
       setShown((all) =>
         all.some((h) => h.level === result.level)
           ? all

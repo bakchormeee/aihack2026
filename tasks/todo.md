@@ -233,7 +233,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/lib/pipeline/mark.ts` (+ test), `app/questions/[questionId]/mark/page.tsx`, `app/questions/[questionId]/mark/actions.ts`, `app/questions/[questionId]/submit-actions.ts`, `src/db/queries/marking.ts`
   - Depends on: M8, A4, L1
 
-- [ ] **M10: Solution lock, next hint and retry** (S) — SC 10, 11
+- [x] **M10: Solution lock, next hint and retry** (S) — SC 10, 11
   - Acceptance:
     - `getVisibleSolution` matches C4 and uses `isSolutionUnlocked`; no other code reads `solution` for display.
     - After a full mark, or after the third hint, the question and mark pages show the worked solution; otherwise it is absent from the page data.

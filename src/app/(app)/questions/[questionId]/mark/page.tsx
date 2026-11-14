@@ -4,16 +4,18 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SolutionPanel } from "@/components/solution-panel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getLatestAttemptFor } from "@/db/queries/attempts";
-import { getMarkScreenData } from "@/db/queries/marking";
+import { getLatestAttemptFor, visibleHintsFor } from "@/db/queries/attempts";
+import { getMarkScreenData, getVisibleSolution } from "@/db/queries/marking";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { getNextHref } from "@/lib/navigation";
 import type { ErrorType, Outcome } from "@/lib/domain";
 import { isStale } from "@/lib/pipeline/stale";
 
-import { retryMarkAction } from "./actions";
+import { retryMarkAction, retryNowAction, retryWithNextHintAction } from "./actions";
 
 // The retry button starts the AI marking again, which can run for a minute or two.
 export const maxDuration = 300;
@@ -56,6 +58,10 @@ export default async function MarkPage({
     return <NothingToMark questionId={questionId} sessionId={sessionId} />;
 
   const { submission, current } = data;
+  // Null while the solution is locked: nothing of it is sent to the browser.
+  const solution = await getVisibleSolution(user.id, questionId);
+  const hintLevel = (await visibleHintsFor(user.id, attemptId)).level;
+  const nextHref = await getNextHref({ userId: user.id, questionId, sessionId });
   const back = `/questions/${questionId}${sessionId ? `?session=${sessionId}` : ""}`;
   const marking = submission?.submittedAt && !current && submission.markStatus === "pending";
   const stuck = marking && isStale(submission.markStatusUpdatedAt);
@@ -141,6 +147,36 @@ export default async function MarkPage({
           <div className="rounded-lg border p-4">
             <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Overall</p>
             <MathText className="text-sm">{current.overallFeedback}</MathText>
+          </div>
+
+          {current.outcome !== "full" ? (
+            <div className="flex flex-col gap-3 rounded-lg border p-4">
+              <p className="text-sm">
+                {solution
+                  ? "You can try again, with the worked solution below to help."
+                  : "Not there yet. Try again, or take a hint first. The worked solution unlocks when you get it fully right, or after all three hints."}
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <form action={retryNowAction.bind(null, questionId, sessionId)}>
+                  <Button type="submit">Retry now</Button>
+                </form>
+                {hintLevel < 3 && question.hintsStatus === "ready" ? (
+                  <form action={retryWithNextHintAction.bind(null, questionId, sessionId)}>
+                    <Button type="submit" variant="outline">
+                      Retry with hint {hintLevel + 1}
+                    </Button>
+                  </form>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {solution ? <SolutionPanel solution={solution} /> : null}
+
+          <div className="flex justify-end text-sm">
+            <Link href={nextHref} className="underline">
+              Next →
+            </Link>
           </div>
         </div>
       ) : null}

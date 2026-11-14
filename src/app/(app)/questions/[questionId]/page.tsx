@@ -5,7 +5,9 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { QuestionView } from "@/components/question-view";
 import { getLatestAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
+import { getVisibleSolution } from "@/db/queries/marking";
 import { getWorkingFor } from "@/db/queries/working";
+import { SolutionPanel } from "@/components/solution-panel";
 import { db } from "@/db";
 import { sheets } from "@/db/schema";
 import { orNotFound } from "@/lib/auth/guards";
@@ -34,6 +36,7 @@ export default async function QuestionPage({
   const attempt = await getLatestAttemptFor(user.id, questionId, sessionId);
   const working = attempt ? await getWorkingFor(user.id, attempt.id) : null;
   const visible = attempt ? await visibleHintsFor(user.id, attempt.id) : { level: 0, hints: [] };
+  const solution = await getVisibleSolution(user.id, questionId);
   const query = sessionId ? `?session=${sessionId}` : "";
   const hintsReady = question.hintsStatus === "ready";
   const [sheet] = question.sheetId
@@ -80,6 +83,8 @@ export default async function QuestionPage({
         prevHref={neighbours.prevId ? `/questions/${neighbours.prevId}${query}` : null}
         nextHref={neighbours.nextId ? `/questions/${neighbours.nextId}${query}` : null}
       />
+
+      {solution ? <SolutionPanel solution={solution} /> : null}
     </section>
   );
 }
