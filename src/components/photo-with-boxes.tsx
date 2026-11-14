@@ -1,0 +1,58 @@
+import { SEVERITY_CLASS } from "@/components/mistake-list";
+import type { Mistake } from "@/lib/domain";
+import { boxStyle, padBox } from "@/lib/marking/boxes";
+import { severityOf } from "@/lib/marking/rules";
+
+/**
+ * One photo of the student's working with a numbered box over each mistake the
+ * marker placed on it. The browser draws the boxes over the image, so they scale
+ * with the screen. Numbers match the list of mistakes.
+ */
+export function PhotoWithBoxes({
+  src,
+  fileIndex,
+  mistakes,
+}: {
+  src: string;
+  fileIndex: number;
+  mistakes: Mistake[];
+}) {
+  const boxed = mistakes.flatMap((mistake, index) =>
+    mistake.location.kind === "image" && mistake.location.fileIndex === fileIndex
+      ? [{ mistake, number: index + 1, box: mistake.location.box }]
+      : [],
+  );
+
+  return (
+    <figure className="flex flex-col gap-1">
+      <div className="relative w-full overflow-hidden rounded-lg border">
+        {/* A signed link to a stored photo: next/image would add nothing here. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={`Your working, photo ${fileIndex + 1}`} className="block w-full" />
+        {boxed.map(({ mistake, number, box }) => {
+          const severity = severityOf(mistake.type);
+          return (
+            <div
+              key={number}
+              data-mistake={number}
+              data-severity={severity}
+              style={boxStyle(padBox(box))}
+              className={`absolute rounded border-2 ${SEVERITY_CLASS[severity].box}`}
+            >
+              <span
+                className={`absolute -top-2.5 -left-2.5 flex size-5 items-center justify-center rounded-full text-[11px] font-semibold ${SEVERITY_CLASS[severity].badge}`}
+              >
+                {number}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {boxed.length > 0 ? (
+        <figcaption className="text-muted-foreground text-xs">
+          Boxes are approximate: the exact words are in the list below.
+        </figcaption>
+      ) : null}
+    </figure>
+  );
+}

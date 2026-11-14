@@ -40,7 +40,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: unit tests for finding quotes (exact, extra spaces, not found, overlapping); browser check.
   - Files: `src/lib/marking/locate-quotes.ts` (+ test), `src/components/working-with-boxes.tsx`, mark page
 
-- [ ] **P6: Boxes on photos, list for PDFs** (M)
+- [x] **P6: Boxes on photos, list for PDFs** (M)
   - Acceptance: each photo is shown with numbered red or amber boxes at the AI's positions (padded, clamped inside the image) and a legend marked "approximate"; PDFs show page number, quote and hint; works at 375 px.
   - Verify: unit tests for box padding and clamping; real-API check on your 1(a) photo; screenshots at desktop and phone width.
   - Files: `src/lib/marking/boxes.ts` (+ test), `src/components/photo-with-boxes.tsx`, mark page

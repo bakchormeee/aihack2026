@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { MarkingScheme, MistakeList } from "@/components/mistake-list";
+import { PhotoWithBoxes } from "@/components/photo-with-boxes";
 import { WorkingWithBoxes } from "@/components/working-with-boxes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,24 @@ export default async function MarkPage({
                 below.
               </p>
               <WorkingWithBoxes text={submission.text} mistakes={current.mistakes} />
+            </div>
+          ) : null}
+
+          {current.mistakes &&
+          current.mistakes.length > 0 &&
+          submission?.files.some((file) => file.mime.startsWith("image/")) ? (
+            <div className="flex flex-col gap-3 rounded-lg border p-4">
+              <h2 className="text-base font-semibold">Your photos</h2>
+              {submission.files.map((file, index) =>
+                file.mime.startsWith("image/") ? (
+                  <PhotoWithBoxes
+                    key={file.id}
+                    src={`/api/files/submission/${file.id}`}
+                    fileIndex={index}
+                    mistakes={current.mistakes ?? []}
+                  />
+                ) : null,
+              )}
             </div>
           ) : null}
 
