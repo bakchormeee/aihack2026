@@ -1,0 +1,37 @@
+{
+  "questions": [
+    {
+      "label": "1",
+      "body": "Differentiate $f(x) = x^2 \\sin x$ with respect to $x$.",
+      "topics": ["Product rule"],
+      "expectedMinutes": 5
+    },
+    {
+      "label": "2(a)",
+      "body": "Evaluate\n\n$$\\int_0^{\\pi} x \\cos x \\, dx.$$",
+      "topics": ["Integration by parts"],
+      "expectedMinutes": 10
+    },
+    {
+      "label": "2(b)",
+      "body": "Hence, or otherwise, find $\\int_0^{\\pi} x^2 \\sin x \\, dx$.",
+      "topics": ["Integration by parts"],
+      "expectedMinutes": 12
+    },
+    {
+      "label": "3",
+      "body": "Let $A = \\begin{pmatrix} 2 & 1 \\\\ 1 & 2 \\end{pmatrix}$. Find the eigenvalues and eigenvectors of $A$.",
+      "topics": ["Eigenvalues and eigenvectors"],
+      "expectedMinutes": 15
+    }
+  ],
+  "newTopics": [
+    { "name": "Product rule", "parent": "Differentiation", "prerequisites": [] },
+    {
+      "name": "Integration by parts",
+      "parent": "Integration",
+      "prerequisites": ["Product rule"]
+    },
+    { "name": "Eigenvalues and eigenvectors", "parent": "Linear algebra", "prerequisites": [] }
+  ]
+}

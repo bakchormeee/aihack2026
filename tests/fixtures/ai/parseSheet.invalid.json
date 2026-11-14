@@ -1,0 +1,10 @@
+{
+  "questions": [
+    {
+      "label": "1",
+      "body": "Differentiate $f(x) = x^2 \\sin x$ with respect to $x$.",
+      "topics": "Product rule",
+      "expectedMinutes": "five"
+    }
+  ]
+}
