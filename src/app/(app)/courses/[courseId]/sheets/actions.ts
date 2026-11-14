@@ -12,7 +12,7 @@ import {
 } from "@/db/queries/sheets";
 import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
-import { runParse } from "@/lib/pipeline/parse";
+import { runSheetPipeline } from "@/lib/pipeline/sheet-job";
 import { UploadRejectedError, verifyUploadedObject } from "@/lib/storage";
 
 const inputSchema = z.object({
@@ -64,6 +64,6 @@ export async function createSheetAction(
     verified.map((file) => ({ path: file.key, mime: file.mime })),
   );
   // Reading the sheet takes a while, so it runs after the response is sent.
-  after(() => runParse(sheet.id));
+  after(() => runSheetPipeline(sheet.id));
   redirect(`/sheets/${sheet.id}`);
 }

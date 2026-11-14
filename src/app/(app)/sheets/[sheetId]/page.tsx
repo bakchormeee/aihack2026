@@ -11,7 +11,7 @@ import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
 
-import { retryParseAction } from "./actions";
+import { retryHintsAction, retryParseAction } from "./actions";
 
 // The retry button starts the background parse again, which can run for a few minutes.
 export const maxDuration = 300;
@@ -31,6 +31,11 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
   const stuck = sheet.status === "parsing" && isStale(sheet.statusUpdatedAt);
   const reading = sheet.status === "parsing" && !stuck;
   const hintsPending = questions.some((question) => question.hintsStatus === "pending");
+  const hintsStuck = questions.some(
+    (question) =>
+      question.hintsStatus === "failed" ||
+      (question.hintsStatus === "pending" && isStale(question.hintsStatusUpdatedAt)),
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -65,6 +70,15 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
           </p>
           <form action={retryParseAction.bind(null, sheet.id)}>
             <Button type="submit">Try again</Button>
+          </form>
+        </div>
+      ) : null}
+
+      {hintsStuck ? (
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border p-4">
+          <p className="text-sm">Hints could not be prepared for some questions.</p>
+          <form action={retryHintsAction.bind(null, sheet.id)}>
+            <Button type="submit">Prepare the hints again</Button>
           </form>
         </div>
       ) : null}

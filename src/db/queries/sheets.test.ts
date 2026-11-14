@@ -11,6 +11,7 @@ import {
   keyIsUnder,
   listQuestionsWithTopics,
   listSheets,
+  requeueHintsForSheet,
   requeueParse,
   titleFromFileName,
 } from "./sheets";
@@ -246,5 +247,64 @@ describe("listQuestionsWithTopics", () => {
     const other = await userWithCourse("lq-other@test.local");
 
     expect(await listQuestionsWithTopics(other.user.id, sheet.id)).toEqual([]);
+  });
+});
+
+describe("requeueHintsForSheet", () => {
+  async function sheetWithQuestions(
+    email: string,
+    specs: { status: "pending" | "ready" | "failed"; ageMs: number }[],
+  ) {
+    const { user, course } = await userWithCourse(email);
+    const sheet = await createSheetWithFiles(course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+    const rows = await db
+      .insert(questions)
+      .values(
+        specs.map((spec, i) => ({
+          courseId: course.id,
+          sheetId: sheet.id,
+          position: i + 1,
+          label: String(i + 1),
+          body: "B",
+          expectedMinutes: 5,
+          hintsStatus: spec.status,
+          hintsStatusUpdatedAt: new Date(Date.now() - spec.ageMs),
+        })),
+      )
+      .returning();
+    return { user, sheet, rows };
+  }
+  const statuses = async (sheetId: string) =>
+    (
+      await db
+        .select()
+        .from(questions)
+        .where(eq(questions.sheetId, sheetId))
+        .orderBy(questions.position)
+    ).map((q) => q.hintsStatus);
+
+  it("restarts failed questions and stuck pending ones, and leaves the rest", async () => {
+    const { user, sheet } = await sheetWithQuestions("rh-mix@test.local", [
+      { status: "failed", ageMs: 0 },
+      { status: "pending", ageMs: STALE_JOB_MS + 1000 },
+      { status: "pending", ageMs: 1000 },
+      { status: "ready", ageMs: STALE_JOB_MS + 1000 },
+    ]);
+
+    expect(await requeueHintsForSheet(user.id, sheet.id)).toBe(2);
+
+    expect(await statuses(sheet.id)).toEqual(["pending", "pending", "pending", "ready"]);
+  });
+
+  it("changes nothing for another user's sheet", async () => {
+    const { sheet } = await sheetWithQuestions("rh-owner@test.local", [
+      { status: "failed", ageMs: 0 },
+    ]);
+    const other = await userWithCourse("rh-other@test.local");
+
+    expect(await requeueHintsForSheet(other.user.id, sheet.id)).toBe(0);
+    expect(await statuses(sheet.id)).toEqual(["failed"]);
   });
 });

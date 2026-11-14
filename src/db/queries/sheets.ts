@@ -127,3 +127,32 @@ export async function listQuestionsWithTopics(userId: string, sheetId: string) {
       .map(({ id, name }) => ({ id, name })),
   }));
 }
+
+/**
+ * Puts failed (or stuck) questions of the user's sheet back to `pending` so
+ * their hints are written again. Returns how many were restarted.
+ */
+export async function requeueHintsForSheet(userId: string, sheetId: string): Promise<number> {
+  const staleBefore = new Date(Date.now() - STALE_JOB_MS);
+  const rows = await db
+    .update(questions)
+    .set({ hintsStatus: "pending", hintsStatusUpdatedAt: new Date() })
+    .where(
+      and(
+        eq(questions.sheetId, sheetId),
+        inArray(
+          questions.courseId,
+          db.select({ id: courses.id }).from(courses).where(eq(courses.userId, userId)),
+        ),
+        or(
+          eq(questions.hintsStatus, "failed"),
+          and(
+            eq(questions.hintsStatus, "pending"),
+            lt(questions.hintsStatusUpdatedAt, staleBefore),
+          ),
+        ),
+      ),
+    )
+    .returning({ id: questions.id });
+  return rows.length;
+}

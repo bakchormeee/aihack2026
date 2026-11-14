@@ -182,7 +182,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/lib/pipeline/parse.ts` (+ test), `src/app/api/sheets/[sheetId]/status/route.ts`, `app/sheets/[sheetId]/page.tsx`, `app/sheets/[sheetId]/actions.ts`, `src/db/queries/sheets.ts`
   - Depends on: M2, A2
 
-- [ ] **M4: Hints pipeline** (S) — SC 5
+- [x] **M4: Hints pipeline** (S) — SC 5
   - Acceptance: after a successful parse, `runHints(questionId)` runs for every question with concurrency 5, saving three hints and the `ai` solution and setting `hints_status`; a failed question can be retried from the overview.
   - Verify: integration test with fixtures (3 hints + 1 solution per question; rerun creates no duplicates); all hints present within 120 s of upload for a real sheet.
   - Files: `src/lib/pipeline/hints.ts` (+ test), `src/lib/pipeline/parse.ts`, `app/sheets/[sheetId]/actions.ts`
