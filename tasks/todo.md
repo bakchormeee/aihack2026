@@ -78,7 +78,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
   - Files: `src/lib/auth/config.ts`, `src/app/(auth)/sign-in/page.tsx`
   - Depends on: F3; must be merged before the tracks start or be cut
 
-- [ ] **F4: Ownership helpers** (S) — SC 2 — parallel with F3
+- [x] **F4: Ownership helpers** (S) — SC 2 — parallel with F3
   - Acceptance: `requireCourse`, `requireSheet`, `requireQuestion`, `requireAttempt`, `requireSheetFile`, `requireSubmissionFile` and `requireRevisionSession` each take `(userId, id)`, return the row, and throw `NotFoundError` for a missing id or another user's id.
   - Verify: integration test on PGlite with two users for every helper.
   - Files: `src/lib/auth/ownership.ts`, `src/lib/auth/ownership.test.ts`
