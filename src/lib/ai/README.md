@@ -101,3 +101,26 @@ npx tsx scripts/try-ai.ts generateHints input.json
 
 `parseSheet`, `generateHints`, `markAttempt`, `extractSolutions`,
 `generateVariant`, `summariseSheet`.
+
+## Module notes for callers
+
+- `parseSheet` makes topic names consistent before it returns: a topic that
+  matches an existing topic in any letter case takes the existing spelling
+  and is not listed in `newTopics`; every other topic a question uses is
+  listed in `newTopics` (with `parent: null` if the model did not declare it).
+  A `parent` or prerequisite may be a name that is in neither list; create it.
+- `generateHints` and `generateVariant` regenerate once when hint 1 or 2
+  contains the final answer, and return the second result even if it still
+  leaks. `hintsLeakAnswer` compares text after normalising spacing and a few
+  LaTeX spellings; it cannot see an answer written in a different but equal
+  form.
+- `markAttempt` returns no outcome. For a score of 100 it sets `errorType`
+  and `firstWrongStep` to `null`. The prompt tells the model not to state the
+  final answer in feedback, because the solution may still be locked.
+- `extractSolutions` requires the model to answer for every question id
+  (a missing, unknown or repeated id is invalid output). A question whose
+  solution is not in the document is **left out of the result**, so
+  `solutions` can be shorter than `questions`. In fixture mode the fixture
+  solutions are given to the caller's questions by position.
+- `summariseSheet` and `extractSolutions` return empty results without a
+  request when given no items or no questions.
