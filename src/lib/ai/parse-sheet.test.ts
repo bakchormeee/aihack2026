@@ -65,6 +65,22 @@ describe("parseSheet", () => {
     expect(create.mock.calls[0][0].system).not.toContain("undefined");
   });
 
+  it("tells the model to make every part its own question, labelled with its number, and to keep each body self-contained", async () => {
+    const create = fakeAi(fixture("parseSheet"));
+
+    await parseSheet({ files: [pdf], existingTopics: [] });
+
+    const system = sentSystem(create);
+    // Parts such as (a), (b), (i), (ii) are separate questions, so that each gets its own hints, answer and mark.
+    expect(system).toMatch(/every lettered part/i);
+    expect(system).toMatch(/\(i\), \(ii\)/);
+    expect(system).toContain('"2(a)"');
+    expect(system).toContain('"3(a)(ii)"');
+    expect(system).toMatch(/introduction/i);
+    // The old rule, which kept parts inside one question, must be gone.
+    expect(system).not.toMatch(/never make a sub-part its own question/i);
+  });
+
   it("does not list an existing topic as new, whatever its letter case", async () => {
     fakeAi(fixture("parseSheet"));
 

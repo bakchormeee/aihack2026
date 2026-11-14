@@ -33,9 +33,10 @@ const SYSTEM = `You convert a university mathematics problem sheet into structur
 
 Questions
 - Return every question on the sheet, in the order it appears. Do not solve anything, and do not add, drop, reorder or rephrase questions.
-- "label" is the question's number as printed, for example "1" or "3". If the sheet has no numbers, number the questions 1, 2, 3, ….
-- A question is the unit a student attempts in one go. Sub-parts (a), (b), (i), (ii), … stay inside the body of their question; never make a sub-part its own question.
-- "body" is the complete text of the question, transcribed faithfully, including shared preamble, definitions and given data that the question needs. Leave out marks, page headers and footers. If the question depends on a figure, describe the figure in one sentence in italics.
+- A question is the unit a student gets hints for, answers and has marked on its own. Make every lettered part (a), (b), … its own question, and split numbered sub-parts (i), (ii), … the same way, so that each part can be attempted, hinted and marked separately. A numbered question with no parts is a single question.
+- "label" is the number as printed, joined to the part letters as printed: "1" for an undivided question, "2(a)" and "2(b)" for its parts, "3(a)(i)" and "3(a)(ii)" for the sub-parts of part (a). If the sheet has no numbers, number the questions 1, 2, 3, ….
+- Do not split a part just because it asks for several items in one sentence, for example "compute these five gcds": that stays one question.
+- "body" is the complete text of that one question, transcribed faithfully, and it must make sense on its own. Begin with the introduction that the question's parts share (the text before (a), and the text before (i) if the part has sub-parts), including definitions and given data, then the part's own text. Do not include the text of the other parts. Leave out marks, page headers and footers. If the question depends on a figure, describe the figure in one sentence in italics.
 - "expectedMinutes" is a whole number: the time a well-prepared student needs to write a full answer. Typical values are 3 to 30.
 
 Topics

@@ -1,6 +1,6 @@
 # Spec: Problem Sheet Companion — V1
 
-Status: approved on 14 November 2026, including the assumptions marked **[A]**
+Status: approved on 14 November 2026 (parts-as-questions change added the same day), including the assumptions marked **[A]**
 and the cut order. Amended the same day after the plan audit (see
 `tasks/plan.md`, "Spec amendments"). No code exists yet.
 
@@ -130,8 +130,15 @@ with variants, and the skill map.
 - **Parse** (`parseSheet`) runs in the background. The sheet has a status:
   `parsing`, `ready` or `failed`. A failed parse shows an error and a retry button.
 - Parse output, per question: label (e.g. "3"), body in Markdown with LaTeX,
-  1–3 topics, expected minutes. Sub-parts (a), (b), … stay inside the body of
-  their question; the question is the unit that is attempted and marked. **[A]**
+  1–3 topics, expected minutes. **Every part is its own question** (changed on
+  14 November 2026 at the user's request): (a), (b), … and the sub-parts
+  (i), (ii), … each become a separate question, labelled as printed
+  ("2(a)", "3(a)(ii)"), so each part has its own hints, its own submission,
+  its own mark and its own place in mastery. Each part's body starts with the
+  introduction its parts share, so it makes sense alone. A numbered question
+  without parts is one question, and a part that merely lists several items
+  ("compute these five gcds") stays one question. Sheets read before this
+  change keep their old grouping and must be uploaded again to be split.
 - **Topics**: the parser receives the course's existing topic list and returns,
   for each question, existing topics or new ones. For each new topic it may
   propose a parent topic and prerequisite topics. New topics are added to the
@@ -584,7 +591,7 @@ Each of these was not stated by you. Correct any of them before approval.
 1. One spec file with an embedded capability map, instead of one spec per module.
 2. Upload limits: PDF 20 MB / 30 pages; images JPEG, PNG or WebP, 10 MB each,
    10 per upload. HEIC is not accepted.
-3. A question with sub-parts is attempted and marked as one unit.
+3. Each part of a question ((a), (b), (i), (ii)) is attempted, hinted and marked as its own question.
 4. The topic tree and prerequisite links are proposed by the parser from the
    sheets themselves, since syllabus import is deferred.
 5. Outcome is derived from the score: full ≥ 90, partial 25–89, stuck < 25.
