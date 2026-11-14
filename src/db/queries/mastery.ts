@@ -1,7 +1,7 @@
 // The course skill map data (contract C5). Mastery is never stored: it is
 // replayed from the user's marked attempts every time it is read.
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -14,6 +14,8 @@ import {
   questionTopics,
   revisionSessions,
   sheets,
+  spotAnswers,
+  spotItems,
   topicPrereqs,
   topics,
 } from "@/db/schema";
@@ -111,6 +113,41 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
     byTopic.set(r.topicId, [...(byTopic.get(r.topicId) ?? []), attempt]);
   }
 
+  // Answers to spot-the-error questions count too, at a lower weight (see replayMastery).
+  const spotRows = await db
+    .select({
+      topicIds: spotItems.topicIds,
+      answeredAt: spotAnswers.answeredAt,
+      outcome: spotAnswers.outcome,
+      expectedMinutes: spotItems.expectedMinutes,
+    })
+    .from(spotAnswers)
+    .innerJoin(spotItems, eq(spotAnswers.itemId, spotItems.id))
+    .innerJoin(revisionSessions, eq(spotItems.sessionId, revisionSessions.id))
+    .where(
+      and(
+        eq(revisionSessions.userId, userId),
+        eq(revisionSessions.courseId, courseId),
+        isNotNull(spotAnswers.answeredAt),
+        isNotNull(spotAnswers.outcome),
+      ),
+    );
+  const ownTopics = new Set(topicIds);
+  for (const row of spotRows) {
+    const answer: MarkedAttempt = {
+      at: row.answeredAt!,
+      outcome: row.outcome!,
+      score: 0,
+      basis: "ai",
+      hintLevel: 0,
+      secondsSpent: null,
+      expectedMinutes: row.expectedMinutes,
+      kind: "spot",
+    };
+    for (const topicId of row.topicIds)
+      if (ownTopics.has(topicId)) byTopic.set(topicId, [...(byTopic.get(topicId) ?? []), answer]);
+  }
+
   const now = new Date();
   return {
     topics: topicRows.map(({ topic }) => {
@@ -142,7 +179,12 @@ export async function getCourseEvents(
     .innerJoin(courses, eq(sheets.courseId, courses.id))
     .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId)));
   const sessionRows = await db
-    .select({ at: revisionSessions.createdAt, minutes: revisionSessions.targetMinutes })
+    .select({
+      at: revisionSessions.createdAt,
+      mode: revisionSessions.mode,
+      minutes: revisionSessions.targetMinutes,
+      questions: revisionSessions.questionCount,
+    })
     .from(revisionSessions)
     .where(
       and(
@@ -156,7 +198,10 @@ export async function getCourseEvents(
     ...sessionRows.map((r) => ({
       at: r.at,
       kind: "revision" as const,
-      label: `Revision, ${r.minutes} min`,
+      label:
+        r.mode === "spot_error"
+          ? `Spot the error, ${r.questions} questions`
+          : `Revision, ${r.minutes} min`,
     })),
   ].sort((x, y) => x.at.getTime() - y.at.getTime());
 }

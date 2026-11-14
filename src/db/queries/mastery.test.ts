@@ -9,6 +9,8 @@ import {
   questionTopics,
   revisionSessions,
   sheets,
+  spotAnswers,
+  spotItems,
   topicPrereqs,
   topics,
   users,
@@ -176,6 +178,108 @@ describe("getCourseMastery", () => {
   });
 });
 
+describe("getCourseMastery with spot-the-error answers", () => {
+  async function spotAnswer(
+    w: Awaited<ReturnType<typeof setup>>,
+    o: { topicIds: string[]; outcome: "full" | "partial" | "stuck" | null; answered?: boolean },
+  ) {
+    const [session] = await db
+      .insert(revisionSessions)
+      .values({
+        userId: w.user.id,
+        courseId: w.course.id,
+        mode: "spot_error",
+        questionCount: 5,
+        status: "ready",
+      })
+      .returning();
+    const [item] = await db
+      .insert(spotItems)
+      .values({
+        sessionId: session.id,
+        position: 1,
+        body: "Q",
+        lines: ["a", "b", "c"],
+        planted: [],
+        topicIds: o.topicIds,
+      })
+      .returning();
+    await db.insert(spotAnswers).values({
+      itemId: item.id,
+      userId: w.user.id,
+      answeredAt: o.answered === false ? null : new Date(Date.now() - DAY),
+      outcome: o.outcome,
+    });
+  }
+
+  it("counts a correct answer on the question's topics at weight 0.25", async () => {
+    const w = await setup("ms-spot@test.local");
+    await spotAnswer(w, { topicIds: [w.algebra.id, w.groups.id], outcome: "full" });
+
+    const result = await getCourseMastery(w.user.id, w.course.id);
+
+    for (const id of [w.algebra.id, w.groups.id]) {
+      const topic = result.topics.find((t) => t.id === id)!;
+      expect(topic.mastery).toBeCloseTo(0.5 + 0.3 * 0.25 * (1 - 0.5));
+      expect(topic.attempts).toBe(1);
+    }
+    expect(result.topics.find((t) => t.id === w.child.id)!.mastery).toBeNull();
+  });
+
+  it("moves mastery down for a stuck answer and by half for a partly right one", async () => {
+    const stuck = await setup("ms-spot-stuck@test.local");
+    await spotAnswer(stuck, { topicIds: [stuck.algebra.id], outcome: "stuck" });
+    const partial = await setup("ms-spot-partial@test.local");
+    await spotAnswer(partial, { topicIds: [partial.algebra.id], outcome: "partial" });
+
+    const down = (await getCourseMastery(stuck.user.id, stuck.course.id)).topics.find(
+      (t) => t.id === stuck.algebra.id,
+    )!;
+    const same = (await getCourseMastery(partial.user.id, partial.course.id)).topics.find(
+      (t) => t.id === partial.algebra.id,
+    )!;
+    expect(down.mastery).toBeCloseTo(0.5 + 0.3 * 0.25 * (0 - 0.5));
+    expect(same.mastery).toBeCloseTo(0.5); // evidence 0.5 from a start of 0.5
+  });
+
+  it("ignores an unanswered or still-judging question and topics of another course", async () => {
+    const w = await setup("ms-spot-ignore@test.local");
+    const other = await setup("ms-spot-other@test.local");
+    await spotAnswer(w, { topicIds: [w.algebra.id], outcome: "full", answered: false });
+    await spotAnswer(w, { topicIds: [w.algebra.id], outcome: null });
+    await spotAnswer(w, { topicIds: [other.algebra.id], outcome: "full" });
+
+    const result = await getCourseMastery(w.user.id, w.course.id);
+
+    expect(result.topics.every((t) => t.mastery === null)).toBe(true);
+  });
+
+  it("leaves the mastery of long-form attempts unchanged when there are no spot answers", async () => {
+    const w = await setup("ms-spot-none@test.local");
+    await attemptWithMark(w.user.id, w.question.id, "full");
+
+    const topic = (await getCourseMastery(w.user.id, w.course.id)).topics.find(
+      (t) => t.id === w.algebra.id,
+    )!;
+
+    expect(topic.mastery).toBeCloseTo(0.5 + 0.3 * 0.5 * (1 - 0.5));
+  });
+
+  it("adds a spot answer after a long-form attempt in time order", async () => {
+    const w = await setup("ms-spot-order@test.local");
+    await attemptWithMark(w.user.id, w.question.id, "full", "ai", 5);
+    await spotAnswer(w, { topicIds: [w.algebra.id], outcome: "stuck" });
+
+    const topic = (await getCourseMastery(w.user.id, w.course.id)).topics.find(
+      (t) => t.id === w.algebra.id,
+    )!;
+
+    const afterFirst = 0.5 + 0.3 * 0.5 * (1 - 0.5);
+    expect(topic.mastery).toBeCloseTo(afterFirst + 0.3 * 0.25 * (0 - afterFirst));
+    expect(topic.attempts).toBe(2);
+  });
+});
+
 describe("getCourseEvents", () => {
   it("lists sheet uploads and ready revision sessions of the user's course only", async () => {
     const a = await setup("ev-a@test.local");
@@ -198,6 +302,14 @@ describe("getCourseEvents", () => {
         createdAt: new Date(Date.now() - DAY),
       },
       { userId: a.user.id, courseId: a.course.id, targetMinutes: 45, status: "failed" },
+      {
+        userId: a.user.id,
+        courseId: a.course.id,
+        mode: "spot_error",
+        questionCount: 10,
+        status: "ready",
+        createdAt: new Date(Date.now() - DAY / 2),
+      },
     ]);
 
     const events = await getCourseEvents(a.user.id, a.course.id);
@@ -205,6 +317,7 @@ describe("getCourseEvents", () => {
     expect(events.map((e) => [e.kind, e.label])).toEqual([
       ["sheet", "Sheet 1"],
       ["revision", "Revision, 20 min"],
+      ["revision", "Spot the error, 10 questions"],
     ]);
     expect(await getCourseEvents(b.user.id, a.course.id)).toEqual([]);
   });

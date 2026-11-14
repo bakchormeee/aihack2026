@@ -55,7 +55,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
   - Verify: checks; browser check at desktop and 375 px.
   - Files: `src/components/spot-reveal.tsx`, `src/app/(app)/revise/[sessionId]/page.tsx`, the spot question page
 
-- [ ] **S8: Mastery at weight 0.25 and the progress chart** (S)
+- [x] **S8: Mastery at weight 0.25 and the progress chart** (S)
   - Acceptance: answered spot items count on their topics at weight 0.25 with no hint or time factor; long-form mastery values are unchanged for a course with no spot answers; the progress chart labels spot sessions "Spot the error, N questions".
   - Verify: checks; integration tests in `mastery.test.ts`.
   - Files: `src/db/queries/mastery.ts` (+ test), `src/lib/mastery/mastery.ts` (+ test)
