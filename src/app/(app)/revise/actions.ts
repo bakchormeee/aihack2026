@@ -10,9 +10,13 @@ import {
   NoCandidatesError,
   requeueRevisionSession,
 } from "@/db/queries/revision";
-import { NotFoundError } from "@/lib/auth/ownership";
+import { hideMisconception } from "@/db/queries/misconceptions";
+import { createSpotSession } from "@/db/queries/spot";
+import { NotFoundError, requireRevisionSession } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { buildRevisionSession } from "@/lib/pipeline/revision";
+import { buildSpotSession } from "@/lib/pipeline/spot-session";
+import { SPOT_QUESTION_COUNTS } from "@/lib/domain";
 
 const inputSchema = z.object({
   courseId: z.string().min(1),
@@ -50,11 +54,64 @@ export async function startRevisionAction(
   redirect(`/revise/${sessionId}`);
 }
 
-/** Builds a failed or stuck session again. */
+const spotInputSchema = z.object({
+  courseId: z.string().min(1),
+  questionCount: z.union(
+    SPOT_QUESTION_COUNTS.map((n) => z.literal(n)) as [
+      z.ZodLiteral<5>,
+      z.ZodLiteral<10>,
+      z.ZodLiteral<15>,
+    ],
+  ),
+  topicIds: z.array(z.string().min(1)).max(200),
+});
+
+/** Creates a spot-the-error session, writes it after the response, and opens it. Redirects on success. */
+export async function startSpotSessionAction(
+  input: z.input<typeof spotInputSchema>,
+): Promise<StartRevisionResult> {
+  const user = await requireUser();
+  const parsed = spotInputSchema.safeParse(input);
+  if (!parsed.success) return { error: "Invalid request." };
+
+  let sessionId: string;
+  try {
+    const session = await createSpotSession(user.id, parsed.data);
+    sessionId = session.id;
+  } catch (error) {
+    if (error instanceof NoCandidatesError) {
+      return {
+        error:
+          "There are no common errors to practise yet for this choice. Get some work marked first.",
+      };
+    }
+    if (error instanceof NotFoundError) return { error: "Course or topic not found." };
+    throw error;
+  }
+  // Writing the exercises takes a while, so it runs after the response is sent.
+  after(() => buildSpotSession(sessionId));
+  redirect(`/revise/${sessionId}`);
+}
+
+/** Builds a failed or stuck session again, with the builder for its kind. */
 export async function retryRevisionAction(sessionId: string): Promise<void> {
   const user = await requireUser();
+  const session = await requireRevisionSession(user.id, sessionId);
   if (await requeueRevisionSession(user.id, sessionId)) {
-    after(() => buildRevisionSession(sessionId));
+    after(() =>
+      session.mode === "spot_error" ? buildSpotSession(sessionId) : buildRevisionSession(sessionId),
+    );
   }
   revalidatePath(`/revise/${sessionId}`);
+}
+
+/** "Not me": hides a misconception so it is never planted or shown again. */
+export async function hideMisconceptionAction(misconceptionId: string): Promise<void> {
+  const user = await requireUser();
+  try {
+    await hideMisconception(user.id, misconceptionId);
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error;
+  }
+  revalidatePath("/revise");
 }

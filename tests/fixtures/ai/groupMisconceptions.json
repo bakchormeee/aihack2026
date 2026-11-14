@@ -1,0 +1,16 @@
+{
+  "newMisconceptions": [
+    {
+      "key": "n1",
+      "description": "Drops a minus sign when integrating a trigonometric function, e.g. writes $\\int \\sin x \\, dx = \\cos x$."
+    },
+    {
+      "key": "n2",
+      "description": "Stops after the integration step without justifying why the boundary term vanishes."
+    }
+  ],
+  "placements": [
+    { "mistake": 1, "existing": null, "key": "n1" },
+    { "mistake": 2, "existing": null, "key": "n2" }
+  ]
+}

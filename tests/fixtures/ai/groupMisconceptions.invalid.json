@@ -1,0 +1,4 @@
+{
+  "newMisconceptions": [{ "key": "n1", "description": "Uses \\frac{1}{2} wrongly." }],
+  "placements": [{ "mistake": 1, "existing": "m1", "key": "n1" }]
+}

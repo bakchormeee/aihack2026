@@ -63,6 +63,9 @@ export async function buildRevisionSession(
     .from(revisionSessions)
     .where(eq(revisionSessions.id, sessionId));
   if (!session || session.status !== "building") return;
+  // Spot-the-error sessions are sized in questions and built by their own job.
+  if (session.mode !== "long_form" || session.targetMinutes === null) return;
+  const targetMinutes = session.targetMinutes;
 
   try {
     const candidates = await listRetryCandidates(
@@ -77,7 +80,7 @@ export async function buildRevisionSession(
     const { items } = buildQueue({
       candidates,
       priorityByTopic,
-      targetMinutes: session.targetMinutes,
+      targetMinutes,
       now,
     });
 

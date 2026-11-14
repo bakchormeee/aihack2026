@@ -1,0 +1,14 @@
+{
+  "judgements": [
+    {
+      "line": 3,
+      "right": true,
+      "comment": "Yes: the minus sign changes both terms in the bracket, giving $3 - 2 - 8$."
+    },
+    {
+      "line": 1,
+      "right": true,
+      "comment": "Yes: the sign before $x^2 \\cos x$ should be plus."
+    }
+  ]
+}

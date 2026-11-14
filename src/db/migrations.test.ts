@@ -68,9 +68,10 @@ const markRow = async (db: PGlite, id: string) =>
   ).rows[0];
 
 describe("migration files", () => {
-  it("has the three migrations in order: initial, additive A, conversion B", () => {
-    expect(files).toHaveLength(3);
+  it("has the four migrations in order: initial, additive A, conversion B, additive C", () => {
+    expect(files).toHaveLength(4);
     expect(files[2]).toMatch(/^0002_convert_marks_to_five/);
+    expect(files[3]).toMatch(/^0003_spot_the_error/);
   });
 });
 
@@ -175,5 +176,78 @@ describe("migration B (conversion)", () => {
         insertMark(db, { score: good, outcome: "full", mistakes: "[]" }),
       ).resolves.toBeTruthy();
     }
+  });
+});
+
+describe("migration C (spot the error)", () => {
+  async function databaseBeforeC() {
+    const db = new PGlite();
+    for (const file of files.slice(0, 3)) await applyMigration(db, file);
+    await db.exec(`
+      insert into "user" (id, email) values ('u1', 'c@test.local');
+      insert into course (id, user_id, name) values ('c1', 'u1', 'C');
+      insert into revision_session (id, user_id, course_id, target_minutes, status)
+        values ('old', 'u1', 'c1', 45, 'ready');
+    `);
+    return db;
+  }
+
+  it("leaves an existing session as a long-form session with its minutes", async () => {
+    const db = await databaseBeforeC();
+    await applyMigration(db, files[3]);
+
+    const { rows } = await db.query<{
+      mode: string;
+      target_minutes: number;
+      question_count: number | null;
+    }>("select mode, target_minutes, question_count from revision_session where id = 'old'");
+    expect(rows[0]).toEqual({ mode: "long_form", target_minutes: 45, question_count: null });
+  });
+
+  it("saves a spot-the-error session sized in questions, without minutes", async () => {
+    const db = await databaseBeforeC();
+    await applyMigration(db, files[3]);
+
+    await db.exec(`
+      insert into revision_session (id, user_id, course_id, mode, question_count)
+        values ('spot', 'u1', 'c1', 'spot_error', 10);
+    `);
+
+    const { rows } = await db.query<{ target_minutes: number | null }>(
+      "select target_minutes from revision_session where id = 'spot'",
+    );
+    expect(rows[0].target_minutes).toBeNull();
+  });
+
+  it("deletes a session's spot questions and answers with it", async () => {
+    const db = await databaseBeforeC();
+    await applyMigration(db, files[3]);
+    await db.exec(`
+      insert into revision_session (id, user_id, course_id, mode, question_count)
+        values ('spot', 'u1', 'c1', 'spot_error', 5);
+      insert into spot_item (id, session_id, position, body, lines, planted, topic_ids)
+        values ('i1', 'spot', 1, 'Q', '["a","b"]', '[]', '[]');
+      insert into spot_answer (item_id, user_id) values ('i1', 'u1');
+      delete from revision_session where id = 'spot';
+    `);
+
+    expect((await db.query("select 1 from spot_item")).rows).toHaveLength(0);
+    expect((await db.query("select 1 from spot_answer")).rows).toHaveLength(0);
+  });
+
+  it("gives each session one question per position", async () => {
+    const db = await databaseBeforeC();
+    await applyMigration(db, files[3]);
+    await db.exec(`
+      insert into revision_session (id, user_id, course_id, mode, question_count)
+        values ('spot', 'u1', 'c1', 'spot_error', 5);
+      insert into spot_item (id, session_id, position, body, lines, planted, topic_ids)
+        values ('i1', 'spot', 1, 'Q', '[]', '[]', '[]');
+    `);
+
+    await expect(
+      db.exec(`insert into spot_item (id, session_id, position, body, lines, planted, topic_ids)
+        values ('i2', 'spot', 1, 'Q', '[]', '[]', '[]')`),
+    ).rejects.toThrow();
   });
 });

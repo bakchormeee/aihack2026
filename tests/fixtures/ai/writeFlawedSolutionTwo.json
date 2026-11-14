@@ -1,0 +1,24 @@
+{
+  "body": "Differentiate $x^2 \\sin x$ and evaluate the derivative at $x = 0$.",
+  "lines": [
+    "Use the product rule: $\\frac{d}{dx}(x^2 \\sin x) = 2x \\sin x - x^2 \\cos x$.",
+    "Factorise this as $x(2 \\sin x - x \\cos x)$.",
+    "At $x = 0$ the bracket is $2 \\sin 0 - 0 \\cdot \\cos 0 = 0$.",
+    "So the derivative at $0$ is $0 \\cdot 0 = 1$."
+  ],
+  "planted": [
+    {
+      "line": 1,
+      "misconception": "e1",
+      "whatsWrong": "The product rule adds the two terms: the sign before $x^2 \\cos x$ should be plus.",
+      "correctLine": "Use the product rule: $\\frac{d}{dx}(x^2 \\sin x) = 2x \\sin x + x^2 \\cos x$."
+    },
+    {
+      "line": 4,
+      "misconception": "e2",
+      "whatsWrong": "A product with a zero factor is $0$, not $1$.",
+      "correctLine": "So the derivative at $0$ is $0 \\cdot 0 = 0$."
+    }
+  ],
+  "expectedMinutes": 4
+}

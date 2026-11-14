@@ -1,81 +1,86 @@
-# Task List: Marking v2
+# Task List: Spot the error
 
-Source spec: [SPEC-marking-v2.md](../SPEC-marking-v2.md) · Plan: [plan.md](plan.md)
+Source spec: [SPEC-spot-the-error.md](../SPEC-spot-the-error.md) · Plan: [plan.md](plan.md)
 
-**Nothing here is built yet. Building starts only after you approve the plan; P10 needs a
+**Nothing here is built yet. Building starts only after you approve the plan; S10 needs a
 second go-ahead.**
 
-Every task: test first, then code. "Checks" = `npm run lint`, `npm run typecheck`, `npm test`.
-Sizes: S = 1–2 files, M = 3–5 files.
+Every task: test first, then code, one commit with explicit paths. "Checks" = `npm run lint`,
+`npm run typecheck`, `npm test`. Sizes: S = 1–2 files, M = 3–5 files.
 
-## Phase 1: Foundation (40 min)
+## Phase 1: Foundation (45 min)
 
-- [x] **P1: Rules, labels and the LaTeX check** (M)
-  - Acceptance: `outcomeFromScore` gives 4–5 full, 2–3 partial, 0–1 stuck and rejects anything but 0–5 whole numbers; `severityOf` makes algebra, arithmetic and notation slips careless and everything else structural; `scoreFromOldScale` follows the spec's table; a 4 counts 0.9 in mastery evidence; one shared list of labels and the marking scheme; `mathIsDelimited` rejects LaTeX outside `$…$`.
-  - Verify: checks; `npm test -- --coverage` keeps 100% on `src/lib/marking` and `src/lib/mastery`.
-  - Files: `src/lib/domain.ts`, `src/lib/marking/rules.ts` (+ test), `src/lib/mastery/evidence.ts` (+ test), `src/lib/marking/labels.ts`, `src/lib/marking/math-check.ts` (+ test)
+- [x] **S1: Spot-the-error rules** (M)
+  - Acceptance: `rankMisconceptions` puts seen-twice-or-more first (most often seen, then most recent), then seen-once (most recent), skips hidden ones and ones outside the chosen topics; `dealQuestions(n, ranked)` deals misconceptions in turn and gives each question 0, 1 or 2 planted errors with about 1 in 5 at zero and 1 in 5 at two (two different misconceptions where possible); `spotOutcome` follows the spec's section 4 for all six line cases; `timesSeen` counts distinct attempts whose current mark has a source; spot evidence is the outcome value at weight 0.25.
+  - Verify: checks; `npm test -- --coverage` with `src/lib/spot` added to the 100% folders.
+  - Files: `src/lib/spot/rules.ts` (+ test), `src/lib/domain.ts`, `src/lib/mastery/evidence.ts` (+ test), `vitest.config.mts`
 
-- [x] **P2: Migrations A and B, tested locally only** (S)
-  - Acceptance: A adds `arithmetic_slip`, `notation` and the `mistakes` column; B converts old-scale marks (only where `mistakes IS NULL`), recomputes outcomes and adds the 0–5 check. Both are tested on the in-memory database with sample old marks: boundary scores convert as specified, a new-style mark is left alone, the check rejects 6.
-  - Verify: checks. **Neither migration is applied to Neon in this task.**
-  - Files: `src/db/schema.ts`, `src/db/migrations/0001_*.sql`, `src/db/migrations/0002_*.sql` (+ meta), `src/db/migrations.test.ts`
+- [x] **S2: Migration C, tested locally only** (S)
+  - Acceptance: adds `misconception`, `misconception_source`, `misconception_mark`, `misconception_job`, `spot_item`, `spot_answer`; adds `mode` (default `long_form`) and `question_count` to `revision_session`; makes `target_minutes` nullable. Tested on the in-memory database: existing sessions read as long-form; a spot session saves without minutes; deleting a session deletes its spot items and answers.
+  - Verify: checks. **Not applied to Neon in this task.**
+  - Files: `src/db/schema.ts`, `src/db/migrations/0003_*.sql` (+ meta), `src/db/migrations.test.ts`
 
 ### Checkpoint 1
 - [ ] All tests pass; nothing has touched the live database
 
-## Phase 2: Marking and the mark screen (2 h)
+## Phase 2: Common-errors memory (1 h 30 min)
 
-- [x] **P3: The new marker, end to end in the pipeline** (M)
-  - Acceptance: the marker returns a 0–5 score, an ordered list of mistakes (type, quote, hint, location) and hints-only feedback, with all maths in `$…$`; a reply that fails the schema or the LaTeX check is asked for once more; `performMark` saves the score, the outcome from the new bands, the mistakes, and the first mistake's type; disputes and official re-marks use it unchanged; the mastery query passes the score. Fixtures rewritten in the new shape and hints-only.
-  - Verify: checks; contract tests (valid fixture, invalid fixture, a fixture with LaTeX outside `$…$` is rejected, a fixture that states the correction fails a hints-only test); one real-API mark of a typed answer, timed.
-  - Files: `src/lib/ai/mark-attempt.ts` (+ test), `tests/fixtures/ai/markAttempt*.json`, `src/lib/pipeline/mark.ts` (+ test), `src/db/queries/mastery.ts`
+- [x] **S3: Grouping mistakes into misconceptions, refreshed after each mark** (M)
+  - Acceptance: `groupMisconceptions` (schema, LaTeX check, one retry, fixtures) places numbered mistakes into existing or new misconceptions; `refreshMisconceptions` claims the course, sends only unread marks' mistakes (old marks as type + first wrong step), saves sources, marks them read, ignores unknown ids and numbers, never revives a hidden misconception, and is safe to run twice; `performMark` schedules it after saving a mark; `listMisconceptions` returns visible ones with times seen, topics, last seen and one example quote; `hideMisconception` refuses another user's.
+  - Verify: checks; integration tests (first build from old and new marks, a dispute superseding a mark lowers times seen, hidden stays hidden, two runs at once); real-API grouping of your own mistakes read-only from Neon, printed for you to review.
+  - Files: `src/lib/ai/group-misconceptions.ts` (+ test, fixtures), `src/lib/pipeline/misconceptions.ts` (+ test), `src/db/queries/misconceptions.ts` (+ test), `src/lib/pipeline/mark.ts`
 
-- [x] **P4: Mark screen shows the score out of 5, the scheme and the mistake list** (S)
-  - Acceptance: "4/5" with Correct / Partly right / Stuck; the scheme with the current score highlighted; each mistake numbered with its kind (careless or structural), quote and hint; old marks without a mistake list still show their first wrong step; the all-marks list shows /5.
-  - Verify: checks; browser check on a real mark.
-  - Files: `src/app/(app)/questions/[questionId]/mark/page.tsx`, `src/components/mistake-list.tsx`
-
-- [x] **P5: Boxes on typed working** (S)
-  - Acceptance: the typed working is shown with each quote boxed red or amber and numbered to match the list; a quote not found in the text stays in the list only; maths in the working still renders.
-  - Verify: unit tests for finding quotes (exact, extra spaces, not found, overlapping); browser check.
-  - Files: `src/lib/marking/locate-quotes.ts` (+ test), `src/components/working-with-boxes.tsx`, mark page
-
-- [x] **P6: Boxes on photos, list for PDFs** (M)
-  - Acceptance: each photo is shown with numbered red or amber boxes at the AI's positions (padded, clamped inside the image) and a legend marked "approximate"; PDFs show page number, quote and hint; works at 375 px.
-  - Verify: unit tests for box padding and clamping; real-API check on your 1(a) photo; screenshots at desktop and phone width.
-  - Files: `src/lib/marking/boxes.ts` (+ test), `src/components/photo-with-boxes.tsx`, mark page
+- [x] **S4: Revise page: mode switch, common-errors list, "Not me"** (M)
+  - Acceptance: the page offers Long-form (unchanged) and Spot the error; spot mode shows optional topics, 5/10/15 questions and the course's list (sentence, times seen, last seen, one rendered example quote, "Not me"); with nothing to plant it explains why and disables start; opening the page starts a refresh when the course has unread marks and says the list is being updated.
+  - Verify: checks; browser check on a local database at desktop and 375 px.
+  - Files: `src/app/(app)/revise/page.tsx`, `src/components/revision-form.tsx`, `src/components/common-errors.tsx`, `src/app/(app)/revise/actions.ts`
 
 ### Checkpoint 2
-- [ ] A typed answer and your 1(a) photo, marked with the real API, look right in the browser: score, scheme, boxes, hints that do not give the correction, maths rendered
+- [ ] Your real mistakes grouped into misconceptions you agree with; the list and "Not me" work in the browser
 
-## Phase 3: Everything else (1 h 15 min)
+## Phase 3: Spot-the-error sessions (2 h 30 min)
 
-- [x] **P7: Scores out of 5 everywhere else** (M)
-  - Acceptance: solutions review, attempt cards and the sheet list show /5; averages to one decimal ("3.4/5"); the review's ordering still works.
-  - Verify: checks with the history, marking and summary tests updated to the new scale.
-  - Files: `src/app/(app)/sheets/[sheetId]/solutions/page.tsx`, `src/components/attempt-card.tsx`, `src/db/queries/history.ts` (+ test), `src/db/queries/marking.ts` (+ test)
+- [x] **S5: Writing flawed solutions and building a session** (M)
+  - Acceptance: `writeFlawedSolution` (schema, LaTeX check on body, lines and planted text, one retry, fixtures) returns a question, numbered lines and 0–2 planted errors on given lines with what is wrong and the correct line; `buildSpotSession` deals questions with S1's rules, writes them 5 at a time, drops a question that fails twice, is ready with at least one question, fails (retry button) with none, and is safe to run twice; the start action creates a spot session.
+  - Verify: checks; integration tests with a fake AI; one real-API session of 5 on a local database, reviewed by you.
+  - Files: `src/lib/ai/write-flawed-solution.ts` (+ test, fixtures), `src/lib/pipeline/spot-session.ts` (+ test), `src/db/queries/revision.ts`, `src/app/(app)/revise/actions.ts`
 
-- [x] **P8: Retry starts from a copy of the previous working** (M)
-  - Acceptance: "Retry now" and "Retry with hint N" give a draft with the previous typed text and the same files; the earlier attempt is unchanged; removing a copied file from the draft never deletes a stored object another submission uses; "Try again" from History still starts empty.
-  - Verify: integration tests for all four rules.
-  - Files: `src/db/queries/attempts.ts` (+ test), `src/db/queries/working.ts` (+ test), `src/app/(app)/questions/[questionId]/submit-actions.ts`
+- [x] **S6: Answering and judging** (M)
+  - Acceptance: the spot question page shows the question and numbered lines (maths rendered); the student ticks lines with an explanation each (1–500 characters) or presses "No error"; `judgeSpotAnswer` (schema, fixtures) judges only ticked planted lines; the outcome comes from `spotOutcome`; one answer per question (a second submit changes nothing); time spent is recorded; another user's item is a 404.
+  - Verify: checks; integration tests for the save and the one-answer rule; real-API judging of a right, a wrong and a reworded explanation.
+  - Files: `src/lib/ai/judge-spot-answer.ts` (+ test, fixtures), `src/db/queries/spot.ts` (+ test), `src/app/(app)/revise/[sessionId]/spot/[position]/page.tsx`, `src/components/spot-answer-form.tsx`
 
-- [x] **P9: End-to-end tests on the new marking** (S)
-  - Acceptance: both end-to-end specs pass with the new fixture; added checks: the mark shows /5 and the scheme, a typed mistake is boxed, a retry opens with the previous working.
-  - Verify: `npm run e2e`; full checks; `npm run build`.
-  - Files: `tests/e2e/core-loop.spec.ts`, `tests/e2e/full-flow.spec.ts`
+- [x] **S7: Reveal and session summary** (S)
+  - Acceptance: after answering, each planted error shows its line highlighted, what is wrong, the correct line and "Based on your common error: …"; wrongly ticked lines say "this line was correct"; each explanation shows the AI's verdict; "Next" moves on; the session page for a spot session lists its questions with outcomes and ends with a summary (counts and missed misconceptions); a long-form session page is unchanged.
+  - Verify: checks; browser check at desktop and 375 px.
+  - Files: `src/components/spot-reveal.tsx`, `src/app/(app)/revise/[sessionId]/page.tsx`, the spot question page
+
+- [x] **S8: Mastery at weight 0.25 and the progress chart** (S)
+  - Acceptance: answered spot items count on their topics at weight 0.25 with no hint or time factor; long-form mastery values are unchanged for a course with no spot answers; the progress chart labels spot sessions "Spot the error, N questions".
+  - Verify: checks; integration tests in `mastery.test.ts`.
+  - Files: `src/db/queries/mastery.ts` (+ test), `src/lib/mastery/mastery.ts` (+ test)
 
 ### Checkpoint 3
-- [ ] Lint, types, every unit test and every end-to-end test pass; build succeeds; ready for your go-ahead to release
+- [ ] A real-API spot session on a local database: natural planted errors, correct other lines, fair judging, full reveal, mastery moves
 
-## Phase 4: Release (needs your go-ahead)
+## Phase 4: Finish (30 min)
 
-- [ ] **P10: Back up, migrate, deploy, convert, verify** (S)
-  - Steps: copy the `mark` table to a backup table; apply migration A; push `main` (redeploys); once the new code is live, apply migration B; spot-check converted marks against the backup; mark one answer on the live site.
-  - Rollback: restore scores and outcomes from the backup table and revert the release commits.
-  - Verify: no mark above 5; every outcome matches the bands; a live mark shows /5 with boxes.
+- [x] **S9: End-to-end tests and build** (S)
+  - Acceptance: a new end-to-end spec: mark an answer, see the common-errors list, start a 5-question spot session, answer one with ticked lines and one with "No error", see the reveal and the summary, confirm the skill map changed; existing specs still pass; every new screen fits 375 px.
+  - Verify: `npm run e2e` (local Postgres until migration C is on Neon); full checks; `npm run build`.
+  - Files: `tests/e2e/spot-the-error.spec.ts`, `tests/e2e/helpers.ts`
 
-## Carried over from V1
+### Checkpoint 4
+- [ ] Lint, types, every unit and end-to-end test pass; build succeeds; ready for your go-ahead
 
-- [ ] **C1: Finish the live run-through** (you, after P10): a dispute, a revision session, and the hand-in export with a photo, on the live site.
+## Phase 5: Release (needs your go-ahead)
+
+- [ ] **S10: Migrate, deploy, build your list, verify** (S)
+  - Steps: apply migration C to Neon (additive; old code ignores it); push `main` (redeploys); open Revise on the live site so your list is built from your marks; run one live spot session.
+  - Rollback: revert the release commits; the new tables can stay (unused) or be dropped.
+  - Verify: existing long-form sessions still open; your list looks right; a live session works end to end.
+
+## Carried over
+
+- [ ] **C1: Finish the live run-through** (you): a dispute, a revision session, and the hand-in export with a photo, on the live site.
 - [ ] **C2: Demo preparation** (you): a demo account with a sheet already uploaded and marked; rotate the Anthropic key and delete the old one once the new one works.

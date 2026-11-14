@@ -215,6 +215,21 @@ describe("buildRevisionSession", () => {
     expect((await sessionRow(session.id)).status).toBe("ready");
   });
 
+  it("leaves a spot-the-error session alone: it is built by its own job", async () => {
+    const { session } = await setup("rv-spot@test.local");
+    await db
+      .update(revisionSessions)
+      .set({ mode: "spot_error", targetMinutes: null, questionCount: 5 })
+      .where(eq(revisionSessions.id, session.id));
+    const generateVariant = vi.fn(async () => variantAnswer);
+
+    await buildRevisionSession(session.id, { generateVariant });
+
+    expect(generateVariant).not.toHaveBeenCalled();
+    expect((await sessionRow(session.id)).status).toBe("building");
+    expect(await itemsOf(session.id)).toHaveLength(0);
+  });
+
   it("ignores a session that is not building", async () => {
     const { session } = await setup("rb-ready@test.local");
     await db

@@ -1,0 +1,6 @@
+{
+  "body": "Evaluate $x$.",
+  "lines": ["Step one with x^2.", "Step two.", "Step three."],
+  "planted": [{ "line": 9, "misconception": "e1", "whatsWrong": "Wrong.", "correctLine": "Step two." }],
+  "expectedMinutes": 3
+}

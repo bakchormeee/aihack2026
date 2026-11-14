@@ -16,7 +16,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       // The pure rule folders must be fully covered (SPEC.md, Testing Strategy).
-      include: ["src/lib/marking/**", "src/lib/mastery/**"],
+      include: ["src/lib/marking/**", "src/lib/mastery/**", "src/lib/spot/**"],
       exclude: ["**/*.test.ts"],
       thresholds: { lines: 100 },
     },
