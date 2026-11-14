@@ -12,6 +12,9 @@ import { orNotFound } from "@/lib/auth/guards";
 import { requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 
+// Submitting starts the AI marking in the background, which can run for a minute or two.
+export const maxDuration = 300;
+
 export default async function QuestionPage({
   params,
   searchParams,

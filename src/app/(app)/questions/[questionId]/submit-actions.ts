@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { z } from "zod";
 
 import { keyIsUnder } from "@/db/queries/sheets";
@@ -14,6 +15,7 @@ import {
   submitWorking,
 } from "@/db/queries/working";
 import { requireUser } from "@/lib/auth/session";
+import { claimMark, performMark } from "@/lib/pipeline/mark";
 import { UploadRejectedError, deleteObject, verifyUploadedObject } from "@/lib/storage";
 
 const attemptSchema = z.object({ attemptId: z.string().min(1).max(100) });
@@ -100,12 +102,17 @@ export async function removeWorkingFileAction(input: {
   return { ok: true, files: toFiles((await getWorkingFor(user.id, attemptId)).files) };
 }
 
-/** Submits the attempt's working. The mark is started by task M9. */
+/** Submits the attempt's working and starts the AI marking in the background. */
 export async function submitWorkingAction(input: { attemptId: string }): Promise<ActionResult> {
   const user = await requireUser();
   const { attemptId } = attemptSchema.parse(input);
   try {
-    await submitWorking(user.id, attemptId);
+    const { submissionId, alreadySubmitted } = await submitWorking(user.id, attemptId);
+    if (!alreadySubmitted) {
+      // Claim now so the mark screen shows "marking" at once; the AI call runs afterwards.
+      const claim = await claimMark({ submissionId, basis: "ai" });
+      if (claim) after(() => performMark(claim));
+    }
     return { ok: true };
   } catch (error) {
     return friendly(error);

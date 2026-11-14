@@ -224,7 +224,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `src/components/working-input.tsx`, `app/questions/[questionId]/submit-actions.ts` (+ test), `app/questions/[questionId]/page.tsx`, `app/sheets/[sheetId]/page.tsx`, `src/db/queries/attempts.ts`
   - Depends on: M6, F5
 
-- [ ] **M9: Provisional mark and mark screen** (M) — SC 9
+- [x] **M9: Provisional mark and mark screen** (M) — SC 9
   - Acceptance:
     - `runMark` matches C4: claims the submission, loads the solution for the basis and the working files, calls `markAttempt`, derives the outcome with `outcomeFromScore`, and inserts a mark; on error it sets `mark_status` to `failed`.
     - Submitting starts `runMark` with basis `ai`; "submit all" starts one per submission with concurrency 5.

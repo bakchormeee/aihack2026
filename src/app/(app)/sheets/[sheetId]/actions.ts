@@ -6,7 +6,9 @@ import { after } from "next/server";
 import { requeueHintsForSheet, requeueParse, setTimerEnabled } from "@/db/queries/sheets";
 import { submitAllDrafts } from "@/db/queries/working";
 import { requireUser } from "@/lib/auth/session";
+import { mapLimit } from "@/lib/concurrency";
 import { runHintsForSheet } from "@/lib/pipeline/hints";
+import { claimMark, performMark } from "@/lib/pipeline/mark";
 import { runSheetPipeline } from "@/lib/pipeline/sheet-job";
 
 /** Runs the reading of a failed or stuck sheet again. Does nothing for any other sheet. */
@@ -30,9 +32,13 @@ export async function setTimerAction(sheetId: string, enabled: boolean): Promise
   revalidatePath(`/sheets/${sheetId}`);
 }
 
-/** Submits every question's working that is still a draft. The marks are started by task M9. */
+/** Submits every question's working that is still a draft and starts the marking, five at a time. */
 export async function submitAllAction(sheetId: string): Promise<void> {
   const user = await requireUser();
-  await submitAllDrafts(user.id, sheetId);
+  const submitted = await submitAllDrafts(user.id, sheetId);
+  const claims = (
+    await Promise.all(submitted.map(({ submissionId }) => claimMark({ submissionId, basis: "ai" })))
+  ).filter((claim) => claim !== null);
+  after(() => mapLimit(claims, 5, (claim) => performMark(claim)));
   revalidatePath(`/sheets/${sheetId}`);
 }

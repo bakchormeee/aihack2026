@@ -332,7 +332,8 @@ describe("submitAllDrafts", () => {
 
     const submitted = await submitAllDrafts(user.id, sheet.id);
 
-    expect(submitted.sort()).toEqual([made[0].id, made[1].id].sort());
+    expect(submitted.map((s) => s.attemptId).sort()).toEqual([made[0].id, made[1].id].sort());
+    expect(submitted.every((s) => typeof s.submissionId === "string")).toBe(true);
     expect((await getWorkingFor(user.id, made[0].id)).submittedAt).not.toBeNull();
     expect((await getWorkingFor(user.id, made[1].id)).submittedAt).not.toBeNull();
     expect((await getWorkingFor(user.id, made[2].id)).submittedAt).toBeNull();

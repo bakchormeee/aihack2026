@@ -165,10 +165,13 @@ export async function submitWorking(
 
 /**
  * Submits every draft of the user's on the sheet that has working. For each
- * question only the latest attempt counts. Returns the ids of the attempts
- * submitted; empty for a sheet that is not the user's.
+ * question only the latest attempt counts. Returns the attempts and
+ * submissions submitted; empty for a sheet that is not the user's.
  */
-export async function submitAllDrafts(userId: string, sheetId: string): Promise<string[]> {
+export async function submitAllDrafts(
+  userId: string,
+  sheetId: string,
+): Promise<{ attemptId: string; submissionId: string }[]> {
   const candidates = await db
     .select({ attemptId: attempts.id, questionId: attempts.questionId })
     .from(attempts)
@@ -186,11 +189,12 @@ export async function submitAllDrafts(userId: string, sheetId: string): Promise<
   const latestPerQuestion = [
     ...new Map([...candidates].reverse().map((row) => [row.questionId, row])).values(),
   ];
-  const submitted: string[] = [];
+  const submitted: { attemptId: string; submissionId: string }[] = [];
   for (const { attemptId } of latestPerQuestion) {
     try {
       const result = await submitWorking(userId, attemptId);
-      if (!result.alreadySubmitted) submitted.push(attemptId);
+      if (!result.alreadySubmitted)
+        submitted.push({ attemptId, submissionId: result.submissionId });
     } catch (error) {
       if (!(error instanceof EmptyWorkingError)) throw error;
     }
