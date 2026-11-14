@@ -1,12 +1,13 @@
 // Spot-the-error sessions, questions and answers (SPEC-spot-the-error.md).
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { listMisconceptions } from "@/db/queries/misconceptions";
 import { NoCandidatesError } from "@/db/queries/revision";
-import { revisionSessions, topics } from "@/db/schema";
-import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
+import { revisionSessions, spotAnswers, spotItems, topics } from "@/db/schema";
+import { NotFoundError, requireCourse, requireRevisionSession } from "@/lib/auth/ownership";
+import type { Outcome, SpotJudgement, SpotTick } from "@/lib/domain";
 import { rankMisconceptions } from "@/lib/spot/rules";
 
 /** The student's misconceptions as the ranking rules want them. */
@@ -59,4 +60,63 @@ export async function createSpotSession(
     })
     .returning();
   return session;
+}
+
+/** One question of a spot-the-error session of the user's, with their answer row if they have opened it. */
+export async function loadSpotItem(userId: string, sessionId: string, position: number) {
+  const session = await requireRevisionSession(userId, sessionId);
+  if (session.mode !== "spot_error") throw new NotFoundError();
+  const [item] = await db
+    .select()
+    .from(spotItems)
+    .where(and(eq(spotItems.sessionId, sessionId), eq(spotItems.position, position)));
+  if (!item) throw new NotFoundError();
+  const [answer] = await db.select().from(spotAnswers).where(eq(spotAnswers.itemId, item.id));
+  return { session, item, answer: answer ?? null };
+}
+
+/** Records that the student has opened the question; the clock for time spent starts here. */
+export async function startSpotAnswer(userId: string, itemId: string): Promise<void> {
+  await db.insert(spotAnswers).values({ itemId, userId }).onConflictDoNothing();
+}
+
+/**
+ * Takes the student's one answer: saves their lines and explanations and the time spent.
+ * Returns false when the question was already answered, so a double submit changes nothing.
+ */
+export async function claimSpotAnswer(
+  itemId: string,
+  a: { noError: boolean; ticked: SpotTick[] },
+  now: Date,
+): Promise<boolean> {
+  const [row] = await db.select().from(spotAnswers).where(eq(spotAnswers.itemId, itemId));
+  if (!row) return false;
+  const claimed = await db
+    .update(spotAnswers)
+    .set({
+      answeredAt: now,
+      secondsSpent: Math.max(0, Math.round((now.getTime() - row.startedAt.getTime()) / 1000)),
+      noError: a.noError,
+      ticked: a.ticked,
+    })
+    .where(and(eq(spotAnswers.itemId, itemId), isNull(spotAnswers.answeredAt)))
+    .returning({ itemId: spotAnswers.itemId });
+  return claimed.length > 0;
+}
+
+/** Saves the AI's verdicts and the outcome that follows from them. */
+export async function finishSpotAnswer(
+  itemId: string,
+  judgements: SpotJudgement[],
+  outcome: Outcome,
+): Promise<void> {
+  await db.update(spotAnswers).set({ judgements, outcome }).where(eq(spotAnswers.itemId, itemId));
+}
+
+/** Gives the answer back (the AI failed), so the student can submit again. */
+export async function releaseSpotAnswer(itemId: string): Promise<void> {
+  await db
+    .update(spotAnswers)
+    .set({ answeredAt: null, secondsSpent: null, noError: false, ticked: [], judgements: [] })
+    .where(eq(spotAnswers.itemId, itemId));
 }

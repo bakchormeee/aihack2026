@@ -45,7 +45,7 @@ Every task: test first, then code, one commit with explicit paths. "Checks" = `n
   - Verify: checks; integration tests with a fake AI; one real-API session of 5 on a local database, reviewed by you.
   - Files: `src/lib/ai/write-flawed-solution.ts` (+ test, fixtures), `src/lib/pipeline/spot-session.ts` (+ test), `src/db/queries/revision.ts`, `src/app/(app)/revise/actions.ts`
 
-- [ ] **S6: Answering and judging** (M)
+- [x] **S6: Answering and judging** (M)
   - Acceptance: the spot question page shows the question and numbered lines (maths rendered); the student ticks lines with an explanation each (1–500 characters) or presses "No error"; `judgeSpotAnswer` (schema, fixtures) judges only ticked planted lines; the outcome comes from `spotOutcome`; one answer per question (a second submit changes nothing); time spent is recorded; another user's item is a 404.
   - Verify: checks; integration tests for the save and the one-answer rule; real-API judging of a right, a wrong and a reworded explanation.
   - Files: `src/lib/ai/judge-spot-answer.ts` (+ test, fixtures), `src/db/queries/spot.ts` (+ test), `src/app/(app)/revise/[sessionId]/spot/[position]/page.tsx`, `src/components/spot-answer-form.tsx`

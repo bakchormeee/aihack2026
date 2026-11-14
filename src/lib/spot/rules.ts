@@ -117,3 +117,27 @@ export function timesSeen(
       attempts.add(source.attemptId);
   return attempts.size;
 }
+
+export const MAX_EXPLANATION = 500;
+
+/** Why an answer cannot be submitted, or null when it can. */
+export function checkAnswer(
+  lineCount: number,
+  a: { noError: boolean; ticked: { line: number; explanation: string }[] },
+): string | null {
+  if (a.noError && a.ticked.length > 0)
+    return "Choose either No error or the lines you think are wrong, not both.";
+  if (!a.noError && a.ticked.length === 0)
+    return "Tick the lines you think are wrong, or press No error.";
+  const seen = new Set<number>();
+  for (const { line, explanation } of a.ticked) {
+    if (!Number.isInteger(line) || line < 1 || line > lineCount) return "That line does not exist.";
+    if (seen.has(line)) return "Each line can be ticked once.";
+    seen.add(line);
+    const length = explanation.trim().length;
+    if (length === 0) return `Explain what is wrong in line ${line}.`;
+    if (length > MAX_EXPLANATION)
+      return `Keep the explanation of line ${line} to ${MAX_EXPLANATION} characters.`;
+  }
+  return null;
+}

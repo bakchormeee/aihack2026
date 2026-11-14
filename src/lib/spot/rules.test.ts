@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MAX_EXPLANATION,
+  checkAnswer,
   dealQuestions,
   judgeLines,
   rankMisconceptions,
@@ -209,5 +211,39 @@ describe("timesSeen", () => {
         current,
       ),
     ).toBe(2);
+  });
+});
+
+describe("checkAnswer", () => {
+  const tick = (line: number, explanation = "It is wrong because the sign changes.") => ({
+    line,
+    explanation,
+  });
+
+  it("accepts ticked lines with an explanation each, or No error alone", () => {
+    expect(checkAnswer(5, { noError: false, ticked: [tick(2), tick(4)] })).toBeNull();
+    expect(checkAnswer(5, { noError: true, ticked: [] })).toBeNull();
+  });
+
+  it("needs either No error or at least one ticked line, not both", () => {
+    expect(checkAnswer(5, { noError: false, ticked: [] })).toMatch(/tick the lines/i);
+    expect(checkAnswer(5, { noError: true, ticked: [tick(2)] })).toMatch(/either/i);
+  });
+
+  it("needs real, distinct line numbers", () => {
+    expect(checkAnswer(5, { noError: false, ticked: [tick(0)] })).toMatch(/line/i);
+    expect(checkAnswer(5, { noError: false, ticked: [tick(6)] })).toMatch(/line/i);
+    expect(checkAnswer(5, { noError: false, ticked: [tick(1.5)] })).toMatch(/line/i);
+    expect(checkAnswer(5, { noError: false, ticked: [tick(2), tick(2)] })).toMatch(/once/i);
+  });
+
+  it("needs an explanation of 1 to 500 characters for every ticked line", () => {
+    expect(checkAnswer(5, { noError: false, ticked: [tick(2, "   ")] })).toMatch(/explain/i);
+    expect(
+      checkAnswer(5, { noError: false, ticked: [tick(2, "x".repeat(MAX_EXPLANATION))] }),
+    ).toBeNull();
+    expect(
+      checkAnswer(5, { noError: false, ticked: [tick(2, "x".repeat(MAX_EXPLANATION + 1))] }),
+    ).toMatch(/500/);
   });
 });
