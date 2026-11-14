@@ -13,7 +13,7 @@ export default function TestSignInPage() {
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-8 px-4 py-16">
       <BrandMark href="/" />
-      <div className="flex flex-col gap-6 rounded-xl border p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+      <div className="flex flex-col gap-6 bg-card rounded-lg border p-6">
         <h1 className="text-2xl font-medium tracking-tight">Test sign-in</h1>
         <form
           className="flex flex-col gap-2"

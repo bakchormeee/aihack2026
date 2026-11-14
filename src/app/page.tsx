@@ -3,7 +3,6 @@ import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { MathText } from "@/components/math-text";
 import { MistakeList } from "@/components/mistake-list";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { WorkingWithBoxes } from "@/components/working-with-boxes";
 import type { Mistake } from "@/lib/domain";
@@ -30,18 +29,22 @@ const SAMPLE_MISTAKES: Mistake[] = [
   },
 ];
 
-const STEPS = [
+const WEEK = [
   {
-    title: "Upload the sheet",
-    body: "Drop in this week's PDF. Each question is split out and tagged with its topic, ready to attempt.",
+    term: "Upload",
+    body: "Drop in the sheet as a PDF. It is split into questions, each tagged with its topics.",
   },
   {
-    title: "Attempt with hints",
-    body: "Type or photograph your working. Stuck? Open a nudge, then an approach, then a skeleton, one rung at a time.",
+    term: "Attempt",
+    body: "Type your working or photograph it. If you are stuck, take a nudge, then an approach, then a skeleton.",
   },
   {
-    title: "Get marked, then revise",
-    body: "Each answer is marked out of 5 with its mistakes boxed. Revision sessions pick the topics you are weakest at.",
+    term: "Get marked",
+    body: "A score out of 5, every mistake boxed, and a hint for each one rather than the answer.",
+  },
+  {
+    term: "Revise",
+    body: "Before exams, retry what went wrong and try fresh variants of your weakest topics.",
   },
 ];
 
@@ -49,94 +52,84 @@ export default function LandingPage() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 sm:px-6">
           <BrandMark href="/" />
-          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <Link href="/sign-in" className="text-sm font-medium underline-offset-4 hover:underline">
             Sign in
           </Link>
         </div>
       </header>
 
-      <main className="flex-1">
-        <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:py-24">
-          <div className="flex flex-col items-start gap-6">
-            <p className="text-muted-foreground text-sm font-medium">
-              For weekly university maths problem sheets
-            </p>
-            <h1 className="max-w-xl text-4xl leading-[1.1] font-medium tracking-tight sm:text-5xl">
-              See exactly where your working goes wrong.
-            </h1>
-            <p className="text-muted-foreground max-w-lg text-lg leading-relaxed">
-              Upload a problem sheet, attempt each question with hints when you are stuck, and get
-              your working marked out of 5 with every mistake boxed and explained.
-            </p>
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <Link href="/courses" className={buttonVariants({ size: "lg" })}>
-                Open my courses
-              </Link>
-              <Link href="#how" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                How it works
-              </Link>
-            </div>
-          </div>
-
-          <SampleMark />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 sm:px-6">
+        <section className="flex flex-col items-start gap-6 py-16 sm:py-20">
+          <h1 className="text-[2.5rem] leading-[1.08] font-medium sm:text-[3.25rem]">
+            Weekly problem sheets, marked line by line.
+          </h1>
+          <p className="text-muted-foreground max-w-xl text-lg leading-relaxed">
+            Upload the sheet, attempt each question with up to three hints, and see every slip boxed
+            in your own working, a week before the official solutions come out.
+          </p>
+          <Link href="/courses" className={buttonVariants({ size: "lg" })}>
+            Open my courses
+          </Link>
         </section>
 
-        <section id="how" className="border-t">
-          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-            <h2 className="max-w-xl text-2xl font-medium tracking-tight sm:text-3xl">
-              One sheet, three steps.{" "}
-              <span className="text-muted-foreground">The same loop every week.</span>
-            </h2>
-            <ol className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
-              {STEPS.map((step, i) => (
-                <li key={step.title} className="flex flex-col gap-2 border-t pt-5">
-                  <span className="text-muted-foreground font-mono text-sm">0{i + 1}</span>
-                  <h3 className="text-lg font-medium">{step.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{step.body}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
+        <SampleMark />
+
+        <section aria-labelledby="week" className="py-16 sm:py-20">
+          <h2 id="week" className="text-2xl font-medium">
+            What you do each week
+          </h2>
+          <dl className="mt-6 border-t">
+            {WEEK.map((row) => (
+              <div
+                key={row.term}
+                className="grid gap-1 border-b py-4 sm:grid-cols-[10rem_1fr] sm:gap-6"
+              >
+                <dt className="font-heading text-lg font-medium">{row.term}</dt>
+                <dd className="text-muted-foreground leading-relaxed">{row.body}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
       </main>
 
       <footer className="border-t">
-        <div className="text-muted-foreground mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="text-muted-foreground mx-auto flex w-full max-w-3xl flex-col gap-1 px-4 py-6 text-sm sm:flex-row sm:justify-between sm:px-6">
           <span>Problem Sheet Companion</span>
-          <span>
-            Marks are AI-generated and provisional until checked against official solutions.
-          </span>
+          <span>AI marks are provisional until checked against official solutions.</span>
         </div>
       </footer>
     </div>
   );
 }
 
+/** One question from a sheet, as the mark screen shows it after submitting. */
 function SampleMark() {
   return (
-    <div
-      role="img"
-      aria-label="Example of a marked answer: 3 out of 5, partly right, with two mistakes boxed in the working"
-      className="bg-card overflow-hidden rounded-xl border shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-12px_rgb(0_0_0/0.12)]"
+    <figure
+      aria-label="Example: question 2(b) marked 3 out of 5, with two mistakes boxed in the working"
+      className="border-foreground border-t-2"
     >
-      <div className="bg-muted/60 flex items-center justify-between gap-3 border-b px-5 py-3 text-sm">
-        <span className="font-medium">Question 2(b)</span>
-        <span className="text-muted-foreground">Integration by parts</span>
+      <div className="text-muted-foreground flex items-baseline justify-between border-b py-2 font-mono text-xs">
+        <span>Sheet 3 · Integration</span>
+        <span>AI-marked, provisional</span>
       </div>
-      <div className="flex flex-col gap-5 p-5">
-        <MathText className="text-sm">{"Find $\\displaystyle\\int x e^{2x}\\,dx$."}</MathText>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-medium tracking-tight">3/5</span>
-          <Badge variant="secondary">Partly right</Badge>
-          <span className="text-muted-foreground text-xs">AI-marked, provisional</span>
+      <div className="flex flex-col gap-6 py-6">
+        <div className="flex items-start justify-between gap-6">
+          <div className="font-heading flex gap-3 text-lg">
+            <span className="font-medium">2(b)</span>
+            <MathText>{"Find $\\displaystyle\\int x e^{2x}\\,dx$."}</MathText>
+          </div>
+          <p className="font-heading text-pen shrink-0 text-3xl leading-none italic">
+            3<span className="text-xl">/5</span>
+          </p>
         </div>
-        <div className="rounded-lg border px-4 py-3">
+        <div className="bg-card rounded-md border px-4 py-3">
           <WorkingWithBoxes text={SAMPLE_WORKING} mistakes={SAMPLE_MISTAKES} />
         </div>
         <MistakeList mistakes={SAMPLE_MISTAKES} />
       </div>
-    </div>
+    </figure>
   );
 }

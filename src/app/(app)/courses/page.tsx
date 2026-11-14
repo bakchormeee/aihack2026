@@ -23,7 +23,7 @@ export default async function CoursesPage() {
             <li key={course.id}>
               <Link
                 href={`/courses/${course.id}`}
-                className="hover:border-foreground/25 hover:bg-muted/40 block rounded-lg border p-4 font-medium transition-colors"
+                className="bg-card hover:border-foreground/40 font-heading block rounded-lg border p-4 text-lg font-medium transition-colors"
               >
                 {course.name}
               </Link>
