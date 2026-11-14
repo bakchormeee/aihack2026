@@ -15,6 +15,9 @@ import { getNextHref } from "@/lib/navigation";
 import type { ErrorType, Outcome } from "@/lib/domain";
 import { isStale } from "@/lib/pipeline/stale";
 
+import { canDispute } from "@/lib/marking/rules";
+
+import { DisputeForm } from "./dispute-form";
 import { retryMarkAction, retryNowAction, retryWithNextHintAction } from "./actions";
 
 // The retry button starts the AI marking again, which can run for a minute or two.
@@ -58,6 +61,7 @@ export default async function MarkPage({
     return <NothingToMark questionId={questionId} sessionId={sessionId} />;
 
   const { submission, current } = data;
+  const disputeCount = data.marks.filter((mark) => mark.isDispute).length;
   // Null while the solution is locked: nothing of it is sent to the browser.
   const solution = await getVisibleSolution(user.id, questionId);
   const hintLevel = (await visibleHintsFor(user.id, attemptId)).level;
@@ -66,6 +70,12 @@ export default async function MarkPage({
   const marking = submission?.submittedAt && !current && submission.markStatus === "pending";
   const stuck = marking && isStale(submission.markStatusUpdatedAt);
   const waiting = marking && !stuck;
+  // A dispute or the official re-mark is running while an earlier mark is shown.
+  const remarking =
+    submission?.submittedAt &&
+    current &&
+    submission.markStatus === "pending" &&
+    !isStale(submission.markStatusUpdatedAt);
   const failed =
     submission?.submittedAt &&
     !current &&
@@ -73,7 +83,7 @@ export default async function MarkPage({
 
   return (
     <section className="flex flex-col gap-6">
-      <AutoRefresh active={Boolean(waiting)} />
+      <AutoRefresh active={Boolean(waiting || remarking)} />
       <div>
         <Link href={back} className="text-muted-foreground text-sm underline">
           Back to question {question.label}
@@ -96,6 +106,12 @@ export default async function MarkPage({
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
+      ) : null}
+
+      {remarking ? (
+        <p className="text-muted-foreground text-sm" aria-live="polite">
+          Marking again… the earlier mark stays below until the new one is ready.
+        </p>
       ) : null}
 
       {failed ? (
@@ -171,7 +187,44 @@ export default async function MarkPage({
             </div>
           ) : null}
 
+          {submission?.markStatus === "done" && current.outcome !== "full" ? (
+            canDispute(disputeCount) ? (
+              <DisputeForm
+                questionId={questionId}
+                attemptId={attemptId}
+                remaining={2 - disputeCount}
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                You have asked for this attempt to be looked at again twice.
+              </p>
+            )
+          ) : null}
+
           {solution ? <SolutionPanel solution={solution} /> : null}
+
+          {data.marks.length > 1 ? (
+            <section className="flex flex-col gap-2 rounded-lg border p-4">
+              <h2 className="text-base font-semibold">All marks for this attempt</h2>
+              <ul className="flex flex-col gap-2 text-sm">
+                {data.marks.map((mark) => (
+                  <li key={mark.id} className="flex flex-col gap-0.5">
+                    <span>
+                      {mark.score}/100 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
+                      {mark.basis === "official" ? "official solutions" : "AI, provisional"}
+                      {mark.isDispute ? " · you disputed this" : ""}
+                      {mark.id === current.id ? " (current)" : ""}
+                    </span>
+                    {mark.disputeReason ? (
+                      <span className="text-muted-foreground text-xs">
+                        Your reason: {mark.disputeReason}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <div className="flex justify-end text-sm">
             <Link href={nextHref} className="underline">
