@@ -84,7 +84,7 @@ Source spec: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md) (version 2)
   - Files: `src/lib/auth/ownership.ts`, `src/lib/auth/ownership.test.ts`
   - Depends on: F2
 
-- [ ] **F5: Storage, signed URLs and upload component** (M)
+- [x] **F5: Storage, signed URLs and upload component** (M)
   - Acceptance:
     - `src/lib/storage/` exports `presignUpload`, `statObject`, `getObjectBytes`, `signedDownloadUrl` and `assertOwnedKey(userId, key)`; keys follow decision 5.
     - `POST /api/uploads/presign` validates purpose, type and size against the spec's limits; the two `/api/files/…` routes check ownership and redirect to a 5-minute signed URL.
