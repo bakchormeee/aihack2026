@@ -24,7 +24,7 @@ const SAMPLE_MISTAKES: Mistake[] = [
   },
   {
     type: "method",
-    quote: "$2xe^{2x} + \\int 2e^{2x}\\,dx$",
+    quote: "$\\int x e^{2x}\\,dx = 2xe^{2x} + \\int 2e^{2x}\\,dx$",
     hint: "Write out the integration by parts formula first. Which sign sits in front of $\\int v\\,du$?",
     location: { kind: "text" },
   },
@@ -105,7 +105,9 @@ export default function LandingPage() {
       <footer className="border-t">
         <div className="text-muted-foreground mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>Problem Sheet Companion</span>
-          <span>Marks are AI-generated and provisional until checked against official solutions.</span>
+          <span>
+            Marks are AI-generated and provisional until checked against official solutions.
+          </span>
         </div>
       </footer>
     </div>
