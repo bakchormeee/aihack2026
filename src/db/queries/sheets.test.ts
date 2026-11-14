@@ -2,13 +2,16 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "@/db";
-import { courses, sheetFiles, users } from "@/db/schema";
+import { courses, questionTopics, questions, sheetFiles, sheets, topics, users } from "@/db/schema";
+import { STALE_JOB_MS } from "@/lib/domain";
 
 import {
   checkSheetFileSet,
   createSheetWithFiles,
   keyIsUnder,
+  listQuestionsWithTopics,
   listSheets,
+  requeueParse,
   titleFromFileName,
 } from "./sheets";
 
@@ -122,5 +125,126 @@ describe("createSheetWithFiles and listSheets", () => {
     await createSheetWithFiles(owner.course.id, "Mine", [{ path: "p", mime: "application/pdf" }]);
 
     expect(await listSheets(other.user.id, owner.course.id)).toEqual([]);
+  });
+});
+
+describe("requeueParse", () => {
+  async function sheetWith(email: string, status: "parsing" | "ready" | "failed", ageMs = 0) {
+    const { user, course } = await userWithCourse(email);
+    const sheet = await createSheetWithFiles(course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+    await db
+      .update(sheets)
+      .set({
+        status,
+        statusUpdatedAt: new Date(Date.now() - ageMs),
+        error: status === "failed" ? "boom" : null,
+      })
+      .where(eq(sheets.id, sheet.id));
+    return { user, sheet };
+  }
+
+  it("restarts a failed sheet and clears its error", async () => {
+    const { user, sheet } = await sheetWith("rq-failed@test.local", "failed");
+
+    expect(await requeueParse(user.id, sheet.id)).toBe(true);
+
+    const [row] = await db.select().from(sheets).where(eq(sheets.id, sheet.id));
+    expect(row.status).toBe("parsing");
+    expect(row.error).toBeNull();
+  });
+
+  it("restarts a sheet that has been parsing for too long", async () => {
+    const { user, sheet } = await sheetWith("rq-stale@test.local", "parsing", STALE_JOB_MS + 1000);
+
+    expect(await requeueParse(user.id, sheet.id)).toBe(true);
+  });
+
+  it("leaves a sheet that is still being read", async () => {
+    const { user, sheet } = await sheetWith("rq-busy@test.local", "parsing", 1000);
+
+    expect(await requeueParse(user.id, sheet.id)).toBe(false);
+  });
+
+  it("leaves a sheet that is already ready", async () => {
+    const { user, sheet } = await sheetWith("rq-ready@test.local", "ready");
+
+    expect(await requeueParse(user.id, sheet.id)).toBe(false);
+  });
+
+  it("does nothing for another user's failed sheet", async () => {
+    const { sheet } = await sheetWith("rq-owner@test.local", "failed");
+    const other = await userWithCourse("rq-other@test.local");
+
+    expect(await requeueParse(other.user.id, sheet.id)).toBe(false);
+    const [row] = await db.select().from(sheets).where(eq(sheets.id, sheet.id));
+    expect(row.status).toBe("failed");
+  });
+});
+
+describe("listQuestionsWithTopics", () => {
+  it("returns the sheet's questions in order with their topics", async () => {
+    const { user, course } = await userWithCourse("lq@test.local");
+    const sheet = await createSheetWithFiles(course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+    const [t1, t2] = await db
+      .insert(topics)
+      .values([
+        { courseId: course.id, name: "Limits" },
+        { courseId: course.id, name: "Series" },
+      ])
+      .returning();
+    const [q2, q1] = await db
+      .insert(questions)
+      .values([
+        {
+          courseId: course.id,
+          sheetId: sheet.id,
+          position: 2,
+          label: "2",
+          body: "B",
+          expectedMinutes: 5,
+        },
+        {
+          courseId: course.id,
+          sheetId: sheet.id,
+          position: 1,
+          label: "1",
+          body: "A",
+          expectedMinutes: 5,
+        },
+      ])
+      .returning();
+    await db.insert(questionTopics).values([
+      { questionId: q1.id, topicId: t1.id },
+      { questionId: q1.id, topicId: t2.id },
+      { questionId: q2.id, topicId: t2.id },
+    ]);
+
+    const result = await listQuestionsWithTopics(user.id, sheet.id);
+
+    expect(result.map((q) => q.label)).toEqual(["1", "2"]);
+    expect(result[0].topics.map((t) => t.name).sort()).toEqual(["Limits", "Series"]);
+    expect(result[1].topics.map((t) => t.name)).toEqual(["Series"]);
+  });
+
+  it("returns nothing for another user", async () => {
+    const { course } = await userWithCourse("lq-owner@test.local");
+    const sheet = await createSheetWithFiles(course.id, "S", [
+      { path: "p", mime: "application/pdf" },
+    ]);
+    await db.insert(questions).values({
+      courseId: course.id,
+      sheetId: sheet.id,
+      position: 1,
+      label: "1",
+      body: "A",
+      expectedMinutes: 5,
+    });
+    const other = await userWithCourse("lq-other@test.local");
+
+    expect(await listQuestionsWithTopics(other.user.id, sheet.id)).toEqual([]);
   });
 });

@@ -8,6 +8,9 @@ import { requireUser } from "@/lib/auth/session";
 
 import { SheetUploadForm } from "./sheet-upload-form";
 
+// The upload action starts the background parse, which can run for a few minutes.
+export const maxDuration = 300;
+
 const STATUS_LABEL = { parsing: "Reading the sheet…", ready: "Ready", failed: "Failed" } as const;
 
 export default async function SheetsPage({ params }: PageProps<"/courses/[courseId]/sheets">) {

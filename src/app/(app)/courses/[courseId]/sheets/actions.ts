@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -11,6 +12,7 @@ import {
 } from "@/db/queries/sheets";
 import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { runParse } from "@/lib/pipeline/parse";
 import { UploadRejectedError, verifyUploadedObject } from "@/lib/storage";
 
 const inputSchema = z.object({
@@ -61,5 +63,7 @@ export async function createSheetAction(
     title,
     verified.map((file) => ({ path: file.key, mime: file.mime })),
   );
+  // Reading the sheet takes a while, so it runs after the response is sent.
+  after(() => runParse(sheet.id));
   redirect(`/sheets/${sheet.id}`);
 }

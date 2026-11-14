@@ -173,7 +173,7 @@ production; it is readable at 375 px. Files: `src/components/charts/<name>.tsx`,
   - Files: `app/courses/[courseId]/sheets/page.tsx`, `app/courses/[courseId]/sheets/actions.ts`, `src/db/queries/sheets.ts`
   - Depends on: M1, F5
 
-- [ ] **M3: Parse pipeline and sheet overview** (M) — SC 3
+- [x] **M3: Parse pipeline and sheet overview** (M) — SC 3
   - Acceptance:
     - `runParse(sheetId)` runs after upload through `after()`, claims the sheet, calls `parseSheet`, and saves questions, topics (upsert by lower-case name), parents and prerequisites in one transaction; on error it sets `failed` and `error`.
     - `GET /api/sheets/[sheetId]/status` returns sheet status and per-question `hints_status`; the overview polls it, then lists each question with `<MathText>` and topic badges, linking to the question page.
