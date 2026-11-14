@@ -30,7 +30,7 @@ Sizes: S = 1–2 files, M = 3–5 files.
   - Verify: checks; contract tests (valid fixture, invalid fixture, a fixture with LaTeX outside `$…$` is rejected, a fixture that states the correction fails a hints-only test); one real-API mark of a typed answer, timed.
   - Files: `src/lib/ai/mark-attempt.ts` (+ test), `tests/fixtures/ai/markAttempt*.json`, `src/lib/pipeline/mark.ts` (+ test), `src/db/queries/mastery.ts`
 
-- [ ] **P4: Mark screen shows the score out of 5, the scheme and the mistake list** (S)
+- [x] **P4: Mark screen shows the score out of 5, the scheme and the mistake list** (S)
   - Acceptance: "4/5" with Correct / Partly right / Stuck; the scheme with the current score highlighted; each mistake numbered with its kind (careless or structural), quote and hint; old marks without a mistake list still show their first wrong step; the all-marks list shows /5.
   - Verify: checks; browser check on a real mark.
   - Files: `src/app/(app)/questions/[questionId]/mark/page.tsx`, `src/components/mistake-list.tsx`

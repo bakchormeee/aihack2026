@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
+import { MarkingScheme, MistakeList } from "@/components/mistake-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SolutionPanel } from "@/components/solution-panel";
@@ -13,7 +14,7 @@ import { requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { getNextHref } from "@/lib/navigation";
 import type { Outcome } from "@/lib/domain";
-import { ERROR_LABEL } from "@/lib/marking/labels";
+import { ERROR_LABEL, OUTCOME_LABEL } from "@/lib/marking/labels";
 import { isStale } from "@/lib/pipeline/stale";
 
 import { canDispute } from "@/lib/marking/rules";
@@ -24,11 +25,6 @@ import { retryMarkAction, retryNowAction, retryWithNextHintAction } from "./acti
 // The retry button starts the AI marking again, which can run for a minute or two.
 export const maxDuration = 300;
 
-const OUTCOME_LABEL: Record<Outcome, string> = {
-  full: "Full marks",
-  partial: "Partly right",
-  stuck: "Stuck",
-};
 const OUTCOME_VARIANT: Record<Outcome, "default" | "secondary" | "destructive"> = {
   full: "default",
   partial: "secondary",
@@ -129,7 +125,7 @@ export default async function MarkPage({
             <Badge variant={OUTCOME_VARIANT[current.outcome]}>
               {OUTCOME_LABEL[current.outcome]}
             </Badge>
-            <span className="text-lg font-semibold">{current.score}/100</span>
+            <span className="text-lg font-semibold">{current.score}/5</span>
             {current.errorType ? (
               <Badge variant="outline">{ERROR_LABEL[current.errorType]}</Badge>
             ) : null}
@@ -140,7 +136,12 @@ export default async function MarkPage({
             </span>
           </div>
 
-          {current.firstWrongStep ? (
+          {current.mistakes && current.mistakes.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <h2 className="text-base font-semibold">What to check</h2>
+              <MistakeList mistakes={current.mistakes} />
+            </div>
+          ) : current.firstWrongStep ? (
             <div className="rounded-lg border p-4">
               <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">
                 Where it first goes wrong
@@ -158,6 +159,15 @@ export default async function MarkPage({
             <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Overall</p>
             <MathText className="text-sm">{current.overallFeedback}</MathText>
           </div>
+
+          <details className="rounded-lg border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              How marks out of 5 work
+            </summary>
+            <div className="mt-3">
+              <MarkingScheme score={current.score} />
+            </div>
+          </details>
 
           {current.outcome !== "full" ? (
             <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -204,7 +214,7 @@ export default async function MarkPage({
                 {data.marks.map((mark) => (
                   <li key={mark.id} className="flex flex-col gap-0.5">
                     <span>
-                      {mark.score}/100 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
+                      {mark.score}/5 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
                       {mark.basis === "official" ? "official solutions" : "AI, provisional"}
                       {mark.isDispute ? " · you disputed this" : ""}
                       {mark.id === current.id ? " (current)" : ""}
