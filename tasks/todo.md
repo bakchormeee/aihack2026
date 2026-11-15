@@ -35,8 +35,8 @@ are in [plan.md](plan.md).
 
 ## Phase 4: Finish and release
 
-- [ ] **D6: End-to-end test of delete** (S, after D5)
-- [ ] **B5: End-to-end test of batch working** (S, after B4)
+- [x] **D6: End-to-end test of delete** (S, after D5)
+- [x] **B5: End-to-end test of batch working** (S, after B4)
 - [ ] **R1: Release** (each step needs your go-ahead): apply migration F to Neon; full
   checks, `npm run e2e` and the build; push `main`; check both features live.
 
