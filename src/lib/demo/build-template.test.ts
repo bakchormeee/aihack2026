@@ -203,6 +203,16 @@ describe("buildDemoTemplate", () => {
     expect(report.attempts).toBeLessThanOrEqual(4);
   });
 
+  it("skips the official solutions when asked, keeping only the AI marks", async () => {
+    const report = await buildDemoTemplate({ ...base, eraseOld, officialSolutions: false });
+    const sheetRows = await db
+      .select()
+      .from(sheets)
+      .innerJoin(courses, eq(courses.id, sheets.courseId))
+      .where(eq(courses.userId, report.userId));
+    expect(sheetRows.every((r) => r.sheet.solutionsStatus === "none")).toBe(true);
+  });
+
   it("builds two courses with three sheets each, leaving sheet 3 unattempted", async () => {
     const wide = mkdtempSync(path.join(tmpdir(), "demo-sheets-"));
     for (const [course, names] of [

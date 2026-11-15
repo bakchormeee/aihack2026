@@ -10,6 +10,7 @@
 //   --sheets <dir>    the folder of course folders (default ../Sample Problem Sheets)
 //   --seed <n>        the history plan's seed (default 2026)
 //   --questions-per-sheet <n>  answer only the first n questions of each sheet (default all)
+//   --no-official     skip the official solutions and the re-mark (quicker)
 //   --sheets-per-course <n>  1–3 sheets of each course (default 3; a quicker, smaller run)
 //   --yes             really run
 
@@ -29,6 +30,7 @@ const { values } = parseArgs({
     seed: { type: "string" },
     "sheets-per-course": { type: "string" },
     "questions-per-sheet": { type: "string" },
+    "no-official": { type: "boolean", default: false },
     yes: { type: "boolean", default: false },
   },
 });
@@ -66,6 +68,7 @@ async function main() {
     questionsPerSheet: values["questions-per-sheet"]
       ? Number(values["questions-per-sheet"])
       : undefined,
+    officialSolutions: !values["no-official"],
     storage: { put: putObject, get: getObjectBytes },
     writeWorking: writeDemoWorking,
     // Erase the previous template's rows. Its files stay in R2: live copies still read

@@ -102,6 +102,8 @@ export type BuildDemoOptions = {
   sheetsPerCourse?: number;
   /** Answer only the first N questions of each attempted sheet (default: all). */
   questionsPerSheet?: number;
+  /** Upload the official solutions of sheets 1–2 and re-mark (default true). */
+  officialSolutions?: boolean;
   seed?: number;
   /** The end of the history; read when the rows are backdated. */
   now?: () => Date;
@@ -216,30 +218,37 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
   // 1. Courses and sheets: upload, parse, hints.
   const built: { courseId: string; sheetId: string; n: number; answers: string | null }[] = [];
   const courseIds: string[] = [];
-  for (const name of courseNames) {
-    const course = await createCourse(userId, name);
-    courseIds.push(course.id);
-    for (let n = 1; n <= sheetCount; n++) {
-      const files = await findSheetFiles(path.join(options.sheetsDir, name), n);
-      const key = buildKey({
-        userId,
-        purpose: "sheet",
-        parentId: course.id,
-        mime: "application/pdf",
-      });
-      await storage.put(key, await readPdf(files.sheet), "application/pdf");
-      const sheet = await createSheetWithFiles(course.id, `Problem Sheet ${n}`, [
-        { path: key, mime: "application/pdf" },
-      ]);
-      aiCalls++; // parseSheet
-      await runParse(sheet.id, { readFile: storage.get });
-      const [parsed] = await db.select().from(sheets).where(eq(sheets.id, sheet.id));
-      ensure(parsed.status === "ready", `${name} sheet ${n} could not be parsed`);
-      await runHintsForSheet(sheet.id, io.hints);
-      built.push({ courseId: course.id, sheetId: sheet.id, n, answers: files.answers });
-      log(`${name}: sheet ${n} parsed`);
-    }
-  }
+  for (const name of courseNames) courseIds.push((await createCourse(userId, name)).id);
+  // Courses are parsed side by side; the sheets of one course one after another, so
+  // two parses never create the same topic at once.
+  await Promise.all(
+    courseNames.map(async (name, c) => {
+      const courseId = courseIds[c];
+      for (let n = 1; n <= sheetCount; n++) {
+        const files = await findSheetFiles(path.join(options.sheetsDir, name), n);
+        const key = buildKey({
+          userId,
+          purpose: "sheet",
+          parentId: courseId,
+          mime: "application/pdf",
+        });
+        await storage.put(key, await readPdf(files.sheet), "application/pdf");
+        const sheet = await createSheetWithFiles(courseId, `Problem Sheet ${n}`, [
+          { path: key, mime: "application/pdf" },
+        ]);
+        aiCalls++; // parseSheet
+        await runParse(sheet.id, { readFile: storage.get });
+        const [parsed] = await db.select().from(sheets).where(eq(sheets.id, sheet.id));
+        ensure(parsed.status === "ready", `${name} sheet ${n} could not be parsed`);
+        await runHintsForSheet(sheet.id, io.hints);
+        // Without official solutions, the answers file is ignored.
+        const answers = options.officialSolutions === false ? null : files.answers;
+        built.push({ courseId, sheetId: sheet.id, n, answers });
+        log(`${name}: sheet ${n} parsed (${built.length} of ${courseNames.length * sheetCount})`);
+      }
+    }),
+  );
+  built.sort((a, b) => courseIds.indexOf(a.courseId) - courseIds.indexOf(b.courseId) || a.n - b.n);
 
   // 2. The planned history on sheets 1 and 2 (questions whose hints are ready).
   const early = built.filter((s) => s.n <= 2);
