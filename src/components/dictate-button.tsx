@@ -23,18 +23,27 @@ export function DictateButton({
   const [error, setError] = useState<string | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
+  const lifetime = useRef<AbortController | null>(null);
 
-  // Release the microphone if the component goes away mid-recording.
-  useEffect(
-    () => () => {
+  // Leaving the page cancels recording and uploads; only an explicit stop sends audio.
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    return () => {
+      controller.abort();
       const current = recorder.current;
-      if (current && current.state !== "inactive") current.stop();
+      if (current) {
+        current.onstop = null;
+        current.ondataavailable = null;
+        if (current.state !== "inactive") current.stop();
+      }
       current?.stream.getTracks().forEach((track) => track.stop());
-    },
-    [],
-  );
+    };
+  }, []);
 
   async function start() {
+    const signal = lifetime.current?.signal;
+    if (!signal || signal.aborted) return;
     setError(null);
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError("This browser cannot record audio. Please type instead.");
@@ -44,7 +53,12 @@ export function DictateButton({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setError("Microphone access was blocked. Allow it in the browser, or type instead.");
+      if (!signal.aborted)
+        setError("Microphone access was blocked. Allow it in the browser, or type instead.");
+      return;
+    }
+    if (signal.aborted) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
     const media = new MediaRecorder(stream);
@@ -54,7 +68,8 @@ export function DictateButton({
     };
     media.onstop = () => {
       stream.getTracks().forEach((track) => track.stop());
-      void send(new Blob(chunks.current, { type: media.mimeType || "audio/webm" }));
+      if (!signal.aborted)
+        void send(new Blob(chunks.current, { type: media.mimeType || "audio/webm" }), signal);
     };
     recorder.current = media;
     media.start();
@@ -68,7 +83,7 @@ export function DictateButton({
     setState("transcribing");
   }
 
-  async function send(audio: Blob) {
+  async function send(audio: Blob, signal: AbortSignal) {
     if (audio.size === 0) {
       setState("idle");
       return;
@@ -76,15 +91,16 @@ export function DictateButton({
     try {
       const body = new FormData();
       body.append("audio", audio, "answer.webm");
-      const response = await fetch("/api/speech/transcribe", { method: "POST", body });
+      const response = await fetch("/api/speech/transcribe", { method: "POST", body, signal });
       const data = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+      if (signal.aborted) return;
       if (!response.ok) setError(data.error ?? "Could not transcribe that. Please try again.");
       else if (data.text) onText(data.text);
       else setError("No speech was heard. Please try again.");
     } catch {
-      setError("Could not reach the server. Please try again.");
+      if (!signal.aborted) setError("Could not reach the server. Please try again.");
     } finally {
-      setState("idle");
+      if (!signal.aborted) setState("idle");
     }
   }
 
