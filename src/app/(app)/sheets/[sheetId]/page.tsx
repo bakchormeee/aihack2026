@@ -5,7 +5,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listQuestionsWithTopics } from "@/db/queries/sheets";
 import { orNotFound } from "@/lib/auth/guards";
@@ -105,6 +105,9 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
           action={submitAllAction.bind(null, sheet.id)}
           className="flex flex-wrap items-center gap-3"
         >
+          <Link href={`/sheets/${sheet.id}/batch`} className={buttonVariants()}>
+            Upload working for several questions
+          </Link>
           <Button type="submit" variant="outline">
             Submit all drafts
           </Button>
