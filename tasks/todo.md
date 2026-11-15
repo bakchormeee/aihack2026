@@ -64,8 +64,8 @@ M = 3–5 files.
   - Verify: `npm run e2e`; full checks; `npm run build`.
   - Files: `tests/e2e/spaced-review.spec.ts`
 
-- [ ] **F2: Release** (your go-ahead): push `main`, wait for the deploy, and check the
-  live course page. No database change.
+- [x] **F2: Release** (your go-ahead): pushed `main` (`743bfca`) on 15 November 2026; the
+  Vercel deploy succeeded. Left for you: check Focus next on a live course page.
 
 ## Carried over
 
