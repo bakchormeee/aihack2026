@@ -1,6 +1,6 @@
 # Spec Delta: Demo account for hackathon judges
 
-Status: approved 15 November 2026.
+Status: implemented (released 15 November 2026).
 Original spec: [SPEC.md](SPEC.md), sections "`accounts`" (Google sign-in, test sign-in off
 in production) and "Boundaries" ("Never: enable the test sign-in in production"). Uses the
 features of [SPEC-marking-v2.md](SPEC-marking-v2.md),
