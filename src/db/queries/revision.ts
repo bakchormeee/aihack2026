@@ -143,7 +143,7 @@ export async function createRevisionSession(
 /**
  * A session with its items in order. An item is done once the user submitted an attempt
  * of it in this session. Items on binned questions are left out; `allDeleted` is true
- * when the session had items and every one of them is in the bin.
+ * for a ready long-form session with no item left (all binned, or erased after 30 days).
  */
 export async function getRevisionSession(userId: string, sessionId: string) {
   const session = await requireRevisionSession(userId, sessionId);
@@ -179,7 +179,7 @@ export async function getRevisionSession(userId: string, sessionId: string) {
   return {
     session,
     items: items.map((item) => ({ ...item, done: doneIds.has(item.questionId) })),
-    allDeleted: allItems.length > 0 && items.length === 0,
+    allDeleted: session.mode === "long_form" && session.status === "ready" && items.length === 0,
   };
 }
 

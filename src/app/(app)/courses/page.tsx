@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { after } from "next/server";
 
 import { DeletedNotice } from "@/components/deleted-notice";
 import { EmptyState, PageHeader, Panel } from "@/components/page-parts";
 import { listBin } from "@/db/queries/bin";
+import { eraseDueBinItems, logEraseFailure } from "@/db/queries/bin-erase";
 import { listCourses } from "@/db/queries/courses";
 import { requireUser } from "@/lib/auth/session";
 
@@ -13,6 +15,8 @@ export default async function CoursesPage({ searchParams }: PageProps<"/courses"
   const courses = await listCourses(user.id);
   const bin = await listBin(user.id);
   const binHasItems = bin.courses.length + bin.sheets.length > 0;
+  // Items 30 days in the bin are erased after this response is sent.
+  if (binHasItems) after(() => eraseDueBinItems(user.id).catch(logEraseFailure));
 
   return (
     <section className="flex flex-col gap-8">

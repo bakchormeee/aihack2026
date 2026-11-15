@@ -1,6 +1,9 @@
+import { after } from "next/server";
+
 import { EmptyState, PageHeader, RuledList, SectionTitle } from "@/components/page-parts";
 import { Button } from "@/components/ui/button";
 import { listBin } from "@/db/queries/bin";
+import { eraseDueBinItems, logEraseFailure } from "@/db/queries/bin-erase";
 import { requireUser } from "@/lib/auth/session";
 
 import { restoreCourseAction, restoreSheetAction } from "./actions";
@@ -47,6 +50,8 @@ export default async function RecentlyDeletedPage() {
   const user = await requireUser();
   const bin = await listBin(user.id);
   const empty = bin.courses.length + bin.sheets.length === 0;
+  // Items 30 days in the bin are erased after this response is sent.
+  if (!empty) after(() => eraseDueBinItems(user.id).catch(logEraseFailure));
 
   return (
     <section className="flex flex-col gap-8">

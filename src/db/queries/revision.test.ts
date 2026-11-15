@@ -346,10 +346,10 @@ describe("revision and the bin", () => {
 
   it("leaves items on binned questions out of a session, and says so when none is left", async () => {
     const w = await withBinnableSheet("rv-bin-session@test.local");
-    const session = async (items: string[]) => {
+    const session = async (items: string[], status: "ready" | "building" = "ready") => {
       const [s] = await db
         .insert(revisionSessions)
-        .values({ userId: w.user.id, courseId: w.course.id, targetMinutes: 20, status: "ready" })
+        .values({ userId: w.user.id, courseId: w.course.id, targetMinutes: 20, status })
         .returning();
       if (items.length === 0) return s;
       await db.insert(revisionItems).values(
@@ -365,7 +365,7 @@ describe("revision and the bin", () => {
     };
     const mixed = await session([w.onSheet.id, w.variant.id, w.kept.id]);
     const onlyBinned = await session([w.onSheet.id, w.variant.id]);
-    const empty = await session([]);
+    const empty = await session([], "building");
     const view = (id: string) => getRevisionSession(w.user.id, id);
 
     expect((await view(mixed.id)).items).toHaveLength(3);
