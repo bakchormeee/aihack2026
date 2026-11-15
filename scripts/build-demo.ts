@@ -14,6 +14,7 @@
 import path from "node:path";
 import { parseArgs } from "node:util";
 
+import { eraseDemoUser } from "../src/db/queries/demo";
 import { DEMO_COURSES, buildDemoTemplate } from "../src/lib/demo/build-template";
 import { getObjectBytes, putObject } from "../src/lib/storage/s3";
 
@@ -56,8 +57,9 @@ async function main() {
     seed,
     storage: { put: putObject, get: getObjectBytes },
     writeWorking: writeDemoWorking,
-    // E2 hook: erase the previous template (eraseDemoUser) — wired by the coordinator
-    eraseOld: undefined,
+    // Erase the previous template's rows. Its files stay in R2: live copies still read
+    // them until they expire (SPEC-demo.md: rebuilding never touches live copies).
+    eraseOld: (userId) => eraseDemoUser(userId, { deleteObject: async () => {} }),
   });
   console.log(JSON.stringify(report, null, 2));
   process.exit(0);
