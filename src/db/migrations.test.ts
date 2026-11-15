@@ -68,10 +68,11 @@ const markRow = async (db: PGlite, id: string) =>
   ).rows[0];
 
 describe("migration files", () => {
-  it("has the four migrations in order: initial, additive A, conversion B, additive C", () => {
-    expect(files).toHaveLength(4);
+  it("has the five migrations in order: initial, additive A, conversion B, additive C and E", () => {
+    expect(files).toHaveLength(5);
     expect(files[2]).toMatch(/^0002_convert_marks_to_five/);
     expect(files[3]).toMatch(/^0003_spot_the_error/);
+    expect(files[4]).toMatch(/^0004_demo_account/);
   });
 });
 
@@ -249,5 +250,37 @@ describe("migration C (spot the error)", () => {
       db.exec(`insert into spot_item (id, session_id, position, body, lines, planted, topic_ids)
         values ('i2', 'spot', 1, 'Q', '[]', '[]', '[]')`),
     ).rejects.toThrow();
+  });
+});
+
+describe("migration E (demo account)", () => {
+  async function databaseBeforeE() {
+    const db = new PGlite();
+    for (const file of files.slice(0, 4)) await applyMigration(db, file);
+    await db.exec(`insert into "user" (id, email) values ('u1', 'e@test.local');`);
+    return db;
+  }
+
+  it("leaves an existing user as a real user with no AI calls counted", async () => {
+    const db = await databaseBeforeE();
+    await applyMigration(db, files[4]);
+
+    const { rows } = await db.query<{
+      demo_role: string | null;
+      demo_expires_at: Date | null;
+      demo_ai_calls: number;
+    }>(`select demo_role, demo_expires_at, demo_ai_calls from "user" where id = 'u1'`);
+    expect(rows[0]).toEqual({ demo_role: null, demo_expires_at: null, demo_ai_calls: 0 });
+  });
+
+  it("accepts only the template and copy roles", async () => {
+    const db = await databaseBeforeE();
+    await applyMigration(db, files[4]);
+
+    await db.exec(`
+      insert into "user" (id, demo_role) values ('t', 'template');
+      insert into "user" (id, demo_role, demo_expires_at) values ('c', 'copy', now());
+    `);
+    await expect(db.exec(`insert into "user" (id, demo_role) values ('x', 'judge')`)).rejects.toThrow();
   });
 });

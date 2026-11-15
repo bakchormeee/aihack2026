@@ -8,7 +8,7 @@ M = 3–5 files.
 
 ## Phase 1: Copies
 
-- [ ] **E1: Migration E and demo rules** (S–M)
+- [x] **E1: Migration E and demo rules** (S–M)
   - Acceptance: the `user` columns `demo_role`, `demo_expires_at` and `demo_ai_calls`
     exist, and existing users read as real; `timeShift`, `isExpired`, `copiesToErase` and
     `aiCallsLeft` cover every case, including exactly 24 hours and exactly 200 copies.

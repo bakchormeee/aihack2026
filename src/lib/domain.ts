@@ -31,8 +31,11 @@ export const ATTEMPT_CONTEXTS = ["sheet", "revision"] as const;
 export const SESSION_MODES = ["long_form", "spot_error"] as const;
 export const SPOT_QUESTION_COUNTS = [5, 10, 15] as const;
 export const REVISION_ITEM_SOURCES = ["retry", "variant"] as const;
+/** The demo student everyone copies, and the private copies (SPEC-demo.md). */
+export const DEMO_ROLES = ["template", "copy"] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
+export type DemoRole = (typeof DEMO_ROLES)[number];
 export type ErrorType = (typeof ERROR_TYPES)[number];
 export type Severity = (typeof SEVERITIES)[number];
 export type MarkBasis = (typeof MARK_BASES)[number];

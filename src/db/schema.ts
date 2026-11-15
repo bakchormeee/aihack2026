@@ -23,6 +23,7 @@ import {
 
 import {
   ATTEMPT_CONTEXTS,
+  DEMO_ROLES,
   ERROR_TYPES,
   HINTS_STATUSES,
   MARK_BASES,
@@ -62,6 +63,7 @@ export const sheetFileKindEnum = pgEnum("sheet_file_kind", SHEET_FILE_KINDS);
 export const questionSourceEnum = pgEnum("question_source", QUESTION_SOURCES);
 export const attemptContextEnum = pgEnum("attempt_context", ATTEMPT_CONTEXTS);
 export const revisionItemSourceEnum = pgEnum("revision_item_source", REVISION_ITEM_SOURCES);
+export const demoRoleEnum = pgEnum("demo_role", DEMO_ROLES);
 
 // ── Accounts. Property names are those the Auth.js Drizzle adapter requires. ──
 
@@ -71,6 +73,10 @@ export const users = pgTable("user", {
   email: text("email").unique(),
   emailVerified: instant("email_verified"),
   image: text("image"),
+  // Demo account (SPEC-demo.md): null for real users.
+  demoRole: demoRoleEnum("demo_role"),
+  demoExpiresAt: instant("demo_expires_at"),
+  demoAiCalls: integer("demo_ai_calls").notNull().default(0),
 });
 
 export const accounts = pgTable(
