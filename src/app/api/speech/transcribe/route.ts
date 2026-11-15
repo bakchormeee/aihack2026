@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { AiLimitError, reserveAiCall } from "@/lib/ai/budget";
 import { getCurrentUser } from "@/lib/auth/session";
-import { MAX_AUDIO_BYTES, TranscribeError, transcribe } from "@/lib/speech/transcribe";
+import {
+  MAX_AUDIO_BYTES,
+  speechEnabled,
+  TranscribeError,
+  transcribe,
+} from "@/lib/speech/transcribe";
 
 export const maxDuration = 60;
 
@@ -20,8 +26,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That is not an audio recording." }, { status: 400 });
 
   try {
+    if (!speechEnabled()) throw new TranscribeError("Speech input is not set up.");
+    // Reserve atomically before the paid request, including concurrent uploads.
+    await reserveAiCall(user.id);
     return NextResponse.json({ text: await transcribe(audio) });
   } catch (error) {
+    if (error instanceof AiLimitError)
+      return NextResponse.json({ error: error.message }, { status: 429 });
     if (error instanceof TranscribeError)
       return NextResponse.json({ error: error.message }, { status: 502 });
     throw error;
