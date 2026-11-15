@@ -13,6 +13,7 @@ import {
   misconceptionSources,
   misconceptions,
 } from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import {
   groupMisconceptions,
   type ExistingMisconception,
@@ -70,93 +71,95 @@ export async function refreshMisconceptions(
 ): Promise<void> {
   if (!(await claim(userId, courseId))) return;
 
-  try {
-    // A mark that arrives while this runs is picked up by the next round.
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      const unread = await findUnreadMarks(userId, courseId);
-      if (unread.length === 0) break;
+  await withAiUser(userId, async () => {
+    try {
+      // A mark that arrives while this runs is picked up by the next round.
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        const unread = await findUnreadMarks(userId, courseId);
+        if (unread.length === 0) break;
 
-      const batch: { item: UnreadMark; found: Found[] }[] = [];
-      let count = 0;
-      for (const item of unread) {
-        const found = mistakesOf(item.mark);
-        if (batch.length > 0 && count + found.length > MAX_MISTAKES_PER_CALL) break;
-        batch.push({ item, found });
-        count += found.length;
-      }
+        const batch: { item: UnreadMark; found: Found[] }[] = [];
+        let count = 0;
+        for (const item of unread) {
+          const found = mistakesOf(item.mark);
+          if (batch.length > 0 && count + found.length > MAX_MISTAKES_PER_CALL) break;
+          batch.push({ item, found });
+          count += found.length;
+        }
 
-      const existing = await db
-        .select()
-        .from(misconceptions)
-        .where(and(eq(misconceptions.userId, userId), eq(misconceptions.courseId, courseId)));
-      const shortId = new Map(existing.map((m, i) => [`m${i + 1}`, m]));
+        const existing = await db
+          .select()
+          .from(misconceptions)
+          .where(and(eq(misconceptions.userId, userId), eq(misconceptions.courseId, courseId)));
+        const shortId = new Map(existing.map((m, i) => [`m${i + 1}`, m]));
 
-      const numbered: (NumberedMistake & { item: UnreadMark; found: Found })[] = [];
-      for (const { item, found } of batch)
-        for (const f of found)
-          numbered.push({
-            n: numbered.length + 1,
-            type: f.type,
-            quote: f.quote,
-            topics: item.topics.map((t) => t.name),
-            item,
-            found: f,
-          });
+        const numbered: (NumberedMistake & { item: UnreadMark; found: Found })[] = [];
+        for (const { item, found } of batch)
+          for (const f of found)
+            numbered.push({
+              n: numbered.length + 1,
+              type: f.type,
+              quote: f.quote,
+              topics: item.topics.map((t) => t.name),
+              item,
+              found: f,
+            });
 
-      const placements = numbered.length
-        ? await io.group({
-            existing: [...shortId].map(([id, m]): ExistingMisconception => ({
-              id,
-              description: m.description,
-              hidden: m.hiddenAt !== null,
-            })),
-            mistakes: numbered.map(({ n, type, quote, topics }) => ({ n, type, quote, topics })),
-          })
-        : [];
+        const placements = numbered.length
+          ? await io.group({
+              existing: [...shortId].map(([id, m]): ExistingMisconception => ({
+                id,
+                description: m.description,
+                hidden: m.hiddenAt !== null,
+              })),
+              mistakes: numbered.map(({ n, type, quote, topics }) => ({ n, type, quote, topics })),
+            })
+          : [];
 
-      await db.transaction(async (tx) => {
-        const created = new Map<string, string>(); // description -> new misconception id
-        for (const placement of placements) {
-          const mistake = numbered.find((m) => m.n === placement.mistake)!;
-          let misconceptionId: string;
-          if ("existing" in placement) {
-            misconceptionId = shortId.get(placement.existing)!.id;
-          } else if (created.has(placement.description)) {
-            misconceptionId = created.get(placement.description)!;
-          } else {
-            const [row] = await tx
-              .insert(misconceptions)
+        await db.transaction(async (tx) => {
+          const created = new Map<string, string>(); // description -> new misconception id
+          for (const placement of placements) {
+            const mistake = numbered.find((m) => m.n === placement.mistake)!;
+            let misconceptionId: string;
+            if ("existing" in placement) {
+              misconceptionId = shortId.get(placement.existing)!.id;
+            } else if (created.has(placement.description)) {
+              misconceptionId = created.get(placement.description)!;
+            } else {
+              const [row] = await tx
+                .insert(misconceptions)
+                .values({
+                  userId,
+                  courseId,
+                  description: placement.description,
+                  errorType: mistake.type,
+                })
+                .returning({ id: misconceptions.id });
+              created.set(placement.description, row.id);
+              misconceptionId = row.id;
+            }
+            await tx
+              .insert(misconceptionSources)
               .values({
-                userId,
-                courseId,
-                description: placement.description,
-                errorType: mistake.type,
+                misconceptionId,
+                markId: mistake.item.mark.id,
+                mistakeIndex: mistake.found.index,
+                attemptId: mistake.item.attemptId,
+                topicIds: mistake.item.topics.map((t) => t.id),
+                quote: mistake.found.quote,
               })
-              .returning({ id: misconceptions.id });
-            created.set(placement.description, row.id);
-            misconceptionId = row.id;
+              .onConflictDoNothing();
           }
           await tx
-            .insert(misconceptionSources)
-            .values({
-              misconceptionId,
-              markId: mistake.item.mark.id,
-              mistakeIndex: mistake.found.index,
-              attemptId: mistake.item.attemptId,
-              topicIds: mistake.item.topics.map((t) => t.id),
-              quote: mistake.found.quote,
-            })
+            .insert(misconceptionMarks)
+            .values(batch.map(({ item }) => ({ markId: item.mark.id, userId, courseId })))
             .onConflictDoNothing();
-        }
-        await tx
-          .insert(misconceptionMarks)
-          .values(batch.map(({ item }) => ({ markId: item.mark.id, userId, courseId })))
-          .onConflictDoNothing();
-      });
+        });
+      }
+      await finish(userId, courseId, "ready");
+    } catch (error) {
+      console.error(`grouping misconceptions for course ${courseId} failed`, error);
+      await finish(userId, courseId, "failed");
     }
-    await finish(userId, courseId, "ready");
-  } catch (error) {
-    console.error(`grouping misconceptions for course ${courseId} failed`, error);
-    await finish(userId, courseId, "failed");
-  }
+  });
 }

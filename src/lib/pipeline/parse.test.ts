@@ -12,6 +12,7 @@ import {
   topics,
   users,
 } from "@/db/schema";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 
 import { runParse } from "./parse";
 
@@ -179,4 +180,28 @@ describe("runParse", () => {
       0,
     );
   });
+
+  it("counts one AI call for a demo copy, and fails the sheet once the copy has none left", async () => {
+    const { user, sheet } = await newSheet("p-demo@test.local");
+    await makeDemoCopy(user.id, 29);
+
+    await runParse(sheet.id, fakeIo);
+    expect(await demoCallsOf(user.id)).toBe(30);
+
+    const second = await newSheetFor(user.id);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await runParse(second.id, fakeIo);
+    const [row] = await db.select().from(sheets).where(eq(sheets.id, second.id));
+    expect(row.status).toBe("failed");
+    expect(await demoCallsOf(user.id)).toBe(30);
+  });
 });
+
+async function newSheetFor(userId: string) {
+  const [course] = await db.insert(courses).values({ userId, name: "Numbers" }).returning();
+  const [sheet] = await db.insert(sheets).values({ courseId: course.id, title: "S2" }).returning();
+  await db
+    .insert(sheetFiles)
+    .values({ sheetId: sheet.id, kind: "sheet", path: "k2.pdf", mime: "application/pdf" });
+  return sheet;
+}

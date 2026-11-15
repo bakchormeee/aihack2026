@@ -13,6 +13,8 @@ import {
   submissions,
   users,
 } from "@/db/schema";
+import { markAttempt } from "@/lib/ai/mark-attempt";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 import { STALE_JOB_MS } from "@/lib/domain";
 
 import { runMark, type MarkIo } from "./mark";
@@ -383,5 +385,36 @@ describe("runMark (dispute and official)", () => {
     await runMark({ submissionId: submission.id, basis: "official" }, okIo({ score: 2 }));
 
     expect((await marksOf(attempt.id))[1].outcomeChanged).toBe(false);
+  });
+});
+
+describe("runMark for a demo copy", () => {
+  const fixtureIo: MarkIo = { readFile: async () => Buffer.from("img"), mark: markAttempt };
+
+  it("counts one AI call for a mark and one for a dispute", async () => {
+    const { user, attempt, submission } = await setup("m-demo@test.local");
+    await makeDemoCopy(user.id);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await runMark({ submissionId: submission.id, basis: "ai" }, fixtureIo);
+    await runMark({ submissionId: submission.id, basis: "ai", disputeReason: "x" }, fixtureIo);
+
+    vi.unstubAllEnvs();
+    expect(await marksOf(attempt.id)).toHaveLength(2);
+    expect(await demoCallsOf(user.id)).toBe(2);
+  });
+
+  it("fails the marking without calling the AI when the copy has no calls left", async () => {
+    const { user, attempt, submission } = await setup("m-demo-full@test.local");
+    await makeDemoCopy(user.id, 30);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await runMark({ submissionId: submission.id, basis: "ai" }, fixtureIo);
+
+    vi.unstubAllEnvs();
+    expect(await statusOf(submission.id)).toBe("failed");
+    expect(await marksOf(attempt.id)).toHaveLength(0);
+    expect(await demoCallsOf(user.id)).toBe(30);
   });
 });

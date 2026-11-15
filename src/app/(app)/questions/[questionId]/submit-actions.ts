@@ -14,6 +14,7 @@ import {
   saveDraftText,
   submitWorking,
 } from "@/db/queries/working";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { requireUser } from "@/lib/auth/session";
 import { claimMark, performMark } from "@/lib/pipeline/mark";
 import { UploadRejectedError, deleteObject, verifyUploadedObject } from "@/lib/storage";
@@ -106,6 +107,8 @@ export async function removeWorkingFileAction(input: {
 export async function submitWorkingAction(input: { attemptId: string }): Promise<ActionResult> {
   const user = await requireUser();
   const { attemptId } = attemptSchema.parse(input);
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { ok: false, error: refusal };
   try {
     const { submissionId, alreadySubmitted } = await submitWorking(user.id, attemptId);
     if (!alreadySubmitted) {

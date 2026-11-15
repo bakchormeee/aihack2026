@@ -4,7 +4,8 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { hints, questions, solutions } from "@/db/schema";
+import { courses, hints, questions, solutions } from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import { generateHints } from "@/lib/ai/generate-hints";
 import { mapLimit } from "@/lib/concurrency";
 
@@ -18,42 +19,45 @@ export const HINTS_CONCURRENCY = 5;
 export async function runHints(questionId: string, io: HintsIo = defaultIo): Promise<void> {
   const [question] = await db.select().from(questions).where(eq(questions.id, questionId));
   if (!question || question.hintsStatus !== "pending") return;
+  const [course] = await db.select().from(courses).where(eq(courses.id, question.courseId));
 
-  try {
-    const generated = await io.generate({ questionBody: question.body });
+  await withAiUser(course.userId, async () => {
+    try {
+      const generated = await io.generate({ questionBody: question.body });
 
-    await db.transaction(async (tx) => {
-      // Claim the result: whichever run gets here first saves, the others stop.
-      const claimed = await tx
+      await db.transaction(async (tx) => {
+        // Claim the result: whichever run gets here first saves, the others stop.
+        const claimed = await tx
+          .update(questions)
+          .set({ hintsStatus: "ready", hintsStatusUpdatedAt: new Date() })
+          .where(and(eq(questions.id, questionId), eq(questions.hintsStatus, "pending")))
+          .returning({ id: questions.id });
+        if (claimed.length === 0) return;
+
+        // Upserts, so that regenerating after an edit replaces the old text in place.
+        await tx
+          .insert(hints)
+          .values(generated.hints.map((body, index) => ({ questionId, level: index + 1, body })))
+          .onConflictDoUpdate({
+            target: [hints.questionId, hints.level],
+            set: { body: sql`excluded.body` },
+          });
+        await tx
+          .insert(solutions)
+          .values({ questionId, basis: "ai", body: generated.solution })
+          .onConflictDoUpdate({
+            target: [solutions.questionId, solutions.basis],
+            set: { body: sql`excluded.body` },
+          });
+      });
+    } catch (error) {
+      console.error(`hints for question ${questionId} failed`, error);
+      await db
         .update(questions)
-        .set({ hintsStatus: "ready", hintsStatusUpdatedAt: new Date() })
-        .where(and(eq(questions.id, questionId), eq(questions.hintsStatus, "pending")))
-        .returning({ id: questions.id });
-      if (claimed.length === 0) return;
-
-      // Upserts, so that regenerating after an edit replaces the old text in place.
-      await tx
-        .insert(hints)
-        .values(generated.hints.map((body, index) => ({ questionId, level: index + 1, body })))
-        .onConflictDoUpdate({
-          target: [hints.questionId, hints.level],
-          set: { body: sql`excluded.body` },
-        });
-      await tx
-        .insert(solutions)
-        .values({ questionId, basis: "ai", body: generated.solution })
-        .onConflictDoUpdate({
-          target: [solutions.questionId, solutions.basis],
-          set: { body: sql`excluded.body` },
-        });
-    });
-  } catch (error) {
-    console.error(`hints for question ${questionId} failed`, error);
-    await db
-      .update(questions)
-      .set({ hintsStatus: "failed", hintsStatusUpdatedAt: new Date() })
-      .where(and(eq(questions.id, questionId), eq(questions.hintsStatus, "pending")));
-  }
+        .set({ hintsStatus: "failed", hintsStatusUpdatedAt: new Date() })
+        .where(and(eq(questions.id, questionId), eq(questions.hintsStatus, "pending")));
+    }
+  });
 }
 
 /** Prepares every question of the sheet that is still pending. Never throws: a failed question is marked failed. */

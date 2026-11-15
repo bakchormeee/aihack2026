@@ -16,6 +16,7 @@ import {
   users,
 } from "@/db/schema";
 import { NoCandidatesError } from "@/db/queries/revision";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 import { NotFoundError } from "@/lib/auth/ownership";
 
 import { buildSpotSession, type SpotIo } from "./spot-session";
@@ -360,5 +361,18 @@ describe("buildSpotSession", () => {
     await buildSpotSession("does-not-exist", { write });
 
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it("counts one AI call per question written for a demo copy", async () => {
+    const { user, session } = await start("sb-demo@test.local", 5);
+    await makeDemoCopy(user.id);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await buildSpotSession(session.id, undefined, () => 0.5);
+
+    vi.unstubAllEnvs();
+    expect((await sessionOf(session.id)).status).toBe("ready");
+    expect(await itemsOf(session.id)).toHaveLength(5);
+    expect(await demoCallsOf(user.id)).toBe(5);
   });
 });

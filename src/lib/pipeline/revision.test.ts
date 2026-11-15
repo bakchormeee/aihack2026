@@ -15,6 +15,7 @@ import {
   topics,
   users,
 } from "@/db/schema";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 
 import { buildRevisionSession, type RevisionIo } from "./revision";
 
@@ -268,5 +269,19 @@ describe("buildRevisionSession", () => {
     await buildRevisionSession(session.id, okIo);
 
     expect((await sessionRow(session.id)).status).toBe("failed");
+  });
+
+  it("counts one AI call per variant for a demo copy", async () => {
+    const { session } = await setup("rb-demo@test.local");
+    await makeDemoCopy(session.userId);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await buildRevisionSession(session.id);
+
+    vi.unstubAllEnvs();
+    expect((await sessionRow(session.id)).status).toBe("ready");
+    const variants = (await itemsOf(session.id)).filter((i) => i.source === "variant");
+    expect(variants.length).toBeGreaterThan(0);
+    expect(await demoCallsOf(session.userId)).toBe(variants.length);
   });
 });

@@ -13,6 +13,9 @@ import {
   submissions,
   users,
 } from "@/db/schema";
+import { extractSolutions } from "@/lib/ai/extract-solutions";
+import { markAttempt } from "@/lib/ai/mark-attempt";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 import { NotFoundError } from "@/lib/auth/ownership";
 import { STALE_JOB_MS } from "@/lib/domain";
 
@@ -266,5 +269,29 @@ describe("runOfficialRemark", () => {
     ).rejects.toBeInstanceOf(NotFoundError);
     await expect(restartOfficialRemark(other.id, sheet.id)).rejects.toBeInstanceOf(NotFoundError);
     expect((await sheetRow(sheet.id)).solutionsStatus).toBe("none");
+  });
+
+  it("counts the reading and each re-mark as AI calls of a demo copy", async () => {
+    const { user, sheet, qs } = await setup("rm-demo@test.local");
+    await makeDemoCopy(user.id);
+    await addFiles(sheet.id);
+    await submitted(user.id, qs[0].id, 3);
+    await submitted(user.id, qs[1].id, 3);
+    const fake = io();
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    // The real AI wrappers answer from fixtures; the fake gives solutions that fit this sheet.
+    await runOfficialRemark(sheet.id, {
+      ...fake.value,
+      extract: async (input) => {
+        await extractSolutions(input);
+        return fake.value.extract(input);
+      },
+      mark: { readFile: fake.value.mark.readFile, mark: markAttempt },
+    });
+
+    vi.unstubAllEnvs();
+    expect((await sheetRow(sheet.id)).solutionsStatus).toBe("done");
+    expect(await demoCallsOf(user.id)).toBe(3);
   });
 });

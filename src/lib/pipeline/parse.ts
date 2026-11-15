@@ -4,7 +4,16 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { questionTopics, questions, sheetFiles, sheets, topicPrereqs, topics } from "@/db/schema";
+import {
+  courses,
+  questionTopics,
+  questions,
+  sheetFiles,
+  sheets,
+  topicPrereqs,
+  topics,
+} from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import { parseSheet, type ParsedSheet } from "@/lib/ai/parse-sheet";
 import { getObjectBytes } from "@/lib/storage";
 
@@ -20,32 +29,35 @@ const lower = (name: string) => name.trim().toLowerCase();
 export async function runParse(sheetId: string, io: ParseIo = defaultIo): Promise<void> {
   const [sheet] = await db.select().from(sheets).where(eq(sheets.id, sheetId));
   if (!sheet || sheet.status !== "parsing") return;
+  const [course] = await db.select().from(courses).where(eq(courses.id, sheet.courseId));
 
-  try {
-    const files = await db
-      .select()
-      .from(sheetFiles)
-      .where(and(eq(sheetFiles.sheetId, sheetId), eq(sheetFiles.kind, "sheet")))
-      .orderBy(asc(sheetFiles.position));
-    const existing = await db
-      .select({ name: topics.name })
-      .from(topics)
-      .where(eq(topics.courseId, sheet.courseId));
+  await withAiUser(course.userId, async () => {
+    try {
+      const files = await db
+        .select()
+        .from(sheetFiles)
+        .where(and(eq(sheetFiles.sheetId, sheetId), eq(sheetFiles.kind, "sheet")))
+        .orderBy(asc(sheetFiles.position));
+      const existing = await db
+        .select({ name: topics.name })
+        .from(topics)
+        .where(eq(topics.courseId, sheet.courseId));
 
-    const parsed = await parseSheet({
-      files: await Promise.all(
-        files.map(async (file) => ({ mime: file.mime, data: await io.readFile(file.path) })),
-      ),
-      existingTopics: existing.map((topic) => topic.name),
-    });
-    await saveParsed(sheet.id, sheet.courseId, parsed);
-  } catch (error) {
-    console.error(`parse of sheet ${sheetId} failed`, error);
-    await db
-      .update(sheets)
-      .set({ status: "failed", statusUpdatedAt: new Date(), error: PARSE_FAILED_MESSAGE })
-      .where(and(eq(sheets.id, sheetId), eq(sheets.status, "parsing")));
-  }
+      const parsed = await parseSheet({
+        files: await Promise.all(
+          files.map(async (file) => ({ mime: file.mime, data: await io.readFile(file.path) })),
+        ),
+        existingTopics: existing.map((topic) => topic.name),
+      });
+      await saveParsed(sheet.id, sheet.courseId, parsed);
+    } catch (error) {
+      console.error(`parse of sheet ${sheetId} failed`, error);
+      await db
+        .update(sheets)
+        .set({ status: "failed", statusUpdatedAt: new Date(), error: PARSE_FAILED_MESSAGE })
+        .where(and(eq(sheets.id, sheetId), eq(sheets.status, "parsing")));
+    }
+  });
 }
 
 async function saveParsed(sheetId: string, courseId: string, parsed: ParsedSheet): Promise<void> {

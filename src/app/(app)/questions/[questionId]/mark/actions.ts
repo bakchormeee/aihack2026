@@ -12,6 +12,7 @@ import {
   startAttemptFor,
 } from "@/db/queries/attempts";
 import { getWorkingFor } from "@/db/queries/working";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireAttempt } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { claimMark, performMark } from "@/lib/pipeline/mark";
@@ -19,6 +20,7 @@ import { claimMark, performMark } from "@/lib/pipeline/mark";
 /** Runs the marking again for a submission whose mark failed or got stuck. Does nothing otherwise. */
 export async function retryMarkAction(questionId: string, attemptId: string): Promise<void> {
   const user = await requireUser();
+  if (await demoAiRefusal(user.id)) return; // a demo copy at its AI limit: nothing starts
   const work = await getWorkingFor(user.id, attemptId);
   if (work.submissionId && work.submittedAt) {
     const claim = await claimMark({ submissionId: work.submissionId, basis: "ai" });
@@ -65,6 +67,8 @@ export async function disputeAction(
   const user = await requireUser();
   const raw = formData.get("reason");
   const reason = typeof raw === "string" && raw.trim() !== "" ? raw : undefined;
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { error: refusal };
   try {
     // The attempt must belong to this question as well as to the user.
     const attempt = await requireAttempt(user.id, attemptId);

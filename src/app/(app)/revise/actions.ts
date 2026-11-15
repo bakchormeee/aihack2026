@@ -12,6 +12,7 @@ import {
 } from "@/db/queries/revision";
 import { hideMisconception } from "@/db/queries/misconceptions";
 import { createSpotSession } from "@/db/queries/spot";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireRevisionSession } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { buildRevisionSession } from "@/lib/pipeline/revision";
@@ -33,6 +34,8 @@ export async function startRevisionAction(
   const user = await requireUser();
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid request." };
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { error: refusal };
 
   let sessionId: string;
   try {
@@ -73,6 +76,8 @@ export async function startSpotSessionAction(
   const user = await requireUser();
   const parsed = spotInputSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid request." };
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { error: refusal };
 
   let sessionId: string;
   try {
@@ -96,6 +101,7 @@ export async function startSpotSessionAction(
 /** Builds a failed or stuck session again, with the builder for its kind. */
 export async function retryRevisionAction(sessionId: string): Promise<void> {
   const user = await requireUser();
+  if (await demoAiRefusal(user.id)) return; // a demo copy at its AI limit: nothing starts
   const session = await requireRevisionSession(user.id, sessionId);
   if (await requeueRevisionSession(user.id, sessionId)) {
     after(() =>

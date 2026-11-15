@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { loadSpotItem } from "@/db/queries/spot";
 import { courses, revisionSessions, spotAnswers, spotItems, users } from "@/db/schema";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 import { NotFoundError } from "@/lib/auth/ownership";
 import type { PlantedError } from "@/lib/domain";
 
@@ -274,13 +275,11 @@ describe("answerSpotItem", () => {
 
   it("records the time spent from when the question was opened", async () => {
     const w = await setup("sa-time@test.local");
-    await db
-      .insert(spotAnswers)
-      .values({
-        itemId: w.item.id,
-        userId: w.user.id,
-        startedAt: new Date("2026-11-14T10:00:00Z"),
-      });
+    await db.insert(spotAnswers).values({
+      itemId: w.item.id,
+      userId: w.user.id,
+      startedAt: new Date("2026-11-14T10:00:00Z"),
+    });
 
     await answerSpotItem(
       w.user.id,
@@ -310,5 +309,20 @@ describe("answerSpotItem", () => {
       .set({ mode: "long_form", targetMinutes: 20 })
       .where(eq(revisionSessions.id, w.session.id));
     await expect(loadSpotItem(w.user.id, w.session.id, 1)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("counts the judging as one AI call of a demo copy", async () => {
+    const w = await setup("sa-demo@test.local");
+    await makeDemoCopy(w.user.id);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    const result = await answerSpotItem(w.user.id, w.session.id, 1, {
+      noError: false,
+      ticked: [tick(3)],
+    });
+
+    vi.unstubAllEnvs();
+    expect(result).toEqual({ ok: true, outcome: "full" });
+    expect(await demoCallsOf(w.user.id)).toBe(1);
   });
 });
