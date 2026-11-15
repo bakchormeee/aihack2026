@@ -16,10 +16,10 @@ are in [plan.md](plan.md).
 
 ## Phase 2: Delete (after D1)
 
-- [ ] **D2: Bin and restore, and 404 for binned items** (M)
-- [ ] **D3: Binned work is hidden and does not count** (M, after D2)
-- [ ] **D4: Delete dialogs and Recently deleted** (M, after D2)
-- [ ] **D5: Erase after 30 days** (M, after D4)
+- [x] **D2: Bin and restore, and 404 for binned items** (M)
+- [x] **D3: Binned work is hidden and does not count** (M, after D2)
+- [x] **D4: Delete dialogs and Recently deleted** (M, after D2)
+- [x] **D5: Erase after 30 days** (M, after D4)
 
 ### Checkpoint 2
 - [ ] Delete, restore and erase work in the browser on a test account
