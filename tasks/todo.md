@@ -58,7 +58,7 @@ M = 3–5 files.
 
 ## Phase 3: Finish (30 min)
 
-- [ ] **F1: End-to-end test and build** (S)
+- [x] **F1: End-to-end test and build** (S)
   - Acceptance: a new spec marks an answer and sees "Next review in …" for its topic in
     Focus next. The existing specs still pass, and Focus next fits 375 px.
   - Verify: `npm run e2e`; full checks; `npm run build`.
