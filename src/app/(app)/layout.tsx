@@ -1,5 +1,6 @@
 import { BrandMark } from "@/components/brand-mark";
 import { MainNav } from "@/components/main-nav";
+import { SoundToggle } from "@/components/sound-toggle";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/config";
 import { requireUser } from "@/lib/auth/session";
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-muted-foreground hidden max-w-48 truncate text-sm md:inline">
               {user.email ?? user.name}
             </span>
+            <SoundToggle />
             <Button type="submit" variant="outline" size="sm">
               Sign out
             </Button>

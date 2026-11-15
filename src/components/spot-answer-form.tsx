@@ -3,21 +3,26 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { DictateButton } from "@/components/dictate-button";
 import { MathText } from "@/components/math-text";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { submitSpotAnswerAction } from "@/app/(app)/revise/[sessionId]/spot/actions";
 import { MAX_EXPLANATION } from "@/lib/spot/rules";
+import { playSfx } from "@/lib/sfx";
 
 /** The numbered solution: tick the lines you think are wrong and say why, or press No error. */
 export function SpotAnswerForm({
   sessionId,
   position,
   lines,
+  speech = false,
 }: {
   sessionId: string;
   position: number;
   lines: string[];
+  /** Show the microphone button (ElevenLabs speech-to-text is configured). */
+  speech?: boolean;
 }) {
   const router = useRouter();
   // A ticked line has an entry, holding the explanation typed so far.
@@ -27,12 +32,23 @@ export function SpotAnswerForm({
   const [pending, startTransition] = useTransition();
 
   function toggleLine(line: number) {
+    if (!(line in ticked)) playSfx("tick");
     setNoError(false);
     setTicked((current) => {
       const next = { ...current };
       if (line in next) delete next[line];
       else next[line] = "";
       return next;
+    });
+  }
+
+  /** Adds spoken text after whatever is already written for that line. */
+  function appendSpoken(line: number, text: string) {
+    setTicked((current) => {
+      if (!(line in current)) return current;
+      const before = current[line].trimEnd();
+      const joined = before ? `${before} ${text}` : text;
+      return { ...current, [line]: joined.slice(0, MAX_EXPLANATION) };
     });
   }
 
@@ -107,6 +123,12 @@ export function SpotAnswerForm({
                       setTicked((current) => ({ ...current, [line]: event.target.value }))
                     }
                   />
+                  {speech ? (
+                    <DictateButton
+                      label="Say what is wrong"
+                      onText={(text) => appendSpoken(line, text)}
+                    />
+                  ) : null}
                 </div>
               ) : null}
             </li>
