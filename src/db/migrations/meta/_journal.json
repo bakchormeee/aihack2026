@@ -36,6 +36,13 @@
       "when": 1794739634522,
       "tag": "0004_demo_account",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794763110891,
+      "tag": "0005_bin",
+      "breakpoints": true
     }
   ]
 }

@@ -128,6 +128,8 @@ export const courses = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     createdAt: createdAt(),
+    // In the bin since this time (SPEC-delete.md); null when not deleted.
+    deletedAt: instant("deleted_at"),
   },
   (t) => [index("course_user_idx").on(t.userId)],
 );
@@ -177,6 +179,8 @@ export const sheets = pgTable(
     solutionsStatus: solutionsStatusEnum("solutions_status").notNull().default("none"),
     solutionsStatusUpdatedAt: instant("solutions_status_updated_at"),
     solutionsUploadedAt: instant("solutions_uploaded_at"),
+    // In the bin since this time (SPEC-delete.md); null when not deleted.
+    deletedAt: instant("deleted_at"),
   },
   (t) => [index("sheet_course_idx").on(t.courseId)],
 );

@@ -68,11 +68,12 @@ const markRow = async (db: PGlite, id: string) =>
   ).rows[0];
 
 describe("migration files", () => {
-  it("has the five migrations in order: initial, additive A, conversion B, additive C and E", () => {
-    expect(files).toHaveLength(5);
+  it("has the six migrations in order: initial, additive A, conversion B, additive C, E and F", () => {
+    expect(files).toHaveLength(6);
     expect(files[2]).toMatch(/^0002_convert_marks_to_five/);
     expect(files[3]).toMatch(/^0003_spot_the_error/);
     expect(files[4]).toMatch(/^0004_demo_account/);
+    expect(files[5]).toMatch(/^0005_bin/);
   });
 });
 
@@ -282,5 +283,23 @@ describe("migration E (demo account)", () => {
       insert into "user" (id, demo_role, demo_expires_at) values ('c', 'copy', now());
     `);
     await expect(db.exec(`insert into "user" (id, demo_role) values ('x', 'judge')`)).rejects.toThrow();
+  });
+});
+
+describe("migration F (bin)", () => {
+  it("adds deleted_at to course and sheet, null for existing rows", async () => {
+    const db = new PGlite();
+    for (const file of files.slice(0, 5)) await applyMigration(db, file);
+    await db.exec(`
+      insert into "user" (id, email) values ('u1', 'f@test.local');
+      insert into course (id, user_id, name) values ('c1', 'u1', 'C');
+      insert into sheet (id, course_id, title) values ('s1', 'c1', 'S');
+    `);
+    await applyMigration(db, files[5]);
+
+    const course = await db.query<{ deleted_at: Date | null }>("select deleted_at from course");
+    const sheet = await db.query<{ deleted_at: Date | null }>("select deleted_at from sheet");
+    expect(course.rows[0].deleted_at).toBeNull();
+    expect(sheet.rows[0].deleted_at).toBeNull();
   });
 });

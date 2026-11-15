@@ -8,7 +8,7 @@ are in [plan.md](plan.md).
 
 ## Phase 1: Foundations (coordinator)
 
-- [ ] **D1: Migration F and bin rules** (M)
+- [x] **D1: Migration F and bin rules** (M)
 - [ ] **B1: Region rules and the `batch` upload purpose** (M)
 
 ### Checkpoint 1

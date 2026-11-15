@@ -22,6 +22,7 @@ export default defineConfig({
         "src/lib/spot/**",
         "src/lib/spaced/**",
         "src/lib/demo/**",
+        "src/lib/bin/**",
       ],
       exclude: ["**/*.test.ts"],
       thresholds: { lines: 100 },
