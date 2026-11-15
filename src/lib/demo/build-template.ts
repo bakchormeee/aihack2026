@@ -62,6 +62,9 @@ import {
 } from "./history";
 
 export const DEMO_TEMPLATE_EMAIL = "demo-template@demo.invalid";
+/** The working of a student who did not know how to start (when writing an answer failed). */
+export const GAVE_UP_WORKING =
+  "I am not sure how to start this one. I tried a few things but got nowhere.";
 export const DEMO_COURSES = ["Numbers", "Analysis I", "Sequences and Series"];
 const DAYS = 21;
 const MIN = 60 * 1000;
@@ -297,6 +300,21 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
   const description = new Map(DEMO_MISCONCEPTIONS.map((m) => [m.key, m.description]));
   log(`Planned ${plan.length} attempts: ${percent(mix(plan.map((a) => a.outcome)))}`);
 
+  /**
+   * The student's working. A reply that fails its checks is tried again up to 3 times;
+   * after that the student is stuck, so one bad reply cannot stop the whole build.
+   */
+  const writeOrGiveUp = async (input: Parameters<typeof io.write>[0]) => {
+    for (let tries = 1; tries <= 3; tries++) {
+      try {
+        return await io.write(input);
+      } catch (error) {
+        log(`  Writing an answer failed (try ${tries} of 3): ${(error as Error).message}`);
+      }
+    }
+    return GAVE_UP_WORKING;
+  };
+
   /** Opens an attempt, reveals hints, writes, submits and marks the working. */
   const work = async (
     questionId: string,
@@ -308,7 +326,7 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     for (let level = 1; level <= planned.hintLevel; level++)
       seen.push((await revealNextHintFor(userId, attempt.id)).body);
     const [question] = await db.select().from(questions).where(eq(questions.id, questionId));
-    const text = await io.write({
+    const text = await writeOrGiveUp({
       questionBody: question.body,
       outcome: planned.outcome,
       misconception: planned.misconception ? description.get(planned.misconception)! : null,

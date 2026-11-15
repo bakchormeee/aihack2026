@@ -27,7 +27,12 @@ import {
 
 import { writeDemoWorking } from "../../../scripts/demo/write-demo-working";
 
-import { DEMO_TEMPLATE_EMAIL, buildDemoTemplate, type BuildDemoOptions } from "./build-template";
+import {
+  DEMO_TEMPLATE_EMAIL,
+  GAVE_UP_WORKING,
+  buildDemoTemplate,
+  type BuildDemoOptions,
+} from "./build-template";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-11-15T18:00:00Z");
@@ -201,6 +206,27 @@ describe("buildDemoTemplate", () => {
     // 2 questions, plus at most one repeat each.
     expect(report.attempts).toBeGreaterThanOrEqual(2);
     expect(report.attempts).toBeLessThanOrEqual(4);
+  });
+
+  it("tries a failed answer three times, then submits a stuck answer and carries on", async () => {
+    const writeWorking = vi.fn(async () => {
+      throw new Error("unclosed $");
+    });
+    const report = await buildDemoTemplate({
+      ...base,
+      eraseOld,
+      questionsPerSheet: 1,
+      officialSolutions: false,
+      writeWorking,
+    });
+    const texts = await db
+      .select({ text: submissions.text })
+      .from(submissions)
+      .innerJoin(attempts, eq(attempts.id, submissions.attemptId))
+      .where(eq(attempts.userId, report.userId));
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.every((t) => t.text === GAVE_UP_WORKING)).toBe(true);
+    expect(writeWorking.mock.calls.length).toBe(3 * texts.length);
   });
 
   it("skips the official solutions when asked, keeping only the AI marks", async () => {
