@@ -13,6 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { readSummary } from "@/db/queries/history";
+import { currentAiUser } from "@/lib/ai/budget";
 
 const summarise = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/ai/summarise-sheet", () => ({ summariseSheet: summarise }));
@@ -159,5 +160,21 @@ describe("startSummaryIfNeeded", () => {
     expect(
       await db.select().from(sheetSummaries).where(eq(sheetSummaries.sheetId, w.sheet.id)),
     ).toEqual([]);
+  });
+
+  it("writes the summary as the student, so a demo copy's AI call is counted", async () => {
+    const w = await world("g-user@test.local");
+    for (const id of w.ids) await mark(w.user.id, id, new Date(Date.now() - 60_000));
+    let aiUser: string | undefined;
+    summarise.mockImplementation(async () => {
+      aiUser = currentAiUser();
+      return BODY;
+    });
+    const job = run();
+
+    await startSummaryIfNeeded(w.user.id, w.sheet.id, job.schedule);
+    await job.done();
+
+    expect(aiUser).toBe(w.user.id);
   });
 });

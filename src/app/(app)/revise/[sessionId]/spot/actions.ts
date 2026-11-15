@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { answerSpotItem } from "@/lib/pipeline/spot-answer";
@@ -23,6 +24,8 @@ export async function submitSpotAnswerAction(
   const user = await requireUser();
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid answer." };
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { ok: false, error: refusal };
 
   try {
     const result = await answerSpotItem(user.id, parsed.data.sessionId, parsed.data.position, {

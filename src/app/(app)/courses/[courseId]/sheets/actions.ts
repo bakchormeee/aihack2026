@@ -10,6 +10,7 @@ import {
   keyIsUnder,
   titleFromFileName,
 } from "@/db/queries/sheets";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { runSheetPipeline } from "@/lib/pipeline/sheet-job";
@@ -33,6 +34,8 @@ export async function createSheetAction(
   const user = await requireUser();
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid request." };
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { error: refusal };
   const { courseId, files } = parsed.data;
 
   try {

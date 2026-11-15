@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { checkSheetFileSet, keyIsUnder } from "@/db/queries/sheets";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -31,6 +32,8 @@ export async function uploadSolutionsAction(
   const user = await requireUser();
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid request." };
+  const refusal = await demoAiRefusal(user.id);
+  if (refusal) return { error: refusal };
   const { sheetId, files } = parsed.data;
 
   try {
@@ -67,6 +70,7 @@ export async function uploadSolutionsAction(
 /** Runs a failed or stuck job again with the files already uploaded. */
 export async function retryRemarkAction(sheetId: string): Promise<void> {
   const user = await requireUser();
+  if (await demoAiRefusal(user.id)) return; // a demo copy at its AI limit: nothing starts
   if (await restartOfficialRemark(user.id, sheetId)) after(() => performOfficialRemark(sheetId));
   revalidatePath(`/sheets/${sheetId}/solutions`);
 }

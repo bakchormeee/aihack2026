@@ -16,6 +16,7 @@ import {
   solutions,
   submissions,
 } from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import { extractSolutions } from "@/lib/ai/extract-solutions";
 import { markAttempt } from "@/lib/ai/mark-attempt";
 import { requireSheet } from "@/lib/auth/ownership";
@@ -140,12 +141,16 @@ export async function performOfficialRemark(sheetId: string, io?: RemarkIo): Pro
       .orderBy(asc(sheetFiles.position));
     if (files.length === 0) throw new Error("the sheet has no official solutions file");
 
-    const extracted = await deps.extract({
-      files: await Promise.all(
-        files.map(async (file) => ({ mime: file.mime, data: await deps.readFile(file.path) })),
-      ),
-      questions: sheetQuestions.map((q) => ({ id: q.id, label: q.label, body: q.body })),
-    });
+    const fileData = await Promise.all(
+      files.map(async (file) => ({ mime: file.mime, data: await deps.readFile(file.path) })),
+    );
+    // Each re-mark below counts its own call: performMark runs it as the attempt's user.
+    const extracted = await withAiUser(course.userId, () =>
+      deps.extract({
+        files: fileData,
+        questions: sheetQuestions.map((q) => ({ id: q.id, label: q.label, body: q.body })),
+      }),
+    );
     const known = new Set(sheetQuestions.map((q) => q.id));
     const found = extracted.solutions.filter((s) => known.has(s.questionId));
     for (const solution of found) {

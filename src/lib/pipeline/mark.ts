@@ -6,6 +6,7 @@ import { and, asc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { attempts, marks, questions, solutions, submissionFiles, submissions } from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import { markAttempt } from "@/lib/ai/mark-attempt";
 import { STALE_JOB_MS, type MarkBasis } from "@/lib/domain";
 import { currentMark, outcomeFromScore } from "@/lib/marking/rules";
@@ -100,12 +101,9 @@ export async function performMark(claim: ClaimedMark, io: MarkIo = defaultIo): P
       ),
     };
 
-    const result = await io.mark({
-      questionBody: question.body,
-      solution: solution.body,
-      working,
-      disputeReason,
-    });
+    const result = await withAiUser(attempt.userId, () =>
+      io.mark({ questionBody: question.body, solution: solution.body, working, disputeReason }),
+    );
     const outcome = outcomeFromScore(result.score);
 
     await db.transaction(async (tx) => {

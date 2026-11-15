@@ -15,6 +15,7 @@ import {
   topics,
   users,
 } from "@/db/schema";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 import { NotFoundError } from "@/lib/auth/ownership";
 import type { ErrorType, Mistake } from "@/lib/domain";
 import { STALE_JOB_MS } from "@/lib/domain";
@@ -318,6 +319,19 @@ describe("refreshMisconceptions", () => {
 
     expect(log.calls[0].mistakes.map((m) => m.quote)).toEqual(["mine"]);
     expect(await listMisconceptions(other.user.id, other.course.id)).toEqual([]);
+  });
+
+  it("counts the grouping as one AI call of a demo copy", async () => {
+    const w = await world("mc-demo@test.local");
+    await w.addMark({ mistakes: [mistake("algebra_slip", "a"), mistake("method", "b")] });
+    await makeDemoCopy(w.user.id);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await refreshMisconceptions(w.user.id, w.course.id);
+
+    vi.unstubAllEnvs();
+    expect((await jobOf(w)).status).toBe("ready");
+    expect(await demoCallsOf(w.user.id)).toBe(1);
   });
 });
 

@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import { getCourseMastery } from "@/db/queries/mastery";
 import { listRetryCandidates } from "@/db/queries/revision";
+import { withAiUser } from "@/lib/ai/budget";
 import { generateVariant } from "@/lib/ai/generate-variant";
 import { mapLimit } from "@/lib/concurrency";
 import { buildQueue } from "@/lib/mastery/queue";
@@ -67,112 +68,119 @@ export async function buildRevisionSession(
   if (session.mode !== "long_form" || session.targetMinutes === null) return;
   const targetMinutes = session.targetMinutes;
 
-  try {
-    const candidates = await listRetryCandidates(
-      session.userId,
-      session.courseId,
-      session.topicIds,
-    );
-    if (candidates.length === 0) throw new Error("no questions to revise");
-
-    const mastery = await getCourseMastery(session.userId, session.courseId);
-    const priorityByTopic = Object.fromEntries(mastery.topics.map((t) => [t.id, t.priority]));
-    const dueTopics = mastery.topics.flatMap((t) =>
-      t.review ? [{ id: t.id, name: t.name, daysUntilDue: t.review.daysUntilDue }] : [],
-    );
-    const { items } = buildQueue({
-      candidates,
-      priorityByTopic,
-      dueTopics,
-      targetMinutes,
-      now,
-    });
-
-    const parentIds = [
-      ...new Set(items.filter((i) => i.source === "variant").map((i) => i.questionId)),
-    ];
-    const parents = parentIds.length
-      ? await db.select().from(questions).where(inArray(questions.id, parentIds))
-      : [];
-    const parentSolutions = parentIds.length
-      ? await db.select().from(solutions).where(inArray(solutions.questionId, parentIds))
-      : [];
-    const parentTopics = parentIds.length
-      ? await db.select().from(questionTopics).where(inArray(questionTopics.questionId, parentIds))
-      : [];
-
-    // The slow part. Nothing is saved yet, so a losing parallel run wastes only AI calls.
-    const generated = await mapLimit(
-      items.map((item, index) => ({ item, index })).filter(({ item }) => item.source === "variant"),
-      VARIANT_CONCURRENCY,
-      async ({ item, index }) => {
-        const parent = parents.find((p) => p.id === item.questionId)!;
-        const official = parentSolutions.find(
-          (s) => s.questionId === parent.id && s.basis === "official",
-        );
-        const ai = parentSolutions.find((s) => s.questionId === parent.id && s.basis === "ai");
-        const variant = await io.generateVariant({
-          parentBody: parent.body,
-          parentSolution: (official ?? ai)?.body ?? "",
-          errorSummary: await errorSummaryFor(parent.id),
-        });
-        return { index, parent, variant };
-      },
-    );
-
-    await db.transaction(async (tx) => {
-      // Claim the result: whichever run gets here first saves, the others stop.
-      const claimed = await tx
-        .update(revisionSessions)
-        .set({ status: "ready", statusUpdatedAt: new Date() })
-        .where(and(eq(revisionSessions.id, sessionId), eq(revisionSessions.status, "building")))
-        .returning({ id: revisionSessions.id });
-      if (claimed.length === 0) return;
-
-      const questionIdAt = new Map<number, string>();
-      for (const { index, parent, variant } of generated) {
-        const [row] = await tx
-          .insert(questions)
-          .values({
-            courseId: parent.courseId,
-            sheetId: null,
-            position: parent.position,
-            label: `${parent.label} (variant)`,
-            body: variant.body,
-            expectedMinutes: variant.expectedMinutes,
-            source: "variant",
-            parentQuestionId: parent.id,
-            hintsStatus: "ready",
-          })
-          .returning({ id: questions.id });
-        const topicIds = parentTopics
-          .filter((t) => t.questionId === parent.id)
-          .map((t) => t.topicId);
-        if (topicIds.length) {
-          await tx
-            .insert(questionTopics)
-            .values(topicIds.map((topicId) => ({ questionId: row.id, topicId })));
-        }
-        await tx
-          .insert(hints)
-          .values(variant.hints.map((body, i) => ({ questionId: row.id, level: i + 1, body })));
-        await tx
-          .insert(solutions)
-          .values({ questionId: row.id, basis: "ai", body: variant.solution });
-        questionIdAt.set(index, row.id);
-      }
-
-      await tx.insert(revisionItems).values(
-        items.map((item, index) => ({
-          sessionId,
-          questionId: questionIdAt.get(index) ?? item.questionId,
-          position: index + 1,
-          source: item.source,
-          reason: item.reason,
-        })),
+  await withAiUser(session.userId, async () => {
+    try {
+      const candidates = await listRetryCandidates(
+        session.userId,
+        session.courseId,
+        session.topicIds,
       );
-    });
-  } catch (error) {
-    await failSession(sessionId, error);
-  }
+      if (candidates.length === 0) throw new Error("no questions to revise");
+
+      const mastery = await getCourseMastery(session.userId, session.courseId);
+      const priorityByTopic = Object.fromEntries(mastery.topics.map((t) => [t.id, t.priority]));
+      const dueTopics = mastery.topics.flatMap((t) =>
+        t.review ? [{ id: t.id, name: t.name, daysUntilDue: t.review.daysUntilDue }] : [],
+      );
+      const { items } = buildQueue({
+        candidates,
+        priorityByTopic,
+        dueTopics,
+        targetMinutes,
+        now,
+      });
+
+      const parentIds = [
+        ...new Set(items.filter((i) => i.source === "variant").map((i) => i.questionId)),
+      ];
+      const parents = parentIds.length
+        ? await db.select().from(questions).where(inArray(questions.id, parentIds))
+        : [];
+      const parentSolutions = parentIds.length
+        ? await db.select().from(solutions).where(inArray(solutions.questionId, parentIds))
+        : [];
+      const parentTopics = parentIds.length
+        ? await db
+            .select()
+            .from(questionTopics)
+            .where(inArray(questionTopics.questionId, parentIds))
+        : [];
+
+      // The slow part. Nothing is saved yet, so a losing parallel run wastes only AI calls.
+      const generated = await mapLimit(
+        items
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.source === "variant"),
+        VARIANT_CONCURRENCY,
+        async ({ item, index }) => {
+          const parent = parents.find((p) => p.id === item.questionId)!;
+          const official = parentSolutions.find(
+            (s) => s.questionId === parent.id && s.basis === "official",
+          );
+          const ai = parentSolutions.find((s) => s.questionId === parent.id && s.basis === "ai");
+          const variant = await io.generateVariant({
+            parentBody: parent.body,
+            parentSolution: (official ?? ai)?.body ?? "",
+            errorSummary: await errorSummaryFor(parent.id),
+          });
+          return { index, parent, variant };
+        },
+      );
+
+      await db.transaction(async (tx) => {
+        // Claim the result: whichever run gets here first saves, the others stop.
+        const claimed = await tx
+          .update(revisionSessions)
+          .set({ status: "ready", statusUpdatedAt: new Date() })
+          .where(and(eq(revisionSessions.id, sessionId), eq(revisionSessions.status, "building")))
+          .returning({ id: revisionSessions.id });
+        if (claimed.length === 0) return;
+
+        const questionIdAt = new Map<number, string>();
+        for (const { index, parent, variant } of generated) {
+          const [row] = await tx
+            .insert(questions)
+            .values({
+              courseId: parent.courseId,
+              sheetId: null,
+              position: parent.position,
+              label: `${parent.label} (variant)`,
+              body: variant.body,
+              expectedMinutes: variant.expectedMinutes,
+              source: "variant",
+              parentQuestionId: parent.id,
+              hintsStatus: "ready",
+            })
+            .returning({ id: questions.id });
+          const topicIds = parentTopics
+            .filter((t) => t.questionId === parent.id)
+            .map((t) => t.topicId);
+          if (topicIds.length) {
+            await tx
+              .insert(questionTopics)
+              .values(topicIds.map((topicId) => ({ questionId: row.id, topicId })));
+          }
+          await tx
+            .insert(hints)
+            .values(variant.hints.map((body, i) => ({ questionId: row.id, level: i + 1, body })));
+          await tx
+            .insert(solutions)
+            .values({ questionId: row.id, basis: "ai", body: variant.solution });
+          questionIdAt.set(index, row.id);
+        }
+
+        await tx.insert(revisionItems).values(
+          items.map((item, index) => ({
+            sessionId,
+            questionId: questionIdAt.get(index) ?? item.questionId,
+            position: index + 1,
+            source: item.source,
+            reason: item.reason,
+          })),
+        );
+      });
+    } catch (error) {
+      await failSession(sessionId, error);
+    }
+  });
 }

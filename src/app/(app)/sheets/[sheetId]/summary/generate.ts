@@ -8,6 +8,7 @@ import {
   readSummary,
   summaryIsStale,
 } from "@/db/queries/history";
+import { withAiUser } from "@/lib/ai/budget";
 import { summariseSheet } from "@/lib/ai/summarise-sheet";
 
 type SummaryBody = { wentWell: string[]; wasHard: string[]; nextSteps: string[] };
@@ -43,14 +44,16 @@ export async function startSummaryIfNeeded(
   const claimedAt =
     stored?.state === "generating" ? null : await claimSummary(userId, sheetId, input.newestMarkAt);
   if (claimedAt) {
-    schedule(async () => {
-      try {
-        await finishSummary(sheetId, claimedAt, await summariseSheet({ items: input.items }));
-      } catch (error) {
-        console.error("Sheet summary failed", error);
-        await failSummary(sheetId, claimedAt);
-      }
-    });
+    schedule(() =>
+      withAiUser(userId, async () => {
+        try {
+          await finishSummary(sheetId, claimedAt, await summariseSheet({ items: input.items }));
+        } catch (error) {
+          console.error("Sheet summary failed", error);
+          await failSummary(sheetId, claimedAt);
+        }
+      }),
+    );
   }
   // Without a claim of our own, someone else has the job, or the summary is being replaced.
   return { kind: "generating", ladder: input.ladder };

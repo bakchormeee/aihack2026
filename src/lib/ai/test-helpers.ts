@@ -1,9 +1,14 @@
-// Helpers for the tests in this folder. Not imported by application code.
+// Helpers for the AI tests (this folder, and the AI limit tests of the pipelines).
+// Not imported by application code.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { eq } from "drizzle-orm";
 import { vi } from "vitest";
+
+import { db } from "@/db";
+import { users } from "@/db/schema";
 
 import { setAiClient, type AiClient, type AiCreateParams } from "./client";
 
@@ -43,4 +48,15 @@ export function sentText(create: ReturnType<typeof fakeAi>, index = 0): string {
 /** The system prompt of request number `index` made through `fakeAi`. */
 export function sentSystem(create: ReturnType<typeof fakeAi>, index = 0): string {
   return String(create.mock.calls[index][0].system);
+}
+
+/** Turns the user into a demo copy that has made `used` AI calls (for the AI limit tests). */
+export async function makeDemoCopy(userId: string, used = 0): Promise<void> {
+  await db.update(users).set({ demoRole: "copy", demoAiCalls: used }).where(eq(users.id, userId));
+}
+
+/** The AI calls a demo copy has made so far. */
+export async function demoCallsOf(userId: string): Promise<number> {
+  const [row] = await db.select().from(users).where(eq(users.id, userId));
+  return row.demoAiCalls;
 }

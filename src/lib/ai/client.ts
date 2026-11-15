@@ -9,6 +9,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 
+import { currentAiUser, reserveAiCall } from "./budget";
+
 export type AiFile = { mime: string; data: Buffer };
 
 export type AiCreateParams = Anthropic.MessageCreateParamsNonStreaming;
@@ -147,6 +149,11 @@ async function readFixture<T>(callName: string, schema: z.ZodType<T>): Promise<T
  *
  * With `AI_FIXTURES=1` no request is made; the result is read from
  * `tests/fixtures/ai/<callName>.json`.
+ *
+ * Inside `withAiUser` (./budget.ts), one call is reserved from the user's demo budget
+ * before each request: the retry after an invalid reply is a second request, so it
+ * counts as a second call. A fixture answer counts as one call. A demo copy at its
+ * limit gets `AiLimitError` and no request is made.
  */
 export async function callAi<T>(args: {
   callName: string;
@@ -159,7 +166,14 @@ export async function callAi<T>(args: {
   if (!/^[A-Za-z0-9_-]+$/.test(callName)) {
     throw new AiInputError(`Invalid AI call name "${callName}".`);
   }
-  if (process.env.AI_FIXTURES === "1") return readFixture(callName, schema);
+  const reserve = async () => {
+    const userId = currentAiUser();
+    if (userId) await reserveAiCall(userId);
+  };
+  if (process.env.AI_FIXTURES === "1") {
+    await reserve();
+    return readFixture(callName, schema);
+  }
 
   const fileBlocks = files.map(fileBlock);
   const format = zodOutputFormat(schema);
@@ -171,6 +185,7 @@ export async function callAi<T>(args: {
       attempt === 1
         ? text
         : `${text}\n\nYour previous reply was rejected (${reason}). Reply again with JSON that matches the schema exactly.`;
+    await reserve();
     const message = await client.messages.create({
       model: process.env.AI_MODEL || DEFAULT_AI_MODEL,
       max_tokens: maxTokens(),

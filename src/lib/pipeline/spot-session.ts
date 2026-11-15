@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { rankedMisconceptionsFor } from "@/db/queries/spot";
 import { courses, revisionSessions, spotItems, topics } from "@/db/schema";
+import { withAiUser } from "@/lib/ai/budget";
 import { writeFlawedSolution } from "@/lib/ai/write-flawed-solution";
 import { mapLimit } from "@/lib/concurrency";
 import { dealQuestions } from "@/lib/spot/rules";
@@ -40,86 +41,89 @@ export async function buildSpotSession(
   if (session.mode !== "spot_error" || session.questionCount === null) return;
   const { questionCount } = session;
 
-  try {
-    const ranked = await rankedMisconceptionsFor(
-      session.userId,
-      session.courseId,
-      session.topicIds,
-    );
-    if (ranked.length === 0) throw new Error("no common errors to plant");
-    const byId = new Map(ranked.map((m) => [m.id, m]));
-    const deal = dealQuestions(
-      questionCount,
-      ranked.map((m) => m.id),
-      random,
-    );
-
-    const [course] = await db.select().from(courses).where(eq(courses.id, session.courseId));
-    const topicRows = await db.select().from(topics).where(eq(topics.courseId, session.courseId));
-    const topicName = new Map(topicRows.map((t) => [t.id, t.name]));
-
-    // The slow part. Nothing is saved yet, so a losing parallel run wastes only AI calls.
-    const written = await mapLimit(deal, SPOT_CONCURRENCY, async (question) => {
-      const focus = byId.get(question.focus)!;
-      const topicIds = session.topicIds?.length
-        ? focus.topicIds.filter((id) => session.topicIds!.includes(id))
-        : focus.topicIds;
-      const plant = question.plant.map((id, i) => ({
-        short: `e${i + 1}`,
-        misconception: byId.get(id)!,
-      }));
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const solution = await io.write({
-            topics: topicIds.map((id) => topicName.get(id)!).filter(Boolean),
-            courseName: course.name,
-            plant: plant.map((p) => ({
-              id: p.short,
-              description: p.misconception.description,
-              example: p.misconception.example,
-            })),
-          });
-          return {
-            topicIds,
-            solution,
-            planted: solution.planted.map((p) => ({
-              line: p.line,
-              misconceptionId: plant.find((x) => x.short === p.misconception)!.misconception.id,
-              whatsWrong: p.whatsWrong,
-              correctLine: p.correctLine,
-            })),
-          };
-        } catch (error) {
-          // One more try, then the question is left out of the session.
-          if (attempt === 2) console.error(`spot question for session ${sessionId} dropped`, error);
-        }
-      }
-      return null;
-    });
-    const items = written.filter((w) => w !== null);
-    if (items.length === 0) throw new Error("no spot-the-error question could be written");
-
-    await db.transaction(async (tx) => {
-      const claimed = await tx
-        .update(revisionSessions)
-        .set({ status: "ready", statusUpdatedAt: new Date() })
-        .where(and(eq(revisionSessions.id, sessionId), eq(revisionSessions.status, "building")))
-        .returning({ id: revisionSessions.id });
-      if (claimed.length === 0) return;
-
-      await tx.insert(spotItems).values(
-        items.map((item, index) => ({
-          sessionId,
-          position: index + 1,
-          body: item.solution.body,
-          lines: item.solution.lines,
-          planted: item.planted,
-          topicIds: item.topicIds,
-          expectedMinutes: item.solution.expectedMinutes,
-        })),
+  await withAiUser(session.userId, async () => {
+    try {
+      const ranked = await rankedMisconceptionsFor(
+        session.userId,
+        session.courseId,
+        session.topicIds,
       );
-    });
-  } catch (error) {
-    await failSession(sessionId, error);
-  }
+      if (ranked.length === 0) throw new Error("no common errors to plant");
+      const byId = new Map(ranked.map((m) => [m.id, m]));
+      const deal = dealQuestions(
+        questionCount,
+        ranked.map((m) => m.id),
+        random,
+      );
+
+      const [course] = await db.select().from(courses).where(eq(courses.id, session.courseId));
+      const topicRows = await db.select().from(topics).where(eq(topics.courseId, session.courseId));
+      const topicName = new Map(topicRows.map((t) => [t.id, t.name]));
+
+      // The slow part. Nothing is saved yet, so a losing parallel run wastes only AI calls.
+      const written = await mapLimit(deal, SPOT_CONCURRENCY, async (question) => {
+        const focus = byId.get(question.focus)!;
+        const topicIds = session.topicIds?.length
+          ? focus.topicIds.filter((id) => session.topicIds!.includes(id))
+          : focus.topicIds;
+        const plant = question.plant.map((id, i) => ({
+          short: `e${i + 1}`,
+          misconception: byId.get(id)!,
+        }));
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const solution = await io.write({
+              topics: topicIds.map((id) => topicName.get(id)!).filter(Boolean),
+              courseName: course.name,
+              plant: plant.map((p) => ({
+                id: p.short,
+                description: p.misconception.description,
+                example: p.misconception.example,
+              })),
+            });
+            return {
+              topicIds,
+              solution,
+              planted: solution.planted.map((p) => ({
+                line: p.line,
+                misconceptionId: plant.find((x) => x.short === p.misconception)!.misconception.id,
+                whatsWrong: p.whatsWrong,
+                correctLine: p.correctLine,
+              })),
+            };
+          } catch (error) {
+            // One more try, then the question is left out of the session.
+            if (attempt === 2)
+              console.error(`spot question for session ${sessionId} dropped`, error);
+          }
+        }
+        return null;
+      });
+      const items = written.filter((w) => w !== null);
+      if (items.length === 0) throw new Error("no spot-the-error question could be written");
+
+      await db.transaction(async (tx) => {
+        const claimed = await tx
+          .update(revisionSessions)
+          .set({ status: "ready", statusUpdatedAt: new Date() })
+          .where(and(eq(revisionSessions.id, sessionId), eq(revisionSessions.status, "building")))
+          .returning({ id: revisionSessions.id });
+        if (claimed.length === 0) return;
+
+        await tx.insert(spotItems).values(
+          items.map((item, index) => ({
+            sessionId,
+            position: index + 1,
+            body: item.solution.body,
+            lines: item.solution.lines,
+            planted: item.planted,
+            topicIds: item.topicIds,
+            expectedMinutes: item.solution.expectedMinutes,
+          })),
+        );
+      });
+    } catch (error) {
+      await failSession(sessionId, error);
+    }
+  });
 }

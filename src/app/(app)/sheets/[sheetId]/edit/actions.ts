@@ -16,6 +16,7 @@ import {
   updateBody,
   updateLabelAndTopics,
 } from "@/db/queries/question-edit";
+import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { runHints } from "@/lib/pipeline/hints";
@@ -28,8 +29,11 @@ const id = z.string().min(1).max(100);
 async function run(
   questionId: string,
   work: (userId: string) => Promise<string[]>,
+  writesHints = false,
 ): Promise<EditResult> {
   const user = await requireUser();
+  const refusal = writesHints ? await demoAiRefusal(user.id) : null;
+  if (refusal) return { ok: false, error: refusal };
   try {
     const { sheetId } = await requireQuestion(user.id, questionId);
     const regenerate = await work(user.id);
@@ -68,10 +72,14 @@ export async function saveBodyAction(input: unknown): Promise<EditResult> {
   if (!parsed.success)
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the input." };
   const { questionId, body } = parsed.data;
-  return run(questionId, async (userId) => {
-    await updateBody(userId, questionId, body);
-    return [questionId];
-  });
+  return run(
+    questionId,
+    async (userId) => {
+      await updateBody(userId, questionId, body);
+      return [questionId];
+    },
+    true,
+  );
 }
 
 export async function deleteQuestionAction(input: unknown): Promise<EditResult> {
@@ -88,12 +96,16 @@ export async function mergeQuestionsAction(input: unknown): Promise<EditResult> 
   const parsed = z.object({ firstId: id, secondId: id }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the input." };
   const { firstId, secondId } = parsed.data;
-  return run(firstId, async (userId) => [await mergeQuestions(userId, firstId, secondId)]);
+  return run(firstId, async (userId) => [await mergeQuestions(userId, firstId, secondId)], true);
 }
 
 export async function splitQuestionAction(input: unknown): Promise<EditResult> {
   const parsed = z.object({ questionId: id, index: z.number().int().min(1) }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choose a point inside the question text." };
   const { questionId, index } = parsed.data;
-  return run(questionId, async (userId) => [...(await splitQuestion(userId, questionId, index))]);
+  return run(
+    questionId,
+    async (userId) => [...(await splitQuestion(userId, questionId, index))],
+    true,
+  );
 }

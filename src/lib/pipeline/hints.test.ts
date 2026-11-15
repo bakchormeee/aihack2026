@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { db } from "@/db";
 import { courses, hints, questions, sheets, solutions, users } from "@/db/schema";
+import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
 
 import { runHints, runHintsForSheet, type HintsIo } from "./hints";
 
@@ -181,5 +182,18 @@ describe("runHintsForSheet", () => {
     await runHintsForSheet(sheet.id, { generate });
 
     expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts one AI call per question for a demo copy, also inside the parallel runs", async () => {
+    const { sheet, rows } = await newQuestions("h-demo@test.local", 3);
+    const [course] = await db.select().from(courses).where(eq(courses.id, rows[0].courseId));
+    await makeDemoCopy(course.userId);
+    vi.stubEnv("AI_FIXTURES", "1");
+
+    await runHintsForSheet(sheet.id);
+
+    vi.unstubAllEnvs();
+    expect(await demoCallsOf(course.userId)).toBe(3);
+    expect(await Promise.all(rows.map((r) => statusOf(r.id)))).toEqual(["ready", "ready", "ready"]);
   });
 });
