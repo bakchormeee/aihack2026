@@ -66,3 +66,12 @@ export async function demoAiRefusal(userId: string): Promise<string | null> {
   if (state?.role === "copy" && aiCallsLeft(state.used) === 0) return DEMO_AI_LIMIT_MESSAGE;
   return null;
 }
+
+/**
+ * The AI calls the user may still make: a number for a demo copy, null (no limit) for
+ * a real user, the template or an unknown id.
+ */
+export async function demoAiCallsLeft(userId: string): Promise<number | null> {
+  const state = await demoState(userId);
+  return state?.role === "copy" ? aiCallsLeft(state.used) : null;
+}

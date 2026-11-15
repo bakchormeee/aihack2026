@@ -1,0 +1,9 @@
+{
+  "regions": [
+    {
+      "photo": 0.5,
+      "box": { "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.2 },
+      "questionLabel": "1"
+    }
+  ]
+}

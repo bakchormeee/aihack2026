@@ -10,6 +10,7 @@ import {
   AiLimitError,
   DEMO_AI_LIMIT_MESSAGE,
   currentAiUser,
+  demoAiCallsLeft,
   demoAiRefusal,
   reserveAiCall,
   withAiUser,
@@ -85,6 +86,17 @@ describe("demoAiRefusal", () => {
     expect(await demoAiRefusal(await newUser("template", 30))).toBeNull();
     expect(await demoAiRefusal(await newUser(null, 30))).toBeNull();
     expect(await demoAiRefusal("no-such-user")).toBeNull();
+  });
+});
+
+describe("demoAiCallsLeft", () => {
+  it("gives the calls a demo copy has left, and null for everyone without a limit", async () => {
+    expect(await demoAiCallsLeft(await newUser("copy", 0))).toBe(30);
+    expect(await demoAiCallsLeft(await newUser("copy", 28))).toBe(2);
+    expect(await demoAiCallsLeft(await newUser("copy", 30))).toBe(0);
+    expect(await demoAiCallsLeft(await newUser("template", 30))).toBeNull();
+    expect(await demoAiCallsLeft(await newUser(null, 30))).toBeNull();
+    expect(await demoAiCallsLeft("no-such-user")).toBeNull();
   });
 });
 
