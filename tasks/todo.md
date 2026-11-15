@@ -15,7 +15,7 @@ M = 3–5 files.
   - Verify: checks; the migration test; 100% coverage with `src/lib/demo` added.
   - Files: `src/db/schema.ts`, `src/db/migrations/0004_*.sql` (+ meta), `src/lib/demo/rules.ts` (+ test), `vitest.config.mts`
 
-- [ ] **E2: Copy and erase** (M)
+- [x] **E2: Copy and erase** (M)
   - Acceptance: `createDemoCopy` copies every row type with new ids and intact links,
     times end at now, file paths unchanged; two copies are independent and the template
     is untouched; `eraseDemoCopy` removes every row and deletes only `u/<copyId>/` keys;
