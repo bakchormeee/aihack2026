@@ -72,6 +72,22 @@ export function signedDownloadUrl(key: string): Promise<string> {
   });
 }
 
+/**
+ * Uploads bytes from the server. Only scripts use it (the demo template, task E5):
+ * the app's own uploads go straight from the browser through `presignUpload`.
+ */
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  await s3().send(
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ContentLength: body.length,
+    }),
+  );
+}
+
 export async function deleteObject(key: string): Promise<void> {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }
