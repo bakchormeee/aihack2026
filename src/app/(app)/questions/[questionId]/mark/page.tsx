@@ -5,6 +5,7 @@ import { MathText } from "@/components/math-text";
 import { MarkingScheme, MistakeList } from "@/components/mistake-list";
 import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
 import { PhotoWithBoxes } from "@/components/photo-with-boxes";
+import { PlaySound } from "@/components/play-sound";
 import { WorkingWithBoxes } from "@/components/working-with-boxes";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import { canDispute } from "@/lib/marking/rules";
 
 import { DisputeForm } from "./dispute-form";
 import { retryMarkAction, retryNowAction, retryWithNextHintAction } from "./actions";
+
+const OUTCOME_SOUND = { full: "success", partial: "partial", stuck: "stuck" } as const;
 
 // The retry button starts the AI marking again, which can run for a minute or two.
 export const maxDuration = 300;
@@ -126,6 +129,10 @@ export default async function MarkPage({
       {current ? (
         <div className="flex flex-col gap-5">
           <Panel className="border-foreground/80 relative flex flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden border-t-2">
+            <PlaySound
+              sound={OUTCOME_SOUND[current.outcome]}
+              once={`mark:${attemptId}:${current.score}:${current.outcome}`}
+            />
             <span className="font-heading text-pen stamp rounded-full border-[3px] border-current px-4 py-3 text-5xl leading-none italic tabular-nums">
               {current.score}/5
             </span>

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
+import { PlaySound } from "@/components/play-sound";
 import {
   Meter,
   PageHeader,
@@ -113,6 +114,10 @@ export async function SpotSessionView({
               aria-label="Summary"
             >
               <SectionTitle>Summary</SectionTitle>
+              <PlaySound
+                sound={counts.full === items.length ? "fanfare" : "partial"}
+                once={`spot-summary:${sessionId}`}
+              />
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <span className="font-heading text-pen stamp rounded-full border-[3px] border-current px-4 py-2 text-4xl leading-none italic tabular-nums">
                   {counts.full}/{items.length}
