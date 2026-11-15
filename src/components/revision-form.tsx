@@ -166,7 +166,7 @@ export function RevisionForm({
         {mode === "spot_error" ? (
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium">Number of questions</legend>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {SPOT_QUESTION_COUNTS.map((n) => (
                 <Button
                   key={n}
@@ -183,7 +183,7 @@ export function RevisionForm({
         ) : (
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium">Length</legend>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {LENGTHS.map((m) => (
                 <Button
                   key={m}
