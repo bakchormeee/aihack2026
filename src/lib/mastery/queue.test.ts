@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { HintLevel, Outcome } from "@/lib/domain";
-import { buildQueue, type Candidate } from "./queue";
+import { buildQueue, type Candidate, type DueTopic } from "./queue";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-11-14T12:00:00Z");
@@ -14,7 +13,6 @@ function cand(id: string, o: Partial<Candidate> = {}): Candidate {
     lastAttemptAt: ago(10),
     lastOutcome: "partial",
     lastHintLevel: 0,
-    consecutiveFull: 0,
     label: `Q ${id}`,
     ...o,
   };
@@ -24,7 +22,8 @@ const build = (
   candidates: Candidate[],
   targetMinutes: number,
   priorityByTopic: Record<string, number> = { t1: 1 },
-) => buildQueue({ candidates, priorityByTopic, targetMinutes, now: NOW });
+  dueTopics: DueTopic[] = [],
+) => buildQueue({ candidates, priorityByTopic, dueTopics, targetMinutes, now: NOW });
 
 describe("buildQueue ranking", () => {
   it("ranks by the highest priority among a candidate's topics", () => {
@@ -39,16 +38,13 @@ describe("buildQueue ranking", () => {
     ]);
   });
 
-  it("puts due candidates before not-yet-due ones, whatever their priority", () => {
-    const due = cand("due", { topicIds: ["a"], lastAttemptAt: ago(2), lastOutcome: "partial" });
-    const notDue = cand("notDue", {
-      topicIds: ["b"],
-      lastAttemptAt: ago(2),
-      lastOutcome: "full",
-      lastHintLevel: 2,
-      consecutiveFull: 2,
-    });
-    const { items } = build([notDue, due], 40, { a: 0.1, b: 1.9 });
+  it("puts candidates with a due topic before the others, whatever their priority", () => {
+    const { items } = build(
+      [cand("notDue", { topicIds: ["b"] }), cand("due", { topicIds: ["a"] })],
+      40,
+      { a: 0.1, b: 1.9 },
+      [{ id: "a", name: "Algebra", daysUntilDue: 0 }],
+    );
     expect(items.map((i) => i.questionId).slice(0, 2)).toEqual(["due", "notDue"]);
   });
 
@@ -81,53 +77,44 @@ describe("buildQueue ranking", () => {
   });
 });
 
-describe("buildQueue due intervals", () => {
-  const dueAfter = (
-    consecutiveFull: number,
-    days: number,
-    outcome: Outcome = "full",
-    hint: HintLevel = 2,
-  ) => {
-    const due = cand("due", {
-      lastOutcome: outcome,
-      lastHintLevel: hint,
-      consecutiveFull,
-      lastAttemptAt: ago(days),
-      topicIds: ["a"],
-    });
-    const other = cand("other", {
-      lastOutcome: "partial",
-      lastAttemptAt: ago(0.5),
-      topicIds: ["b"],
-    });
-    // `other` is never due (0.5 days < 1 day), so it comes first only when `due` is not due.
-    const { items } = build([other, due], 40, { a: 1, b: 2 });
-    return items[0].questionId === "due";
-  };
+describe("buildQueue due topics", () => {
+  it("ranks due candidates by priority among themselves", () => {
+    const { items } = build(
+      [cand("lowDue", { topicIds: ["a"] }), cand("highDue", { topicIds: ["b"] })],
+      40,
+      { a: 0.2, b: 1.5 },
+      [
+        { id: "a", name: "Algebra", daysUntilDue: -5 },
+        { id: "b", name: "Bases", daysUntilDue: 0 },
+      ],
+    );
+    expect(items.filter((i) => i.source === "retry").map((i) => i.questionId)).toEqual([
+      "highDue",
+      "lowDue",
+    ]);
+  });
 
-  it("is due 1 day after a non-full outcome", () => {
-    expect(dueAfter(5, 1, "partial", 0)).toBe(true);
-    expect(dueAfter(5, 0.9, "partial", 0)).toBe(false);
+  it("does not treat a topic with a later due day as due", () => {
+    const { items } = build(
+      [cand("later", { topicIds: ["a"] }), cand("other", { topicIds: ["b"] })],
+      40,
+      { a: 0.1, b: 1 },
+      [{ id: "a", name: "Algebra", daysUntilDue: 2 }],
+    );
+    expect(items[0].questionId).toBe("other");
   });
-  it("is due 1 day after the first full", () => {
-    expect(dueAfter(1, 1)).toBe(true);
-    expect(dueAfter(1, 0.9)).toBe(false);
-  });
-  it("is due 3 days after the second consecutive full", () => {
-    expect(dueAfter(2, 3)).toBe(true);
-    expect(dueAfter(2, 2.9)).toBe(false);
-  });
-  it("is due 7 days after the third consecutive full", () => {
-    expect(dueAfter(3, 7)).toBe(true);
-    expect(dueAfter(3, 6.9)).toBe(false);
-  });
-  it("is due 14 days after the fourth and later consecutive fulls", () => {
-    expect(dueAfter(4, 14)).toBe(true);
-    expect(dueAfter(4, 13.9)).toBe(false);
-    expect(dueAfter(9, 13.9)).toBe(false);
-  });
-  it("uses the 1-day interval when consecutiveFull is 0 after a full", () => {
-    expect(dueAfter(0, 1)).toBe(true);
+
+  it("names the most overdue of a candidate's due topics in the reason", () => {
+    const { items } = build(
+      [cand("a", { topicIds: ["x", "y"], lastOutcome: "stuck", lastAttemptAt: ago(4) })],
+      30,
+      { x: 1, y: 1 },
+      [
+        { id: "x", name: "Limits", daysUntilDue: -1 },
+        { id: "y", name: "Series", daysUntilDue: -6 },
+      ],
+    );
+    expect(items[0].reason).toBe("Series is due for review, and you got stuck on this 4 days ago");
   });
 });
 
@@ -227,17 +214,10 @@ describe("buildQueue reasons", () => {
       reasonOf(cand("a", { lastOutcome: "partial", lastHintLevel: 2, lastAttemptAt: ago(6) })),
     ).toBe("you only got part of this 6 days ago, using 2 hints");
   });
-  it("describes a clean full attempt that is due for spaced review", () => {
+  it("describes a clean full attempt by its age only", () => {
     expect(
-      reasonOf(
-        cand("a", {
-          lastOutcome: "full",
-          lastHintLevel: 0,
-          consecutiveFull: 1,
-          lastAttemptAt: ago(2),
-        }),
-      ),
-    ).toBe("due for spaced review, last done 2 days ago");
+      reasonOf(cand("a", { lastOutcome: "full", lastHintLevel: 0, lastAttemptAt: ago(2) })),
+    ).toBe("you last did this 2 days ago");
   });
   it("names the parent question in a variant's reason", () => {
     const { items } = build(

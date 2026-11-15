@@ -115,6 +115,21 @@ describe("buildRevisionSession", () => {
     expect(items.every((i) => i.reason.length > 0)).toBe(true);
   });
 
+  it("gives retries of topics due for review a reason that names the topic", async () => {
+    // Both answers were marked 3 days ago, stuck and partly right: due after 1 day.
+    const { session, q1, q2 } = await setup("rb-due@test.local");
+
+    await buildRevisionSession(session.id, okIo);
+
+    const retries = (await itemsOf(session.id)).filter((i) => i.source === "retry");
+    expect(retries.find((i) => i.questionId === q1.id)!.reason).toBe(
+      "Limits is due for review, and you got stuck on this 3 days ago",
+    );
+    expect(retries.find((i) => i.questionId === q2.id)!.reason).toBe(
+      "Series is due for review, and you only got part of this 3 days ago",
+    );
+  });
+
   it("saves each variant with parent, topics, three hints and an AI solution", async () => {
     const { session, course, q1, t1 } = await setup("rb-variant@test.local", { topicFilter: "t1" });
     const generate = vi.fn(okIo.generateVariant);

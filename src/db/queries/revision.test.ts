@@ -109,7 +109,6 @@ describe("listRetryCandidates", () => {
       topicIds: [t1.id],
       lastOutcome: "partial",
       lastHintLevel: 0,
-      consecutiveFull: 0,
       expectedMinutes: 10,
       label: "Q1",
     });
@@ -146,7 +145,7 @@ describe("listRetryCandidates", () => {
     expect(c[0].lastHintLevel).toBe(3);
   });
 
-  it("counts consecutive full attempts and ignores unmarked attempts", async () => {
+  it("uses the newest marked attempt and ignores unmarked ones", async () => {
     const { user, course, t1 } = await setup("rv-consec@test.local");
     const q = await question(course.id, [t1.id]);
     await attempt(user.id, q.id, "partial", 10);
@@ -156,7 +155,7 @@ describe("listRetryCandidates", () => {
 
     const c = await listRetryCandidates(user.id, course.id);
 
-    expect(c[0].consecutiveFull).toBe(2);
+    expect(c[0].lastOutcome).toBe("full");
     expect(c[0].lastAttemptAt.getTime()).toBeCloseTo(Date.now() - 4 * DAY, -4);
   });
 

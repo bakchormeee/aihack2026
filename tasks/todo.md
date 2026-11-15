@@ -44,7 +44,7 @@ M = 3–5 files.
     review; browser check at desktop and 375 px.
   - Files: `src/db/queries/mastery.ts` (+ test), `src/lib/insights/insights.ts` (+ test), `src/components/insights/focus-next.tsx`
 
-- [ ] **R3: Revision follows the topic schedule** (S)
+- [x] **R3: Revision follows the topic schedule** (S)
   - Acceptance:
     - `buildQueue({…, dueTopicIds})` ranks a candidate with a due topic first.
     - `intervalDays`, `isDue` and `consecutiveFull` are removed.
@@ -54,7 +54,7 @@ M = 3–5 files.
   - Files: `src/lib/mastery/queue.ts` (+ test), `src/lib/pipeline/revision.ts` (+ test), `src/db/queries/revision.ts` (+ test)
 
 ### Checkpoint 2
-- [ ] Focus next and revision follow the schedule; all checks pass
+- [x] Focus next and revision follow the schedule; all checks pass
 
 ## Phase 3: Finish (30 min)
 

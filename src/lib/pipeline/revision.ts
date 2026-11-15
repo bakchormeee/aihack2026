@@ -77,9 +77,13 @@ export async function buildRevisionSession(
 
     const mastery = await getCourseMastery(session.userId, session.courseId);
     const priorityByTopic = Object.fromEntries(mastery.topics.map((t) => [t.id, t.priority]));
+    const dueTopics = mastery.topics.flatMap((t) =>
+      t.review ? [{ id: t.id, name: t.name, daysUntilDue: t.review.daysUntilDue }] : [],
+    );
     const { items } = buildQueue({
       candidates,
       priorityByTopic,
+      dueTopics,
       targetMinutes,
       now,
     });

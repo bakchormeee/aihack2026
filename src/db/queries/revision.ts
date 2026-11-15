@@ -98,11 +98,6 @@ export async function listRetryCandidates(
     if (outcome === "full" && newest.hintLevel < 2) continue;
     const qTopics = topicsOf.get(questionId) ?? [];
     if (wanted && !qTopics.some((t) => wanted.has(t))) continue;
-    let consecutiveFull = 0;
-    for (const r of list) {
-      if (r.mark!.outcome !== "full") break;
-      consecutiveFull += 1;
-    }
     result.push({
       questionId,
       topicIds: qTopics,
@@ -110,7 +105,6 @@ export async function listRetryCandidates(
       lastAttemptAt: newest.startedAt,
       lastOutcome: outcome,
       lastHintLevel: newest.hintLevel,
-      consecutiveFull,
       label: newest.label,
     });
   }

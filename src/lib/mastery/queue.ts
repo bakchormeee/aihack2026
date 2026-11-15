@@ -7,27 +7,16 @@ export type Candidate = {
   lastAttemptAt: Date;
   lastOutcome: Outcome;
   lastHintLevel: HintLevel;
-  consecutiveFull: number;
   label: string;
 };
+
+/** A topic with its spaced-review due day (SPEC-spaced-review.md): due when daysUntilDue ≤ 0. */
+export type DueTopic = { id: string; name: string; daysUntilDue: number };
 
 type QueueItem = { source: "retry" | "variant"; questionId: string; reason: string };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const RETRY_SHARE = 0.6;
-// Days to wait after 1, 2, 3, 4+ consecutive full attempts.
-const SPACED_INTERVAL_DAYS = [1, 3, 7, 14] as const;
-
-function intervalDays(c: Candidate): number {
-  if (c.lastOutcome !== "full") return 1;
-  // Decision: consecutiveFull of 0 after a full (not expected) uses the shortest interval.
-  const step = Math.min(Math.max(c.consecutiveFull, 1), SPACED_INTERVAL_DAYS.length) - 1;
-  return SPACED_INTERVAL_DAYS[step];
-}
-
-function isDue(c: Candidate, now: Date): boolean {
-  return now.getTime() - c.lastAttemptAt.getTime() >= intervalDays(c) * MS_PER_DAY;
-}
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -42,7 +31,7 @@ function retryReason(c: Candidate, now: Date): string {
   const age = describeAge(c, now);
   const hints = c.lastHintLevel > 0 ? plural(c.lastHintLevel, "hint") : null;
   if (c.lastOutcome === "full") {
-    return hints ? `you used ${hints} on this ${age}` : `due for spaced review, last done ${age}`;
+    return hints ? `you used ${hints} on this ${age}` : `you last did this ${age}`;
   }
   const what = c.lastOutcome === "stuck" ? "you got stuck on this" : "you only got part of this";
   return `${what} ${age}${hints ? `, using ${hints}` : ""}`;
@@ -50,6 +39,7 @@ function retryReason(c: Candidate, now: Date): string {
 
 /**
  * Ranks the (already filtered) retry candidates and fills the session length.
+ * A candidate with a topic whose spaced review is due ranks first (SPEC-spaced-review.md).
  * Decisions where the spec is silent:
  * - Candidates without a known topic priority count as priority 0; ties go to the
  *   oldest last attempt, then to the question id, so the order is deterministic.
@@ -62,14 +52,27 @@ function retryReason(c: Candidate, now: Date): string {
 export function buildQueue(i: {
   candidates: Candidate[];
   priorityByTopic: Record<string, number>;
+  dueTopics: DueTopic[];
   targetMinutes: number;
   now: Date;
 }): { items: QueueItem[] } {
   const topPriority = (c: Candidate) =>
     Math.max(0, ...c.topicIds.map((t) => i.priorityByTopic[t] ?? 0));
+  const due = new Map(i.dueTopics.filter((t) => t.daysUntilDue <= 0).map((t) => [t.id, t]));
+  // The most overdue of the candidate's due topics, or undefined when none is due.
+  const dueTopicOf = (c: Candidate) =>
+    c.topicIds
+      .map((id) => due.get(id))
+      .filter((t) => t !== undefined)
+      .sort((a, b) => a.daysUntilDue - b.daysUntilDue)[0];
+  const reasonFor = (c: Candidate) => {
+    const topic = dueTopicOf(c);
+    const reason = retryReason(c, i.now);
+    return topic ? `${topic.name} is due for review, and ${reason}` : reason;
+  };
 
   const ranked = i.candidates
-    .map((c) => ({ c, due: isDue(c, i.now), priority: topPriority(c) }))
+    .map((c) => ({ c, due: dueTopicOf(c) !== undefined, priority: topPriority(c) }))
     .sort(
       (a, b) =>
         Number(b.due) - Number(a.due) ||
@@ -104,12 +107,12 @@ export function buildQueue(i: {
       ...retries.map((c): QueueItem => ({
         source: "retry",
         questionId: c.questionId,
-        reason: retryReason(c, i.now),
+        reason: reasonFor(c),
       })),
       ...variants.map((c): QueueItem => ({
         source: "variant",
         questionId: c.questionId,
-        reason: `a fresh variant of ${c.label}, because ${retryReason(c, i.now)}`,
+        reason: `a fresh variant of ${c.label}, because ${reasonFor(c)}`,
       })),
     ],
   };
