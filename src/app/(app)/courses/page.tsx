@@ -1,18 +1,35 @@
 import Link from "next/link";
 
+import { DeletedNotice } from "@/components/deleted-notice";
 import { EmptyState, PageHeader, Panel } from "@/components/page-parts";
+import { listBin } from "@/db/queries/bin";
 import { listCourses } from "@/db/queries/courses";
 import { requireUser } from "@/lib/auth/session";
 
 import { CreateCourseForm } from "./create-course-form";
 
-export default async function CoursesPage() {
+export default async function CoursesPage({ searchParams }: PageProps<"/courses">) {
   const user = await requireUser();
   const courses = await listCourses(user.id);
+  const bin = await listBin(user.id);
+  const binHasItems = bin.courses.length + bin.sheets.length > 0;
 
   return (
     <section className="flex flex-col gap-8">
-      <PageHeader title="Your courses" />
+      {(await searchParams).deleted ? <DeletedNotice /> : null}
+      <PageHeader
+        title="Your courses"
+        actions={
+          binHasItems ? (
+            <Link
+              href="/courses/deleted"
+              className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+            >
+              Recently deleted
+            </Link>
+          ) : null
+        }
+      />
       {courses.length === 0 ? (
         <EmptyState>
           No courses yet. Create one for each university module, then upload its problem sheets.

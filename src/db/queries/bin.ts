@@ -3,12 +3,12 @@
 // only clears it (spec assumption 1). These queries read binned rows on purpose; every
 // other query goes through the ownership guards, which refuse them.
 
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { courses, questions, sheets } from "@/db/schema";
+import { attempts, courses, questions, sheets } from "@/db/schema";
 import { NotFoundError } from "@/lib/auth/ownership";
-import { binnedQuestionIds } from "@/lib/bin/rules";
+import { binnedQuestionIds, eraseDate } from "@/lib/bin/rules";
 
 /** SQL condition: the course is not in the bin. */
 export const liveCourse = isNull(courses.deletedAt);
@@ -113,4 +113,88 @@ export async function restoreSheet(userId: string, sheetId: string) {
     .returning();
   if (rows.length === 0) throw new NotFoundError();
   return rows[0];
+}
+
+/**
+ * What deleting would take with it, for the dialog: the course's sheets, and the
+ * questions (revision variants included) and the user's attempts on them. Work already
+ * in the bin on its own is not counted again. The caller has checked ownership.
+ */
+export async function countWhatGoes(
+  userId: string,
+  target: { courseId: string } | { sheetId: string },
+): Promise<{ sheets: number; questions: number; attempts: number }> {
+  const courseId =
+    "courseId" in target
+      ? target.courseId
+      : ((await db.select().from(sheets).where(eq(sheets.id, target.sheetId)))[0]?.courseId ??
+        null);
+  if (courseId === null) return { sheets: 0, questions: 0, attempts: 0 };
+
+  const courseSheets = await db
+    .select({ id: sheets.id, deletedAt: sheets.deletedAt })
+    .from(sheets)
+    .where(eq(sheets.courseId, courseId));
+  const links = await db
+    .select({
+      id: questions.id,
+      sheetId: questions.sheetId,
+      parentQuestionId: questions.parentQuestionId,
+    })
+    .from(questions)
+    .where(eq(questions.courseId, courseId));
+  const alreadyBinned = binnedQuestionIds(
+    links,
+    new Set(courseSheets.filter((s) => s.deletedAt !== null).map((s) => s.id)),
+  );
+  const going =
+    "sheetId" in target
+      ? [...binnedQuestionIds(links, new Set([target.sheetId]))]
+      : links.map((q) => q.id).filter((id) => !alreadyBinned.has(id));
+  const [{ n }] = going.length
+    ? await db
+        .select({ n: count() })
+        .from(attempts)
+        .where(and(eq(attempts.userId, userId), inArray(attempts.questionId, going)))
+    : [{ n: 0 }];
+  return {
+    sheets: "courseId" in target ? courseSheets.filter((s) => s.deletedAt === null).length : 0,
+    questions: going.length,
+    attempts: n,
+  };
+}
+
+export type BinnedCourse = { id: string; name: string; deletedAt: Date; erasedOn: Date };
+export type BinnedSheet = BinnedCourse & { courseId: string; courseName: string };
+
+/**
+ * The user's Recently deleted page: binned courses, and binned sheets whose course is
+ * not binned (a sheet in a binned course comes back with it), newest first.
+ */
+export async function listBin(
+  userId: string,
+): Promise<{ courses: BinnedCourse[]; sheets: BinnedSheet[] }> {
+  const courseRows = await db
+    .select({ id: courses.id, name: courses.name, deletedAt: courses.deletedAt })
+    .from(courses)
+    .where(and(eq(courses.userId, userId), isNotNull(courses.deletedAt)))
+    .orderBy(desc(courses.deletedAt));
+  const sheetRows = await db
+    .select({
+      id: sheets.id,
+      name: sheets.title,
+      deletedAt: sheets.deletedAt,
+      courseId: courses.id,
+      courseName: courses.name,
+    })
+    .from(sheets)
+    .innerJoin(courses, eq(sheets.courseId, courses.id))
+    .where(and(eq(courses.userId, userId), liveCourse, isNotNull(sheets.deletedAt)))
+    .orderBy(desc(sheets.deletedAt));
+  const withDate = <T extends { deletedAt: Date | null }>(row: T) => ({
+    ...row,
+    deletedAt: row.deletedAt!,
+    erasedOn: eraseDate(row.deletedAt!),
+  });
+  return { courses: courseRows.map(withDate), sheets: sheetRows.map(withDate) };
 }

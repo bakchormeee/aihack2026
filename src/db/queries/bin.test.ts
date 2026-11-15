@@ -26,6 +26,8 @@ import {
   binCourse,
   binnedQuestionIdsOf,
   binSheet,
+  countWhatGoes,
+  listBin,
   ownsCourse,
   restoreCourse,
   restoreSheet,
@@ -172,6 +174,100 @@ describe("binnedQuestionIdsOf", () => {
     const w = await world("bin-ids@test.local");
     await binSheet(w.user.id, w.a.id);
     expect(await binnedQuestionIdsOf(w.course.id)).toEqual(new Set([w.qa.q.id, w.va.q.id]));
+  });
+});
+
+describe("countWhatGoes", () => {
+  it("counts a sheet's questions with their variants, and the user's attempts on them", async () => {
+    const w = await world("bin-count-sheet@test.local");
+    const [other] = await db.insert(users).values({ email: "bin-count-o@test.local" }).returning();
+    await db.insert(attempts).values({ userId: other.id, questionId: w.qa.q.id, context: "sheet" });
+
+    expect(await countWhatGoes(w.user.id, { sheetId: w.a.id })).toEqual({
+      sheets: 0,
+      questions: 2,
+      attempts: 2,
+    });
+    expect(await countWhatGoes(w.user.id, { sheetId: "no-such-id" })).toEqual({
+      sheets: 0,
+      questions: 0,
+      attempts: 0,
+    });
+  });
+
+  it("counts a course's sheets, questions and attempts, leaving out a sheet already binned", async () => {
+    const w = await world("bin-count-course@test.local");
+    expect(await countWhatGoes(w.user.id, { courseId: w.course.id })).toEqual({
+      sheets: 2,
+      questions: 3,
+      attempts: 3,
+    });
+
+    await binSheet(w.user.id, w.a.id);
+    expect(await countWhatGoes(w.user.id, { courseId: w.course.id })).toEqual({
+      sheets: 1,
+      questions: 1,
+      attempts: 1,
+    });
+  });
+
+  it("counts no attempts for a sheet without questions", async () => {
+    const w = await world("bin-count-empty@test.local");
+    const [empty] = await db
+      .insert(sheets)
+      .values({ courseId: w.course.id, title: "Empty" })
+      .returning();
+    expect(await countWhatGoes(w.user.id, { sheetId: empty.id })).toEqual({
+      sheets: 0,
+      questions: 0,
+      attempts: 0,
+    });
+  });
+});
+
+describe("listBin", () => {
+  it("lists binned courses and sheets binned on their own, with the erase date", async () => {
+    const w = await world("bin-list@test.local");
+    const second = await world("bin-list-2@test.local");
+    // A course of the same user, binned with a sheet inside it that was binned before.
+    const [binnedCourse] = await db
+      .insert(courses)
+      .values({ userId: w.user.id, name: "Old" })
+      .returning();
+    const [inside] = await db
+      .insert(sheets)
+      .values({ courseId: binnedCourse.id, title: "Inside" })
+      .returning();
+    await binSheet(w.user.id, inside.id, new Date("2026-11-01T09:00:00Z"));
+    await binCourse(w.user.id, binnedCourse.id, new Date("2026-11-02T09:00:00Z"));
+    await binSheet(w.user.id, w.a.id, new Date("2026-11-14T09:00:00Z"));
+    await binSheet(second.user.id, second.a.id);
+
+    expect(await listBin(w.user.id)).toEqual({
+      courses: [
+        {
+          id: binnedCourse.id,
+          name: "Old",
+          deletedAt: new Date("2026-11-02T09:00:00Z"),
+          erasedOn: new Date("2026-12-02T09:00:00Z"),
+        },
+      ],
+      sheets: [
+        {
+          id: w.a.id,
+          name: "A",
+          courseId: w.course.id,
+          courseName: "C",
+          deletedAt: new Date("2026-11-14T09:00:00Z"),
+          erasedOn: new Date("2026-12-14T09:00:00Z"),
+        },
+      ],
+    });
+  });
+
+  it("is empty when nothing is binned", async () => {
+    const w = await world("bin-list-empty@test.local");
+    expect(await listBin(w.user.id)).toEqual({ courses: [], sheets: [] });
   });
 });
 

@@ -11,7 +11,11 @@ import { orNotFound } from "@/lib/auth/guards";
 import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
+import { DeleteDialog } from "@/components/delete-dialog";
+import { countWhatGoes } from "@/db/queries/bin";
+import { deleteSentence } from "@/lib/bin/rules";
 
+import { deleteSheetAction } from "../../courses/[courseId]/delete-actions";
 import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
 
 // The retry button starts the background parse again, which can run for a few minutes.
@@ -45,17 +49,28 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
         back={{ href: `/courses/${sheet.courseId}/sheets`, label: "All sheets" }}
         title={sheet.title}
         actions={
-          <form
-            action={setTimerAction.bind(null, sheet.id, !sheet.timerEnabled)}
-            className="flex items-center gap-2"
-          >
-            <span className="text-muted-foreground text-sm">
-              Timer is {sheet.timerEnabled ? "on" : "off"}
-            </span>
-            <Button type="submit" variant="outline" size="sm">
-              Turn {sheet.timerEnabled ? "off" : "on"}
-            </Button>
-          </form>
+          <>
+            <form
+              action={setTimerAction.bind(null, sheet.id, !sheet.timerEnabled)}
+              className="flex items-center gap-2"
+            >
+              <span className="text-muted-foreground text-sm">
+                Timer is {sheet.timerEnabled ? "on" : "off"}
+              </span>
+              <Button type="submit" variant="outline" size="sm">
+                Turn {sheet.timerEnabled ? "off" : "on"}
+              </Button>
+            </form>
+            <DeleteDialog
+              label="Delete sheet"
+              sentence={deleteSentence({
+                kind: "sheet",
+                name: sheet.title,
+                ...(await countWhatGoes(user.id, { sheetId })),
+              })}
+              action={deleteSheetAction.bind(null, sheet.id)}
+            />
+          </>
         }
       />
 
