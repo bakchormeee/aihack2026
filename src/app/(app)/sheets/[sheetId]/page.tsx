@@ -15,7 +15,7 @@ import { isStale } from "@/lib/pipeline/stale";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { countWhatGoes } from "@/db/queries/bin";
 import { deleteSentence } from "@/lib/bin/rules";
-import { deleteBatchPhotos } from "@/lib/storage/batch-photos";
+import { deleteLeftoverBatchPhotos } from "@/lib/storage/batch-photos";
 
 import { deleteSheetAction } from "../../courses/[courseId]/delete-actions";
 import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
@@ -35,7 +35,7 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
   const sheet = await orNotFound(requireSheet(user.id, sheetId));
   // Photos of a batch upload that was left without confirming (SPEC-batch-working.md).
   after(() =>
-    deleteBatchPhotos(user.id, sheet.id).catch((error) =>
+    deleteLeftoverBatchPhotos(user.id, sheet.id).catch((error) =>
       console.error(`deleting leftover batch photos of sheet ${sheet.id} failed`, error),
     ),
   );

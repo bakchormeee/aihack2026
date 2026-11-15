@@ -26,7 +26,10 @@ vi.mock("@/lib/storage/s3", () => ({
   statObject: async (key: string) => stored.get(key) ?? null,
   getObjectBytes: async (key: string) => Buffer.from(key),
   deleteObject: async (key: string) => void stored.delete(key),
-  listObjects: async (prefix: string) => [...stored.keys()].filter((k) => k.startsWith(prefix)),
+  listObjects: async (prefix: string) =>
+    [...stored.keys()]
+      .filter((k) => k.startsWith(prefix))
+      .map((key) => ({ key, lastModified: null })),
 }));
 
 import {

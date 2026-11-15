@@ -94,14 +94,17 @@ export async function deleteObject(key: string): Promise<void> {
 }
 
 /** Every key that starts with `prefix`, reading all pages of the listing. */
-export async function listObjects(prefix: string): Promise<string[]> {
-  const keys: string[] = [];
+export async function listObjects(
+  prefix: string,
+): Promise<{ key: string; lastModified: Date | null }[]> {
+  const keys: { key: string; lastModified: Date | null }[] = [];
   let token: string | undefined;
   do {
     const page = await s3().send(
       new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }),
     );
-    for (const item of page.Contents ?? []) if (item.Key) keys.push(item.Key);
+    for (const item of page.Contents ?? [])
+      if (item.Key) keys.push({ key: item.Key, lastModified: item.LastModified ?? null });
     token = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (token);
   return keys;

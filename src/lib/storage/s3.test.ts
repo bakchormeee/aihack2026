@@ -50,16 +50,20 @@ describe("putObject", () => {
 });
 
 describe("listObjects", () => {
-  it("lists every key under the prefix, page by page", async () => {
+  it("lists every key under the prefix with its upload time, page by page", async () => {
+    const at = new Date("2026-11-15T10:00:00Z");
     send
       .mockResolvedValueOnce({
-        Contents: [{ Key: "u/a/batch/s/1.jpg" }, {}],
+        Contents: [{ Key: "u/a/batch/s/1.jpg", LastModified: at }, {}],
         IsTruncated: true,
         NextContinuationToken: "next",
       })
       .mockResolvedValueOnce({ Contents: [{ Key: "u/a/batch/s/2.jpg" }], IsTruncated: false });
 
-    expect(await listObjects("u/a/batch/s/")).toEqual(["u/a/batch/s/1.jpg", "u/a/batch/s/2.jpg"]);
+    expect(await listObjects("u/a/batch/s/")).toEqual([
+      { key: "u/a/batch/s/1.jpg", lastModified: at },
+      { key: "u/a/batch/s/2.jpg", lastModified: null },
+    ]);
 
     const [first, second] = send.mock.calls.map((call) => call[0] as ListObjectsV2Command);
     expect(first).toBeInstanceOf(ListObjectsV2Command);

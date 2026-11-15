@@ -26,9 +26,9 @@ are in [plan.md](plan.md).
 
 ## Phase 3: Batch working (after B1; can run beside Phase 2)
 
-- [ ] **B2: `matchWorking` and the propose action** (M)
-- [ ] **B3: Submit the confirmed regions** (M, after B2)
-- [ ] **B4: The review screen** (M, after B3)
+- [x] **B2: `matchWorking` and the propose action** (M)
+- [x] **B3: Submit the confirmed regions** (M, after B2)
+- [x] **B4: The review screen** (M, after B3)
 
 ### Checkpoint 3
 - [ ] Two photos for four questions are matched, corrected, submitted and marked
