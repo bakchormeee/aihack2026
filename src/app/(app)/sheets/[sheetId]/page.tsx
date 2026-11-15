@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listQuestionsWithTopics } from "@/db/queries/sheets";
 import { orNotFound } from "@/lib/auth/guards";
@@ -14,6 +15,7 @@ import { isStale } from "@/lib/pipeline/stale";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { countWhatGoes } from "@/db/queries/bin";
 import { deleteSentence } from "@/lib/bin/rules";
+import { deleteBatchPhotos } from "@/lib/storage/batch-photos";
 
 import { deleteSheetAction } from "../../courses/[courseId]/delete-actions";
 import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
@@ -31,6 +33,12 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
   const user = await requireUser();
   const { sheetId } = await params;
   const sheet = await orNotFound(requireSheet(user.id, sheetId));
+  // Photos of a batch upload that was left without confirming (SPEC-batch-working.md).
+  after(() =>
+    deleteBatchPhotos(user.id, sheet.id).catch((error) =>
+      console.error(`deleting leftover batch photos of sheet ${sheet.id} failed`, error),
+    ),
+  );
   const questions = sheet.status === "ready" ? await listQuestionsWithTopics(user.id, sheetId) : [];
 
   const stuck = sheet.status === "parsing" && isStale(sheet.statusUpdatedAt);
@@ -112,6 +120,9 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
           action={submitAllAction.bind(null, sheet.id)}
           className="flex flex-wrap items-center gap-3"
         >
+          <Link href={`/sheets/${sheet.id}/batch`} className={buttonVariants()}>
+            Upload working for several questions
+          </Link>
           <Button type="submit" variant="outline">
             Submit all drafts
           </Button>

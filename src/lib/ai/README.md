@@ -100,7 +100,7 @@ npx tsx scripts/try-ai.ts generateHints input.json
 ## Call names
 
 `parseSheet`, `generateHints`, `markAttempt`, `extractSolutions`,
-`generateVariant`, `summariseSheet`.
+`generateVariant`, `summariseSheet`, `matchWorking`.
 
 ## Module notes for callers
 

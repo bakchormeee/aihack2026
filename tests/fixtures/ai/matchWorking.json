@@ -1,0 +1,10 @@
+{
+  "regions": [
+    { "photo": 0, "box": { "x": 0.05, "y": 0.04, "w": 0.9, "h": 0.22 }, "questionLabel": "1" },
+    { "photo": 0, "box": { "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.3 }, "questionLabel": "Q2(a)" },
+    { "photo": 0, "box": { "x": 0.05, "y": 0.64, "w": 0.9, "h": 0.32 }, "questionLabel": "2(b)" },
+    { "photo": 1, "box": { "x": 0.05, "y": 0.04, "w": 0.9, "h": 0.2 }, "questionLabel": "2(b)" },
+    { "photo": 1, "box": { "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.4 }, "questionLabel": "3" },
+    { "photo": 1, "box": { "x": 0.6, "y": 0.8, "w": 0.35, "h": 0.15 }, "questionLabel": null }
+  ]
+}
