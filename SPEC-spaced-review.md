@@ -1,6 +1,6 @@
 # Spec Delta: Spaced review of topics (Anki-style)
 
-Status: approved 15 November 2026.
+Status: implemented (released 15 November 2026).
 Original spec: [SPEC.md](SPEC.md), section "`revision`" (the 1, 3, 7, 14-day spaced
 interval), and the "Focus next" panel on the course page
 (`src/components/insights/focus-next.tsx`, `src/lib/insights/insights.ts`). Builds on
