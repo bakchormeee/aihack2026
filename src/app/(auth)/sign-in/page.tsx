@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/components/brand-mark";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { googleConfigured, signIn, testSignInEnabled } from "@/lib/auth/config";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -36,6 +36,18 @@ export default async function SignInPage() {
             Google sign-in is not configured. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET.
           </p>
         )}
+
+        <div className="flex flex-col gap-2 border-t pt-6">
+          <Link
+            href="/demo"
+            className={buttonVariants({ variant: "outline", size: "lg", className: "w-full" })}
+          >
+            Try the demo
+          </Link>
+          <p className="text-muted-foreground text-xs">
+            No sign-in. A private copy of a demo student, deleted after 24 hours.
+          </p>
+        </div>
 
         {testSignInEnabled ? (
           <p className="text-sm">

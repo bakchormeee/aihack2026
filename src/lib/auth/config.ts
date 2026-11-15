@@ -14,6 +14,7 @@ import Google from "next-auth/providers/google";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
 
+import { authorizeDemo, refuseDemoLink } from "./demo-sign-in";
 import { findOrCreateTestUser, isTestEmail, isTestSignInEnabled } from "./test-sign-in";
 
 export const googleConfigured = Boolean(
@@ -43,6 +44,17 @@ if (testSignInEnabled) {
   );
 }
 
+// The demo sign-in (SPEC-demo.md) is on in production too. It has no fields and can
+// only create a fresh demo copy, never reach the template, another copy or a real user.
+providers.push(
+  Credentials({
+    id: "demo",
+    name: "Demo",
+    credentials: {},
+    authorize: () => authorizeDemo(),
+  }),
+);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -53,6 +65,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   session: { strategy: "jwt" },
   pages: { signIn: "/sign-in" },
+  events: {
+    // Signing in with Google while in a demo copy would link the account to the copy.
+    async linkAccount({ user, account }) {
+      if (user.id) await refuseDemoLink(user.id, account);
+    },
+  },
   callbacks: {
     // Put the database user id in the token and the session.
     jwt({ token, user }) {

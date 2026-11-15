@@ -24,12 +24,14 @@ M = 3–5 files.
   - Verify: checks; integration tests on a hand-made template with a fake `deleteObject`.
   - Files: `src/db/queries/demo.ts` (+ test)
 
-- [ ] **E3: Demo sign-in, `/demo`, banner, buttons** (M)
+- [x] **E3: Demo sign-in, `/demo`, banner, buttons** (M)
   - Acceptance: the `demo` provider creates a copy (never the template); `/demo` reuses a
     live copy and starts the erase in `after()`; the banner with Start again shows for
     copies only; "Try the demo" on the landing and sign-in pages; `test` stays off in
     production.
   - Verify: checks; unit tests of `authorize`; browser check at desktop and 375 px.
+  - Done 15 Nov on unit tests; the browser check moves to E6 (it needs migration 0004
+    on a database, and the only one is Neon).
   - Files: `src/lib/auth/config.ts`, `src/app/demo/*`, `src/app/(app)/layout.tsx`, `src/components/demo-banner.tsx`, `src/app/page.tsx`, `src/app/(auth)/sign-in/page.tsx`
 
 ### Checkpoint 1

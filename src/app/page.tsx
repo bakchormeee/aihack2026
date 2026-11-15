@@ -117,6 +117,9 @@ export default function LandingPage() {
                 →
               </span>
             </Link>
+            <Link href="/demo" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              Try the demo
+            </Link>
             <span className="text-muted-foreground text-sm">AI-marked in a minute or two.</span>
           </div>
         </section>
