@@ -1,6 +1,6 @@
 # Spec Delta: Deleting courses and sheets
 
-Status: approved 15 November 2026, deferred (not planned yet; spaced review was built first).
+Status: approved 15 November 2026; ready to plan (it was deferred while spaced review and the demo were built).
 Original spec: [SPEC.md](SPEC.md), section "Data model" ("There is no delete for courses or
 sheets in V1") and "Boundaries" ("Never: update or delete an attempt, submission, hint
 reveal or mark"); out-of-scope row "Deleting courses or sheets".
@@ -110,6 +110,10 @@ While binned, none of it appears anywhere:
   Neon only with your go-ahead); changing the 30-day period.
 - **Never:** erase anything before its 30 days are up; delete a stored file another row
   still uses.
+- **Demo copies (added 15 November 2026, after [SPEC-demo.md](SPEC-demo.md)):** a judge
+  can bin, restore and erase in their own copy like any student. Erasing in a copy never
+  deletes a file of the demo student: only files under the copy's own folder are
+  deleted, as when a copy is erased.
 
 ## Assumptions (correct me if any is wrong)
 
