@@ -2,8 +2,9 @@ import Link from "next/link";
 
 import { masteryBand, masteryColor } from "@/components/charts/colors";
 import { Panel, SectionTitle } from "@/components/page-parts";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { focusTopics, type TopicForFocus } from "@/lib/insights/insights";
+import { focusTopics, reviewSummary, type TopicForFocus } from "@/lib/insights/insights";
 
 /** Mastery on a 0–100% track in the diverging mastery colour, with a 50% tick and the value in words. */
 function MasteryBar({ value, label }: { value: number | null; label: string }) {
@@ -45,13 +46,14 @@ function MasteryBar({ value, label }: { value: number | null; label: string }) {
 export function FocusNext({ courseId, topics }: { courseId: string; topics: TopicForFocus[] }) {
   const items = focusTopics(topics, new Date(), 3);
   if (items.length === 0) return null;
+  const summary = reviewSummary(topics);
 
   return (
     <Panel className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionTitle>Focus next</SectionTitle>
         <p className="text-muted-foreground text-xs">
-          Weakest, least certain and longest-unpractised first.
+          {summary ?? "Weakest, least certain and longest-unpractised first."}
         </p>
       </div>
       <ol className="divide-y">
@@ -65,7 +67,12 @@ export function FocusNext({ courseId, topics }: { courseId: string; topics: Topi
                 {i + 1}
               </span>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <span className="font-medium">{item.name}</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{item.name}</span>
+                  {item.due ? (
+                    <Badge variant={item.due.isDue ? "default" : "outline"}>{item.due.text}</Badge>
+                  ) : null}
+                </span>
                 <MasteryBar value={item.mastery} label={`Mastery of ${item.name}`} />
                 <p className="text-muted-foreground text-sm">{item.reason}</p>
               </div>

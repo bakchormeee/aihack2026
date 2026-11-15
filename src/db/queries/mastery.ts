@@ -22,6 +22,7 @@ import {
 import type { HintLevel } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { replayMastery, type MarkedAttempt } from "@/lib/mastery/mastery";
+import { gradeOf, replaySchedule, type Schedule } from "@/lib/spaced/review";
 
 export type TopicMastery = {
   id: string;
@@ -32,6 +33,8 @@ export type TopicMastery = {
   priority: number;
   attempts: number;
   series: { at: Date; mastery: number }[];
+  /** The topic's spaced-review schedule, replayed from the same marks; null when untried. */
+  review: Schedule | null;
 };
 
 export type CourseMastery = {
@@ -162,6 +165,10 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
         priority: replay.priority,
         attempts: list.length,
         series: replay.series,
+        review: replaySchedule(
+          list.map((a) => ({ at: a.at, grade: gradeOf(a) })),
+          now,
+        ),
       };
     }),
     prereqs,

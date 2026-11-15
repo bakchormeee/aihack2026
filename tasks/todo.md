@@ -31,7 +31,7 @@ M = 3–5 files.
 
 ## Phase 2: Using the schedule (1 h 30 min)
 
-- [ ] **R2: Focus next shows due dates** (M)
+- [x] **R2: Focus next shows due dates** (M)
   - Acceptance:
     - Each topic from `getCourseMastery` has a `review` (null when untried).
     - Due and overdue topics come first, most overdue first and then weakest. A due topic

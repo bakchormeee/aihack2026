@@ -142,6 +142,36 @@ describe("getCourseMastery", () => {
     expect(t.mastery).toBeLessThan(0.5);
   });
 
+  it("gives each tried topic a review schedule from its marks, and none to an untried one", async () => {
+    const { user, course, algebra, groups, question } = await setup("m-review@test.local");
+    await attemptWithMark(user.id, question.id, "full", "ai", 2);
+
+    const all = (await getCourseMastery(user.id, course.id)).topics;
+    const tried = all.find((t) => t.id === algebra.id)!;
+
+    // Full, no hints, on time: Easy, so the first interval is 4 days.
+    expect(tried.review).toMatchObject({ interval: 4, reviews: 1, daysUntilDue: 2 });
+    expect(all.find((t) => t.id === groups.id)!.review).toBeNull();
+  });
+
+  it("changes the schedule when a new mark replaces the old one", async () => {
+    const { user, course, algebra, question } = await setup("m-review-remark@test.local");
+    const attempt = await attemptWithMark(user.id, question.id, "full", "ai", 2);
+    await db.insert(marks).values({
+      attemptId: attempt.id,
+      basis: "official",
+      score: 0,
+      outcome: "stuck",
+      feedback: "f",
+      overallFeedback: "o",
+    });
+
+    const t = (await getCourseMastery(user.id, course.id)).topics.find((x) => x.id === algebra.id)!;
+
+    // Stuck: Again, so it was due the day after.
+    expect(t.review).toMatchObject({ interval: 1, daysUntilDue: -1 });
+  });
+
   it("skips attempts without a mark and counts variant questions", async () => {
     const { user, course, algebra, question } = await setup("m-variant@test.local");
     await db
