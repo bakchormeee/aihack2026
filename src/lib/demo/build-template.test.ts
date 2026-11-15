@@ -194,6 +194,15 @@ describe("buildDemoTemplate", () => {
     );
   });
 
+  it("answers only the first questions of each sheet when asked", async () => {
+    const report = await buildDemoTemplate({ ...base, eraseOld, questionsPerSheet: 2 });
+    const planned = report.planned.full + report.planned.partial + report.planned.stuck;
+    expect(report.attempts).toBe(planned);
+    // 2 questions, plus at most one repeat each.
+    expect(report.attempts).toBeGreaterThanOrEqual(2);
+    expect(report.attempts).toBeLessThanOrEqual(4);
+  });
+
   it("builds two courses with three sheets each, leaving sheet 3 unattempted", async () => {
     const wide = mkdtempSync(path.join(tmpdir(), "demo-sheets-"));
     for (const [course, names] of [

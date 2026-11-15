@@ -100,6 +100,8 @@ export type BuildDemoOptions = {
   courses?: string[];
   /** Sheets per course, default 3. Only sheets 1 and 2 are attempted. */
   sheetsPerCourse?: number;
+  /** Answer only the first N questions of each attempted sheet (default: all). */
+  questionsPerSheet?: number;
   seed?: number;
   /** The end of the history; read when the rows are backdated. */
   now?: () => Date;
@@ -271,7 +273,15 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     if (topic) entry.topics.push(topic);
     byId.set(question.id, entry);
   }
-  const plan = planDemoHistory([...byId.values()], { seed: options.seed ?? 2026, days: DAYS });
+  const limit = options.questionsPerSheet;
+  const chosen = [...byId.values()].filter(
+    (q) =>
+      limit === undefined ||
+      [...byId.values()].filter(
+        (o) => o.sheetId === q.sheetId && (o.position ?? 0) < (q.position ?? 0),
+      ).length < limit,
+  );
+  const plan = planDemoHistory(chosen, { seed: options.seed ?? 2026, days: DAYS });
   const description = new Map(DEMO_MISCONCEPTIONS.map((m) => [m.key, m.description]));
   log(`Planned ${plan.length} attempts: ${percent(mix(plan.map((a) => a.outcome)))}`);
 
