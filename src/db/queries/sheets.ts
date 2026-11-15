@@ -8,6 +8,8 @@ import { STALE_JOB_MS } from "@/lib/domain";
 import { MAX_IMAGES_PER_SHEET_UPLOAD, type UploadCheck } from "@/lib/storage/limits";
 import type { UploadPurpose } from "@/lib/storage/keys";
 
+import { liveCourse, liveSheet } from "./bin";
+
 /** One PDF, or up to 10 images; not both. */
 export function checkSheetFileSet(mimes: string[]): UploadCheck {
   if (mimes.length === 0) return { ok: false, message: "Upload a PDF or some images." };
@@ -60,13 +62,13 @@ export async function createSheetWithFiles(
   });
 }
 
-/** The course's sheets, newest first. Empty unless the course belongs to `userId`. */
+/** The course's sheets that are not in the bin, newest first. Empty unless the course is the user's and not binned. */
 export async function listSheets(userId: string, courseId: string) {
   const rows = await db
     .select({ sheet: sheets })
     .from(sheets)
     .innerJoin(courses, eq(sheets.courseId, courses.id))
-    .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId)))
+    .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId), liveSheet, liveCourse))
     .orderBy(desc(sheets.uploadedAt));
   return rows.map((row) => row.sheet);
 }

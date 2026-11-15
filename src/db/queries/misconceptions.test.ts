@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { db } from "@/db";
-import { getCourseMisconceptionState } from "@/db/queries/misconceptions";
+import { binSheet, restoreSheet } from "@/db/queries/bin";
+import {
+  findUnreadMarks,
+  getCourseMisconceptionState,
+  listMisconceptions,
+} from "@/db/queries/misconceptions";
 import {
   attempts,
   courses,
@@ -11,6 +16,7 @@ import {
   misconceptionSources,
   misconceptions,
   questions,
+  sheets,
   users,
 } from "@/db/schema";
 import { NotFoundError } from "@/lib/auth/ownership";
@@ -154,5 +160,82 @@ describe("getCourseMisconceptionState", () => {
     await expect(getCourseMisconceptionState(b.user.id, a.course.id)).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+});
+
+describe("common errors and the bin", () => {
+  it("does not count a mistake from a binned sheet, and counts it again after restore", async () => {
+    const w = await world("st-bin@test.local");
+    const [sheet] = await db
+      .insert(sheets)
+      .values({ courseId: w.course.id, title: "S", status: "ready" })
+      .returning();
+    const [q] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        sheetId: sheet.id,
+        position: 1,
+        label: "S1",
+        body: "B",
+        expectedMinutes: 5,
+      })
+      .returning();
+    const [attempt] = await db
+      .insert(attempts)
+      .values({ userId: w.user.id, questionId: q.id, context: "sheet" })
+      .returning();
+    const [mark] = await db
+      .insert(marks)
+      .values({
+        attemptId: attempt.id,
+        basis: "ai",
+        score: 2,
+        outcome: "partial",
+        mistakes: [],
+        feedback: "f",
+        overallFeedback: "o",
+      })
+      .returning();
+    const [both, onlyBinned] = await db
+      .insert(misconceptions)
+      .values([
+        { userId: w.user.id, courseId: w.course.id, description: "Both", errorType: "method" },
+        { userId: w.user.id, courseId: w.course.id, description: "Binned", errorType: "method" },
+      ])
+      .returning();
+    const source = (misconceptionId: string, m: { id: string }, a: { id: string }, i: number) => ({
+      misconceptionId,
+      markId: m.id,
+      mistakeIndex: i,
+      attemptId: a.id,
+      topicIds: [],
+      quote: "q",
+    });
+    await db
+      .insert(misconceptionSources)
+      .values([
+        source(both.id, w.mark, w.attempt, 0),
+        source(both.id, mark, attempt, 0),
+        source(onlyBinned.id, mark, attempt, 1),
+      ]);
+
+    const seen = async () =>
+      Object.fromEntries(
+        (await listMisconceptions(w.user.id, w.course.id)).map((m) => [m.description, m.timesSeen]),
+      );
+    const unread = async () =>
+      (await findUnreadMarks(w.user.id, w.course.id)).map((u) => u.attemptId).sort();
+
+    expect(await seen()).toEqual({ Both: 2, Binned: 1 });
+    expect(await unread()).toEqual([w.attempt.id, attempt.id].sort());
+
+    await binSheet(w.user.id, sheet.id);
+    expect(await seen()).toEqual({ Both: 1 });
+    expect(await unread()).toEqual([w.attempt.id]);
+
+    await restoreSheet(w.user.id, sheet.id);
+    expect(await seen()).toEqual({ Both: 2, Binned: 1 });
+    expect(await unread()).toEqual([w.attempt.id, attempt.id].sort());
   });
 });

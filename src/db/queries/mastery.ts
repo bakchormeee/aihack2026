@@ -24,6 +24,8 @@ import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { replayMastery, type MarkedAttempt } from "@/lib/mastery/mastery";
 import { gradeOf, replaySchedule, type Schedule } from "@/lib/spaced/review";
 
+import { binnedQuestionIdsOf, liveSheet } from "./bin";
+
 export type TopicMastery = {
   id: string;
   name: string;
@@ -56,6 +58,11 @@ async function revealedLevels(attemptIds: string[]): Promise<Map<string, number[
   return result;
 }
 
+/**
+ * Every topic of the course with its mastery, progress series and review schedule. An
+ * attempt on a binned question (SPEC-delete.md) is not evidence; spot-the-error answers
+ * belong to no sheet and always count.
+ */
 export async function getCourseMastery(userId: string, courseId: string): Promise<CourseMastery> {
   const topicRows = await db
     .select({ topic: topics })
@@ -71,9 +78,11 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
     .where(inArray(topicPrereqs.topicId, topicIds));
 
   // One row per (attempt, topic) for this user's attempts on this course's questions.
-  const rows = await db
+  const binned = await binnedQuestionIdsOf(courseId);
+  const allRows = await db
     .select({
       attemptId: attempts.id,
+      questionId: attempts.questionId,
       topicId: questionTopics.topicId,
       startedAt: attempts.startedAt,
       secondsSpent: attempts.secondsSpent,
@@ -90,6 +99,7 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
         inArray(questionTopics.topicId, topicIds),
       ),
     );
+  const rows = allRows.filter((r) => !binned.has(r.questionId));
 
   const attemptIds = [...new Set(rows.map((r) => r.attemptId))];
   const markRows = attemptIds.length
@@ -175,7 +185,7 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
   };
 }
 
-/** Sheet uploads and finished revision sessions of the course, oldest first, for the progress chart. */
+/** Sheet uploads (binned sheets left out) and finished revision sessions of the course, oldest first, for the progress chart. */
 export async function getCourseEvents(
   userId: string,
   courseId: string,
@@ -184,7 +194,7 @@ export async function getCourseEvents(
     .select({ at: sheets.uploadedAt, title: sheets.title })
     .from(sheets)
     .innerJoin(courses, eq(sheets.courseId, courses.id))
-    .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId)));
+    .where(and(eq(sheets.courseId, courseId), eq(courses.userId, userId), liveSheet));
   const sessionRows = await db
     .select({
       at: revisionSessions.createdAt,

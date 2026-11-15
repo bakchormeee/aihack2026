@@ -20,6 +20,8 @@ import { STALE_JOB_MS, type HintLevel } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import type { Candidate } from "@/lib/mastery/queue";
 
+import { binnedQuestionIdsOf } from "./bin";
+
 export class NoCandidatesError extends Error {
   constructor() {
     super("Nothing to revise yet");
@@ -30,14 +32,16 @@ export class NoCandidatesError extends Error {
 /**
  * Original questions worth retrying: the newest attempt that has a current mark
  * was not full, or was full with hint level 2 or 3. Only the user's own attempts
- * count. With `topicIds`, only questions tagged with one of them.
+ * count. With `topicIds`, only questions tagged with one of them. Questions in
+ * the bin are left out.
  */
 export async function listRetryCandidates(
   userId: string,
   courseId: string,
   topicIds?: string[] | null,
 ): Promise<Candidate[]> {
-  const rows = await db
+  const binned = await binnedQuestionIdsOf(courseId);
+  const allRows = await db
     .select({
       attemptId: attempts.id,
       questionId: questions.id,
@@ -55,6 +59,7 @@ export async function listRetryCandidates(
         eq(questions.source, "original"),
       ),
     );
+  const rows = allRows.filter((r) => !binned.has(r.questionId));
   if (rows.length === 0) return [];
 
   const attemptIds = rows.map((r) => r.attemptId);
@@ -135,10 +140,15 @@ export async function createRevisionSession(
   return session;
 }
 
-/** A session with its items in order. An item is done once the user submitted an attempt of it in this session. */
+/**
+ * A session with its items in order. An item is done once the user submitted an attempt
+ * of it in this session. Items on binned questions are left out; `allDeleted` is true
+ * when the session had items and every one of them is in the bin.
+ */
 export async function getRevisionSession(userId: string, sessionId: string) {
   const session = await requireRevisionSession(userId, sessionId);
-  const items = await db
+  const binned = await binnedQuestionIdsOf(session.courseId);
+  const allItems = await db
     .select({
       position: revisionItems.position,
       questionId: revisionItems.questionId,
@@ -152,6 +162,7 @@ export async function getRevisionSession(userId: string, sessionId: string) {
     .innerJoin(questions, eq(revisionItems.questionId, questions.id))
     .where(eq(revisionItems.sessionId, sessionId))
     .orderBy(asc(revisionItems.position));
+  const items = allItems.filter((item) => !binned.has(item.questionId));
 
   const submitted = await db
     .select({ questionId: attempts.questionId })
@@ -165,7 +176,11 @@ export async function getRevisionSession(userId: string, sessionId: string) {
       ),
     );
   const doneIds = new Set(submitted.map((s) => s.questionId));
-  return { session, items: items.map((item) => ({ ...item, done: doneIds.has(item.questionId) })) };
+  return {
+    session,
+    items: items.map((item) => ({ ...item, done: doneIds.has(item.questionId) })),
+    allDeleted: allItems.length > 0 && items.length === 0,
+  };
 }
 
 /** Puts a failed or stale `building` session back to `building`. True when this call did it. */
