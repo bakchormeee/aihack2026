@@ -20,6 +20,7 @@ import {
 import type { ErrorType, Outcome } from "@/lib/domain";
 
 import { startAttemptFor } from "./attempts";
+import { binCourse, binSheet, restoreSheet } from "./bin";
 import {
   claimSummary,
   failSummary,
@@ -555,5 +556,74 @@ describe("summary claim", () => {
     const other = await world("h-claim-u-other@test.local");
     expect(await claimSummary(other.user.id, w.sheet.id, at(1))).toBeNull();
     expect(await readSummary(other.user.id, w.sheet.id)).toBeNull();
+  });
+});
+
+describe("history and the bin", () => {
+  it("leaves a binned sheet and the variants of its questions out of the overview and the mistake log, until restored", async () => {
+    const w = await world("h-bin@test.local");
+    const [sheetB] = await db
+      .insert(sheets)
+      .values({ courseId: w.course.id, title: "Sheet B", status: "ready", uploadedAt: at(10) })
+      .returning();
+    const [qb] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        sheetId: sheetB.id,
+        position: 1,
+        label: "B1",
+        body: "B",
+        expectedMinutes: 5,
+      })
+      .returning();
+    const [variant] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        sheetId: null,
+        position: 1,
+        label: "1 (variant)",
+        body: "V",
+        expectedMinutes: 5,
+        source: "variant",
+        parentQuestionId: w.qs[0].id,
+      })
+      .returning();
+    const stuck = { marks: [{ score: 0, outcome: "stuck" as const, at: 30 }] };
+    await addAttempt(w.user.id, w.qs[0].id, { startedAt: 20, ...stuck });
+    await addAttempt(w.user.id, variant.id, { startedAt: 21, ...stuck });
+    await addAttempt(w.user.id, qb.id, { startedAt: 22, ...stuck });
+
+    const overviewIds = async () =>
+      (await getCourseSheetOverview(w.user.id, w.course.id)).map((o) => o.sheet.id).sort();
+    const mistakeQuestions = async () =>
+      (await listMistakes(w.user.id, w.course.id, {})).items.map((i) => i.questionId).sort();
+
+    expect(await overviewIds()).toEqual([w.sheet.id, sheetB.id].sort());
+    expect(await mistakeQuestions()).toEqual([w.qs[0].id, variant.id, qb.id].sort());
+
+    await binSheet(w.user.id, w.sheet.id);
+    expect(await overviewIds()).toEqual([sheetB.id]);
+    expect(await mistakeQuestions()).toEqual([qb.id]);
+    expect(await getSheetHistory(w.user.id, w.sheet.id)).toEqual([]);
+
+    await restoreSheet(w.user.id, w.sheet.id);
+    expect(await overviewIds()).toEqual([w.sheet.id, sheetB.id].sort());
+    expect(await mistakeQuestions()).toEqual([w.qs[0].id, variant.id, qb.id].sort());
+    expect(await getSheetHistory(w.user.id, w.sheet.id)).toHaveLength(2);
+  });
+
+  it("shows nothing of a binned course", async () => {
+    const w = await world("h-bin-course@test.local");
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 0, outcome: "stuck", at: 2 }],
+    });
+    await binCourse(w.user.id, w.course.id);
+
+    expect(await getCourseSheetOverview(w.user.id, w.course.id)).toEqual([]);
+    expect((await listMistakes(w.user.id, w.course.id, {})).items).toEqual([]);
+    expect(await getSheetHistory(w.user.id, w.sheet.id)).toEqual([]);
   });
 });

@@ -20,7 +20,7 @@ export const maxDuration = 300;
 export default async function RevisionSessionPage({ params }: PageProps<"/revise/[sessionId]">) {
   const user = await requireUser();
   const { sessionId } = await params;
-  const { session, items } = await orNotFound(getRevisionSession(user.id, sessionId));
+  const { session, items, allDeleted } = await orNotFound(getRevisionSession(user.id, sessionId));
   if (session.mode === "spot_error")
     return <SpotSessionView userId={user.id} sessionId={sessionId} />;
 
@@ -58,7 +58,11 @@ export default async function RevisionSessionPage({ params }: PageProps<"/revise
         </Panel>
       ) : null}
 
-      {session.status === "ready" ? (
+      {session.status === "ready" && allDeleted ? (
+        <p className="text-muted-foreground">The questions in this session were deleted.</p>
+      ) : null}
+
+      {session.status === "ready" && !allDeleted ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted-foreground tabular-nums">

@@ -1,9 +1,11 @@
 // Course queries (task M1). A course is one university module.
 
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { courses } from "@/db/schema";
+
+import { liveCourse } from "./bin";
 
 export class CourseNameError extends Error {
   constructor(message: string) {
@@ -19,11 +21,12 @@ export function normaliseCourseName(raw: string): string {
   return name;
 }
 
+/** The user's courses that are not in the bin, newest first. */
 export async function listCourses(userId: string) {
   return db
     .select()
     .from(courses)
-    .where(eq(courses.userId, userId))
+    .where(and(eq(courses.userId, userId), liveCourse))
     .orderBy(desc(courses.createdAt));
 }
 

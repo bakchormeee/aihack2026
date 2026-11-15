@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "@/db";
@@ -157,5 +158,102 @@ describe("ownership helpers", () => {
 
     await expect(requireQuestion(alice.user.id, variant.id)).rejects.toBeInstanceOf(NotFoundError);
     expect((await requireQuestion(bob.user.id, variant.id)).id).toBe(variant.id);
+  });
+});
+
+describe("ownership helpers and the bin", () => {
+  /** A chain whose question has a variant, and the variant a variant of its own. */
+  async function chainWithVariants(email: string) {
+    const chain = await createChain(email);
+    const variant = async (parentId: string) =>
+      (
+        await db
+          .insert(questions)
+          .values({
+            courseId: chain.course.id,
+            sheetId: null,
+            position: 1,
+            label: "V",
+            body: "V",
+            expectedMinutes: 5,
+            source: "variant",
+            parentQuestionId: parentId,
+          })
+          .returning()
+      )[0];
+    const v1 = await variant(chain.question.id);
+    const v2 = await variant(v1.id);
+    const [v2Attempt] = await db
+      .insert(attempts)
+      .values({ userId: chain.user.id, questionId: v2.id, context: "revision" })
+      .returning();
+    // A second sheet that stays out of the bin.
+    const [other] = await db
+      .insert(sheets)
+      .values({ courseId: chain.course.id, title: "Sheet 2" })
+      .returning();
+    const [otherQuestion] = await db
+      .insert(questions)
+      .values({
+        courseId: chain.course.id,
+        sheetId: other.id,
+        position: 1,
+        label: "1",
+        body: "Q",
+        expectedMinutes: 5,
+      })
+      .returning();
+    return { ...chain, v1, v2, v2Attempt, other, otherQuestion };
+  }
+
+  const refused = (p: Promise<unknown>) => expect(p).rejects.toBeInstanceOf(NotFoundError);
+
+  it("refuses everything in a binned course", async () => {
+    const c = await chainWithVariants("bin-course@test.local");
+    await db.update(courses).set({ deletedAt: new Date() }).where(eq(courses.id, c.course.id));
+    const u = c.user.id;
+
+    await refused(requireCourse(u, c.course.id));
+    await refused(requireSheet(u, c.sheet.id));
+    await refused(requireSheet(u, c.other.id));
+    await refused(requireQuestion(u, c.question.id));
+    await refused(requireQuestion(u, c.v2.id));
+    await refused(requireAttempt(u, c.attempt.id));
+    await refused(requireSheetFile(u, c.sheetFile.id));
+    await refused(requireSubmissionFile(u, c.submissionFile.id));
+    await refused(requireRevisionSession(u, c.session.id));
+  });
+
+  it("refuses a binned sheet with its questions, their variants, attempts and files", async () => {
+    const c = await chainWithVariants("bin-sheet@test.local");
+    await db.update(sheets).set({ deletedAt: new Date() }).where(eq(sheets.id, c.sheet.id));
+    const u = c.user.id;
+
+    await refused(requireSheet(u, c.sheet.id));
+    await refused(requireQuestion(u, c.question.id));
+    await refused(requireQuestion(u, c.v1.id));
+    await refused(requireQuestion(u, c.v2.id));
+    await refused(requireAttempt(u, c.attempt.id));
+    await refused(requireAttempt(u, c.v2Attempt.id));
+    await refused(requireSheetFile(u, c.sheetFile.id));
+    await refused(requireSubmissionFile(u, c.submissionFile.id));
+
+    // The course, the other sheet and the revision session are still there.
+    expect((await requireCourse(u, c.course.id)).id).toBe(c.course.id);
+    expect((await requireSheet(u, c.other.id)).id).toBe(c.other.id);
+    expect((await requireQuestion(u, c.otherQuestion.id)).id).toBe(c.otherQuestion.id);
+    expect((await requireRevisionSession(u, c.session.id)).id).toBe(c.session.id);
+  });
+
+  it("gives everything back once the bin date is cleared", async () => {
+    const c = await chainWithVariants("bin-back@test.local");
+    await db.update(sheets).set({ deletedAt: new Date() }).where(eq(sheets.id, c.sheet.id));
+    await db.update(sheets).set({ deletedAt: null }).where(eq(sheets.id, c.sheet.id));
+
+    expect((await requireQuestion(c.user.id, c.v2.id)).id).toBe(c.v2.id);
+    expect((await requireAttempt(c.user.id, c.v2Attempt.id)).id).toBe(c.v2Attempt.id);
+    expect((await requireSubmissionFile(c.user.id, c.submissionFile.id)).id).toBe(
+      c.submissionFile.id,
+    );
   });
 });

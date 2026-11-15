@@ -3,7 +3,23 @@ import { describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 
+import { binCourse, restoreCourse } from "./bin";
 import { CourseNameError, createCourse, listCourses, normaliseCourseName } from "./courses";
+
+describe("listCourses and the bin", () => {
+  it("leaves out a binned course until it is restored", async () => {
+    const [user] = await db.insert(users).values({ email: "c-bin@test.local" }).returning();
+    const kept = await createCourse(user.id, "Kept");
+    const binned = await createCourse(user.id, "Binned");
+    expect(await listCourses(user.id)).toHaveLength(2);
+
+    await binCourse(user.id, binned.id);
+    expect((await listCourses(user.id)).map((c) => c.id)).toEqual([kept.id]);
+
+    await restoreCourse(user.id, binned.id);
+    expect(await listCourses(user.id)).toHaveLength(2);
+  });
+});
 
 async function newUser(email: string) {
   const [user] = await db.insert(users).values({ email }).returning();

@@ -23,6 +23,7 @@ import type { ErrorType, HintLevel, MarkBasis, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
 
+import { binnedQuestionIdsOf, liveCourse } from "./bin";
 import { listSheets } from "./sheets";
 
 type Mark = typeof marks.$inferSelect;
@@ -63,6 +64,7 @@ const isSubmitted = (a: AttemptRecord) => a.submission?.submittedAt != null;
 /**
  * Loads the user's questions (all of a course, or of one sheet) with every
  * attempt, its working, hint reveals and marks. Questions come in sheet order.
+ * Work in the bin (a binned course or sheet, with the variants of its questions) is left out.
  */
 async function loadRecords(
   userId: string,
@@ -72,13 +74,16 @@ async function loadRecords(
     "sheetId" in where
       ? eq(questions.sheetId, where.sheetId)
       : eq(questions.courseId, where.courseId);
-  const rows = await db
+  const all = await db
     .select({ question: questions, sheetTitle: sheets.title, sheetUploadedAt: sheets.uploadedAt })
     .from(questions)
     .innerJoin(courses, eq(questions.courseId, courses.id))
     .leftJoin(sheets, eq(questions.sheetId, sheets.id))
-    .where(and(scope, eq(courses.userId, userId)))
+    .where(and(scope, eq(courses.userId, userId), liveCourse))
     .orderBy(asc(questions.position));
+  if (all.length === 0) return [];
+  const binned = await binnedQuestionIdsOf(all[0].question.courseId);
+  const rows = all.filter((row) => !binned.has(row.question.id));
   if (rows.length === 0) return [];
   const questionIds = rows.map((row) => row.question.id);
 

@@ -16,7 +16,8 @@ import {
   questions,
   topics,
 } from "@/db/schema";
-import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
+import { binnedQuestionIdsOf, ownsCourse } from "@/db/queries/bin";
+import { NotFoundError } from "@/lib/auth/ownership";
 import { STALE_JOB_MS, type ErrorType } from "@/lib/domain";
 import { currentMark } from "@/lib/marking/rules";
 import { timesSeen } from "@/lib/spot/rules";
@@ -47,19 +48,34 @@ async function currentMarks(attemptIds: string[]): Promise<Map<string, MarkRow>>
   return result;
 }
 
-/** Every misconception of the course, hidden ones included, most often seen first. */
+/** Those of the given attempts that are on a question in the bin. */
+async function binnedAttemptIds(courseId: string, attemptIds: string[]): Promise<Set<string>> {
+  const binned = await binnedQuestionIdsOf(courseId);
+  if (binned.size === 0 || attemptIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: attempts.id, questionId: attempts.questionId })
+    .from(attempts)
+    .where(inArray(attempts.id, [...new Set(attemptIds)]));
+  return new Set(rows.filter((r) => binned.has(r.questionId)).map((r) => r.id));
+}
+
+/**
+ * Every misconception of the course, hidden ones included, most often seen first. A
+ * binned course is allowed here, so a spot-the-error job that runs while the course is
+ * binned still finishes; pages reach this only through a guarded course.
+ */
 export async function listMisconceptions(
   userId: string,
   courseId: string,
 ): Promise<MisconceptionView[]> {
-  await requireCourse(userId, courseId);
+  if (!(await ownsCourse(userId, courseId))) throw new NotFoundError();
   const rows = await db
     .select()
     .from(misconceptions)
     .where(and(eq(misconceptions.userId, userId), eq(misconceptions.courseId, courseId)));
   if (rows.length === 0) return [];
 
-  const sources = await db
+  const allSources = await db
     .select()
     .from(misconceptionSources)
     .where(
@@ -68,9 +84,20 @@ export async function listMisconceptions(
         rows.map((r) => r.id),
       ),
     );
+  // A mistake in binned work does not count; a misconception seen only there is left out.
+  const binnedAttempts = await binnedAttemptIds(
+    courseId,
+    allSources.map((s) => s.attemptId),
+  );
+  const sources = allSources.filter((s) => !binnedAttempts.has(s.attemptId));
+  const shown = rows.filter(
+    (row) =>
+      sources.some((s) => s.misconceptionId === row.id) ||
+      !allSources.some((s) => s.misconceptionId === row.id),
+  );
   const current = await currentMarks([...new Set(sources.map((s) => s.attemptId))]);
 
-  const views = rows.map((row): MisconceptionView => {
+  const views = shown.map((row): MisconceptionView => {
     const mine = sources.filter((s) => s.misconceptionId === row.id);
     const counting = mine.filter((s) => current.get(s.attemptId)?.id === s.markId);
     const newest = counting.reduce<(typeof counting)[number] | null>(
@@ -117,13 +144,19 @@ export type UnreadMark = {
   topics: { id: string; name: string }[];
 };
 
-/** The current marks of the user's attempts in the course that the grouping job has not read yet. */
+/**
+ * The current marks of the user's attempts in the course that the grouping job has not
+ * read yet. Attempts on binned questions wait until they are restored.
+ */
 export async function findUnreadMarks(userId: string, courseId: string): Promise<UnreadMark[]> {
-  const attemptRows = await db
-    .select({ id: attempts.id, questionId: attempts.questionId })
-    .from(attempts)
-    .innerJoin(questions, eq(attempts.questionId, questions.id))
-    .where(and(eq(attempts.userId, userId), eq(questions.courseId, courseId)));
+  const binned = await binnedQuestionIdsOf(courseId);
+  const attemptRows = (
+    await db
+      .select({ id: attempts.id, questionId: attempts.questionId })
+      .from(attempts)
+      .innerJoin(questions, eq(attempts.questionId, questions.id))
+      .where(and(eq(attempts.userId, userId), eq(questions.courseId, courseId)))
+  ).filter((a) => !binned.has(a.questionId));
   const current = await currentMarks(attemptRows.map((a) => a.id));
   if (current.size === 0) return [];
 

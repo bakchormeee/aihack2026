@@ -12,12 +12,14 @@ import {
   questionTopics,
   revisionItems,
   revisionSessions,
+  sheets,
   submissions,
   topics,
   users,
 } from "@/db/schema";
 import { NotFoundError } from "@/lib/auth/ownership";
 
+import { binSheet, restoreSheet } from "./bin";
 import {
   createRevisionSession,
   getRevisionSession,
@@ -300,5 +302,83 @@ describe("getRevisionSession and requeue", () => {
       await db.select().from(revisionSessions).where(eq(revisionSessions.id, failed.id))
     )[0];
     expect(row.status).toBe("building");
+  });
+});
+
+describe("revision and the bin", () => {
+  async function withBinnableSheet(email: string) {
+    const w = await setup(email);
+    const [sheet] = await db
+      .insert(sheets)
+      .values({ courseId: w.course.id, title: "S", status: "ready" })
+      .returning();
+    const onSheet = await question(w.course.id, [w.t1.id], { position: 1 });
+    await db.update(questions).set({ sheetId: sheet.id }).where(eq(questions.id, onSheet.id));
+    const [variant] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        position: 1,
+        label: "Q1 (variant)",
+        body: "V",
+        expectedMinutes: 10,
+        source: "variant",
+        parentQuestionId: onSheet.id,
+      })
+      .returning();
+    const kept = await question(w.course.id, [w.t2.id], { position: 2 });
+    return { ...w, sheet, onSheet, variant, kept };
+  }
+
+  it("leaves binned questions out of the retry candidates until restored", async () => {
+    const w = await withBinnableSheet("rv-bin-cand@test.local");
+    await attempt(w.user.id, w.onSheet.id, "stuck", 2);
+    await attempt(w.user.id, w.kept.id, "stuck", 1);
+    const ids = async () =>
+      (await listRetryCandidates(w.user.id, w.course.id)).map((c) => c.questionId).sort();
+
+    expect(await ids()).toEqual([w.onSheet.id, w.kept.id].sort());
+    await binSheet(w.user.id, w.sheet.id);
+    expect(await ids()).toEqual([w.kept.id]);
+    await restoreSheet(w.user.id, w.sheet.id);
+    expect(await ids()).toEqual([w.onSheet.id, w.kept.id].sort());
+  });
+
+  it("leaves items on binned questions out of a session, and says so when none is left", async () => {
+    const w = await withBinnableSheet("rv-bin-session@test.local");
+    const session = async (items: string[], status: "ready" | "building" = "ready") => {
+      const [s] = await db
+        .insert(revisionSessions)
+        .values({ userId: w.user.id, courseId: w.course.id, targetMinutes: 20, status })
+        .returning();
+      if (items.length === 0) return s;
+      await db.insert(revisionItems).values(
+        items.map((questionId, i) => ({
+          sessionId: s.id,
+          questionId,
+          position: i + 1,
+          source: "retry" as const,
+          reason: "r",
+        })),
+      );
+      return s;
+    };
+    const mixed = await session([w.onSheet.id, w.variant.id, w.kept.id]);
+    const onlyBinned = await session([w.onSheet.id, w.variant.id]);
+    const empty = await session([], "building");
+    const view = (id: string) => getRevisionSession(w.user.id, id);
+
+    expect((await view(mixed.id)).items).toHaveLength(3);
+    expect((await view(onlyBinned.id)).allDeleted).toBe(false);
+
+    await binSheet(w.user.id, w.sheet.id);
+    expect((await view(mixed.id)).items.map((i) => i.questionId)).toEqual([w.kept.id]);
+    expect((await view(mixed.id)).allDeleted).toBe(false);
+    expect(await view(onlyBinned.id)).toMatchObject({ items: [], allDeleted: true });
+    // A session still being built has no items yet; that is not "deleted".
+    expect((await view(empty.id)).allDeleted).toBe(false);
+
+    await restoreSheet(w.user.id, w.sheet.id);
+    expect((await view(onlyBinned.id)).items).toHaveLength(2);
   });
 });

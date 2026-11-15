@@ -16,6 +16,7 @@ import {
   setTimerEnabled,
   titleFromFileName,
 } from "./sheets";
+import { binCourse, binSheet, restoreCourse, restoreSheet } from "./bin";
 
 async function userWithCourse(email: string) {
   const [user] = await db.insert(users).values({ email }).returning();
@@ -25,6 +26,27 @@ async function userWithCourse(email: string) {
     .returning();
   return { user, course };
 }
+
+describe("listSheets and the bin", () => {
+  it("leaves out a binned sheet, and every sheet of a binned course, until restored", async () => {
+    const { user, course } = await userWithCourse("s-bin@test.local");
+    const pdf = (path: string) => [{ path, mime: "application/pdf" }];
+    const a = await createSheetWithFiles(course.id, "A", pdf("u/x/a.pdf"));
+    const b = await createSheetWithFiles(course.id, "B", pdf("u/x/b.pdf"));
+    const ids = async () => (await listSheets(user.id, course.id)).map((s) => s.id).sort();
+    expect(await ids()).toEqual([a.id, b.id].sort());
+
+    await binSheet(user.id, a.id);
+    expect(await ids()).toEqual([b.id]);
+    await binCourse(user.id, course.id);
+    expect(await ids()).toEqual([]);
+
+    await restoreCourse(user.id, course.id);
+    expect(await ids()).toEqual([b.id]);
+    await restoreSheet(user.id, a.id);
+    expect(await ids()).toEqual([a.id, b.id].sort());
+  });
+});
 
 describe("checkSheetFileSet", () => {
   const pdf = "application/pdf";

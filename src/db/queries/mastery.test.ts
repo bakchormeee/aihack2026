@@ -16,6 +16,7 @@ import {
   users,
 } from "@/db/schema";
 
+import { binSheet, restoreSheet } from "./bin";
 import { getCourseEvents, getCourseMastery } from "./mastery";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -350,5 +351,68 @@ describe("getCourseEvents", () => {
       ["revision", "Spot the error, 10 questions"],
     ]);
     expect(await getCourseEvents(b.user.id, a.course.id)).toEqual([]);
+  });
+});
+
+describe("mastery, the progress chart and the bin", () => {
+  it("leaves out attempts on a binned sheet and its variants, and gives them back on restore", async () => {
+    const w = await setup("m-bin@test.local");
+    const [sheet] = await db
+      .insert(sheets)
+      .values({ courseId: w.course.id, title: "Binned", status: "ready" })
+      .returning();
+    const [onSheet] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        sheetId: sheet.id,
+        position: 1,
+        label: "S1",
+        body: "B",
+        expectedMinutes: 10,
+      })
+      .returning();
+    const [variant] = await db
+      .insert(questions)
+      .values({
+        courseId: w.course.id,
+        position: 1,
+        label: "S1 (variant)",
+        body: "V",
+        expectedMinutes: 10,
+        source: "variant",
+        parentQuestionId: onSheet.id,
+      })
+      .returning();
+    await db.insert(questionTopics).values([
+      { questionId: onSheet.id, topicId: w.algebra.id },
+      { questionId: variant.id, topicId: w.algebra.id },
+    ]);
+    await attemptWithMark(w.user.id, w.question.id, "stuck", "ai", 3);
+    await attemptWithMark(w.user.id, onSheet.id, "full", "ai", 2);
+    await attemptWithMark(w.user.id, variant.id, "full", "ai", 1);
+
+    const algebra = async () =>
+      (await getCourseMastery(w.user.id, w.course.id)).topics.find((t) => t.id === w.algebra.id)!;
+    const eventTitles = async () =>
+      (await getCourseEvents(w.user.id, w.course.id)).map((e) => e.label);
+    const before = await algebra();
+    expect(before.attempts).toBe(3);
+    expect(await eventTitles()).toEqual(["Binned"]);
+
+    await binSheet(w.user.id, sheet.id);
+    const binned = await algebra();
+    expect(binned.attempts).toBe(1);
+    expect(binned.series).toHaveLength(1);
+    expect(binned.mastery).toBeLessThan(before.mastery!);
+    // The review date moves back to the last attempt that still counts.
+    expect(binned.review!.lastDay).toBeLessThan(before.review!.lastDay);
+    expect(await eventTitles()).toEqual([]);
+
+    await restoreSheet(w.user.id, sheet.id);
+    const restored = await algebra();
+    expect(restored.attempts).toBe(3);
+    expect(restored.mastery).toBeCloseTo(before.mastery!);
+    expect(await eventTitles()).toEqual(["Binned"]);
   });
 });

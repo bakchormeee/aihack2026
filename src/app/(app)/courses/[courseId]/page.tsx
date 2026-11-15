@@ -9,6 +9,12 @@ import { listSheets } from "@/db/queries/sheets";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireCourse } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { deleteSentence } from "@/lib/bin/rules";
+import { DeleteDialog } from "@/components/delete-dialog";
+import { DeletedNotice } from "@/components/deleted-notice";
+import { countWhatGoes } from "@/db/queries/bin";
+
+import { deleteCourseAction } from "./delete-actions";
 
 export default async function CoursePage({
   params,
@@ -18,11 +24,25 @@ export default async function CoursePage({
   const { courseId } = await params;
   const course = await orNotFound(requireCourse(user.id, courseId));
   const sheets = await listSheets(user.id, courseId);
+  const query = await searchParams;
+  const deleteCourse = (
+    <DeleteDialog
+      label="Delete course"
+      sentence={deleteSentence({
+        kind: "course",
+        name: course.name,
+        ...(await countWhatGoes(user.id, { courseId })),
+      })}
+      action={deleteCourseAction.bind(null, course.id)}
+    />
+  );
+  const notice = query.deleted ? <DeletedNotice /> : null;
 
   if (sheets.length === 0) {
     return (
       <section className="flex flex-col gap-6">
-        <PageHeader title={course.name} />
+        {notice}
+        <PageHeader title={course.name} actions={deleteCourse} />
         <EmptyState
           action={
             <Link href={`/courses/${course.id}/sheets`} className={buttonVariants()}>
@@ -37,13 +57,15 @@ export default async function CoursePage({
   }
 
   const { topics, prereqs } = await getCourseMastery(user.id, courseId);
-  const rawTopic = (await searchParams).topic;
+  const rawTopic = query.topic;
   const selected = topics.find((t) => t.id === (Array.isArray(rawTopic) ? rawTopic[0] : rawTopic));
 
   return (
     <section className="flex flex-col gap-6">
+      {notice}
       <PageHeader
         title={course.name}
+        actions={deleteCourse}
         description={
           topics.length > 0
             ? "Colour shows mastery, size shows attempts, faded means little evidence yet. Select a topic."
