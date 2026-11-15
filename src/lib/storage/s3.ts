@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -90,4 +91,18 @@ export async function putObject(key: string, body: Buffer, contentType: string):
 
 export async function deleteObject(key: string): Promise<void> {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+}
+
+/** Every key that starts with `prefix`, reading all pages of the listing. */
+export async function listObjects(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let token: string | undefined;
+  do {
+    const page = await s3().send(
+      new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }),
+    );
+    for (const item of page.Contents ?? []) if (item.Key) keys.push(item.Key);
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return keys;
 }

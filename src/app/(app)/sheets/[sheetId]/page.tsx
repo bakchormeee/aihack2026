@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
@@ -11,6 +12,7 @@ import { orNotFound } from "@/lib/auth/guards";
 import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { isStale } from "@/lib/pipeline/stale";
+import { deleteBatchPhotos } from "@/lib/storage/batch-photos";
 
 import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
 
@@ -27,6 +29,12 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
   const user = await requireUser();
   const { sheetId } = await params;
   const sheet = await orNotFound(requireSheet(user.id, sheetId));
+  // Photos of a batch upload that was left without confirming (SPEC-batch-working.md).
+  after(() =>
+    deleteBatchPhotos(user.id, sheet.id).catch((error) =>
+      console.error(`deleting leftover batch photos of sheet ${sheet.id} failed`, error),
+    ),
+  );
   const questions = sheet.status === "ready" ? await listQuestionsWithTopics(user.id, sheetId) : [];
 
   const stuck = sheet.status === "parsing" && isStale(sheet.statusUpdatedAt);

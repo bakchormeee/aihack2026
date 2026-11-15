@@ -1,7 +1,8 @@
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/db";
-import { courses, questions, sheets, users } from "@/db/schema";
+import { attempts, courses, questions, sheets, submissions, users } from "@/db/schema";
 import { DEMO_AI_LIMIT_MESSAGE } from "@/lib/ai/budget";
 import { setAiClient, type AiClient } from "@/lib/ai/client";
 import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
@@ -28,7 +29,12 @@ vi.mock("@/lib/storage/s3", () => ({
   listObjects: async (prefix: string) => [...stored.keys()].filter((k) => k.startsWith(prefix)),
 }));
 
-import { proposeBatchAction } from "./actions";
+import {
+  cancelBatchAction,
+  openBatchAttemptsAction,
+  proposeBatchAction,
+  submitBatchAction,
+} from "./actions";
 
 const MATCH_FAILED = "The photos could not be read. Try again, or attach working on each question.";
 
@@ -150,7 +156,6 @@ describe("proposeBatchAction", () => {
 
   it("passes on a reason the student can act on", async () => {
     const { sheet, photo } = await setup("ba-notready@test.local");
-    const { eq } = await import("drizzle-orm");
     await db.update(sheets).set({ status: "parsing" }).where(eq(sheets.id, sheet.id));
 
     expect(await proposeBatchAction({ sheetId: sheet.id, photoKeys: [photo(1)] })).toEqual({
@@ -191,5 +196,195 @@ describe("proposeBatchAction", () => {
       error: DEMO_AI_LIMIT_MESSAGE,
     });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("openBatchAttemptsAction", () => {
+  it("opens an attempt for each confirmed question and nothing else", async () => {
+    const { user, sheet, qs } = await setup("ba-attempts@test.local");
+
+    const result = await openBatchAttemptsAction({
+      sheetId: sheet.id,
+      questionIds: [qs[0].id, qs[2].id],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.attempts.map((a) => a.questionId)).toEqual([qs[0].id, qs[2].id]);
+    expect(await db.select().from(attempts).where(eq(attempts.userId, user.id))).toHaveLength(2);
+  });
+
+  it("refuses a question of another sheet, an empty list, a demo copy without calls, and gives a 404 for another user's sheet", async () => {
+    const other = await setup("ba-attempts-other@test.local");
+    const { user, sheet, qs } = await setup("ba-attempts-refuse@test.local");
+
+    expect(
+      await openBatchAttemptsAction({ sheetId: sheet.id, questionIds: [other.qs[0].id] }),
+    ).toEqual({ ok: false, error: "A region was given to a question that cannot take working." });
+    expect(await openBatchAttemptsAction({ sheetId: sheet.id, questionIds: [] })).toEqual({
+      ok: false,
+      error: "Give at least one region to a question.",
+    });
+    await expect(
+      openBatchAttemptsAction({ sheetId: other.sheet.id, questionIds: [other.qs[0].id] }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    await makeDemoCopy(user.id, 29);
+    expect(
+      await openBatchAttemptsAction({ sheetId: sheet.id, questionIds: [qs[0].id, qs[1].id] }),
+    ).toEqual({ ok: false, error: DEMO_AI_LIMIT_MESSAGE });
+    expect(await db.select().from(attempts).where(eq(attempts.userId, user.id))).toEqual([]);
+  });
+});
+
+describe("submitBatchAction", () => {
+  async function ready(email: string) {
+    const s = await setup(email);
+    const opened = await openBatchAttemptsAction({
+      sheetId: s.sheet.id,
+      questionIds: [s.qs[0].id, s.qs[1].id],
+    });
+    if (!opened.ok) throw new Error(opened.error);
+    const cropKey = (index: number, n: number) => {
+      const key = `u/${s.user.id}/working/${opened.attempts[index].attemptId}/c${n}.jpg`;
+      stored.set(key, { mime: "image/jpeg", size: 500 });
+      return key;
+    };
+    return { ...s, attempts: opened.attempts, cropKey };
+  }
+
+  it("submits each question with its crops, claims the marks, marks in the background and deletes the photos", async () => {
+    const { sheet, qs, attempts: opened, cropKey, photo } = await ready("ba-submit@test.local");
+    const photos = [photo(1), photo(2)];
+
+    const result = await submitBatchAction({
+      sheetId: sheet.id,
+      questions: [
+        { questionId: qs[0].id, cropKeys: [cropKey(0, 1), cropKey(0, 2)] },
+        { questionId: qs[1].id, cropKeys: [cropKey(1, 3)] },
+      ],
+    });
+
+    expect(result).toEqual({ ok: true });
+    for (const { attemptId } of opened) {
+      const [submission] = await db
+        .select()
+        .from(submissions)
+        .where(eq(submissions.attemptId, attemptId));
+      expect(submission.submittedAt).not.toBeNull();
+      expect(submission.markStatus).toBe("pending");
+    }
+    expect(after).toHaveBeenCalledTimes(1);
+    for (const key of photos) expect(stored.has(key)).toBe(false);
+  });
+
+  it("saves nothing and deletes the unused crops when a key is wrong", async () => {
+    const { sheet, qs, attempts: opened, cropKey, photo } = await ready("ba-submit-bad@test.local");
+    const kept = photo(1);
+    const good = cropKey(0, 1);
+    const wrongFolder = cropKey(0, 2); // uploaded for question 1's attempt, given to question 2
+
+    const result = await submitBatchAction({
+      sheetId: sheet.id,
+      questions: [
+        { questionId: qs[0].id, cropKeys: [good] },
+        { questionId: qs[1].id, cropKeys: [wrongFolder] },
+      ],
+    });
+
+    expect(result).toEqual({ ok: false, error: "A crop was not uploaded for its question." });
+    expect(
+      await db.select().from(submissions).where(eq(submissions.attemptId, opened[0].attemptId)),
+    ).toEqual([]);
+    expect(stored.has(good)).toBe(false);
+    expect(stored.has(wrongFolder)).toBe(false);
+    expect(stored.has(kept)).toBe(true);
+    expect(after).not.toHaveBeenCalled();
+
+    // Another user's key is refused and never deleted.
+    const foreign = `u/someone-else/working/${opened[0].attemptId}/x.jpg`;
+    stored.set(foreign, { mime: "image/jpeg", size: 5 });
+    expect(
+      await submitBatchAction({
+        sheetId: sheet.id,
+        questions: [{ questionId: qs[0].id, cropKeys: [foreign] }],
+      }),
+    ).toEqual({ ok: false, error: "That file does not belong to you." });
+    expect(stored.has(foreign)).toBe(true);
+  });
+
+  it("refuses a crop that did not finish uploading, and an empty confirmation", async () => {
+    const { sheet, qs, attempts: opened, user } = await ready("ba-submit-missing@test.local");
+    const missing = `u/${user.id}/working/${opened[0].attemptId}/missing.jpg`;
+
+    expect(
+      await submitBatchAction({
+        sheetId: sheet.id,
+        questions: [{ questionId: qs[0].id, cropKeys: [missing] }],
+      }),
+    ).toEqual({ ok: false, error: "The upload did not finish. Please try again." });
+    expect(await submitBatchAction({ sheetId: sheet.id, questions: [] })).toEqual({
+      ok: false,
+      error: "Give at least one region to a question.",
+    });
+  });
+
+  it("refuses a demo copy without one call for each question, and another user's sheet", async () => {
+    const { user, sheet, qs, cropKey } = await ready("ba-submit-demo@test.local");
+    const other = await setup("ba-submit-demo-other@test.local");
+    signedIn.id = user.id;
+    await makeDemoCopy(user.id, 29);
+
+    expect(
+      await submitBatchAction({
+        sheetId: sheet.id,
+        questions: [
+          { questionId: qs[0].id, cropKeys: [cropKey(0, 1)] },
+          { questionId: qs[1].id, cropKeys: [cropKey(1, 2)] },
+        ],
+      }),
+    ).toEqual({ ok: false, error: DEMO_AI_LIMIT_MESSAGE });
+    await expect(
+      submitBatchAction({
+        sheetId: other.sheet.id,
+        questions: [{ questionId: other.qs[0].id, cropKeys: [cropKey(0, 1)] }],
+      }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("still succeeds when deleting the photos fails", async () => {
+    const { sheet, qs, cropKey } = await ready("ba-submit-delete-fails@test.local");
+    const storage = await import("@/lib/storage/s3");
+    vi.spyOn(storage, "listObjects").mockRejectedValueOnce(new Error("storage down"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(
+      await submitBatchAction({
+        sheetId: sheet.id,
+        questions: [{ questionId: qs[0].id, cropKeys: [cropKey(0, 1)] }],
+      }),
+    ).toEqual({ ok: true });
+    expect(log).toHaveBeenCalled();
+  });
+});
+
+describe("cancelBatchAction", () => {
+  it("deletes every batch photo of the sheet and nothing else", async () => {
+    const { user, sheet, photo } = await setup("ba-cancel@test.local");
+    const keys = [photo(1), photo(2)];
+    const elsewhere = `u/${user.id}/batch/other-sheet/p.jpg`;
+    stored.set(elsewhere, { mime: "image/jpeg", size: 1 });
+
+    await cancelBatchAction({ sheetId: sheet.id });
+
+    for (const key of keys) expect(stored.has(key)).toBe(false);
+    expect(stored.has(elsewhere)).toBe(true);
+    expect(await db.select().from(attempts).where(eq(attempts.userId, user.id))).toEqual([]);
+  });
+
+  it("gives another user's sheet the 404 page", async () => {
+    const { sheet } = await setup("ba-cancel-owner@test.local");
+    await setup("ba-cancel-intruder@test.local");
+    await expect(cancelBatchAction({ sheetId: sheet.id })).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

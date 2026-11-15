@@ -1,7 +1,7 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const send = vi.fn(async (command: unknown) => {
+const send = vi.fn(async (command: unknown): Promise<unknown> => {
   void command;
   return {};
 });
@@ -14,7 +14,7 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({
   },
 }));
 
-const { putObject } = await import("./s3");
+const { listObjects, putObject } = await import("./s3");
 
 beforeEach(() => {
   send.mockClear();
@@ -46,5 +46,33 @@ describe("putObject", () => {
     vi.stubEnv("S3_BUCKET", "");
     await expect(putObject("k", Buffer.from("x"), "application/pdf")).rejects.toThrow(/S3_BUCKET/);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("listObjects", () => {
+  it("lists every key under the prefix, page by page", async () => {
+    send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "u/a/batch/s/1.jpg" }, {}],
+        IsTruncated: true,
+        NextContinuationToken: "next",
+      })
+      .mockResolvedValueOnce({ Contents: [{ Key: "u/a/batch/s/2.jpg" }], IsTruncated: false });
+
+    expect(await listObjects("u/a/batch/s/")).toEqual(["u/a/batch/s/1.jpg", "u/a/batch/s/2.jpg"]);
+
+    const [first, second] = send.mock.calls.map((call) => call[0] as ListObjectsV2Command);
+    expect(first).toBeInstanceOf(ListObjectsV2Command);
+    expect(first.input).toEqual({
+      Bucket: "test-bucket",
+      Prefix: "u/a/batch/s/",
+      ContinuationToken: undefined,
+    });
+    expect(second.input.ContinuationToken).toBe("next");
+  });
+
+  it("gives an empty list for an empty folder", async () => {
+    send.mockResolvedValueOnce({});
+    expect(await listObjects("u/a/batch/none/")).toEqual([]);
   });
 });
