@@ -7,6 +7,24 @@ sheets. It was built for the Reply Student Tech Clash 2026, AI on Campus (London
 
 - **Live app:** https://aihack2026-lyart.vercel.app (open `/demo` to try it without signing in)
 - **Specification:** [SPEC.md](SPEC.md), plus the feature specs `SPEC-*.md`
+- **Project story:** [The problem, learning science and our approach](docs/PROJECT_STORY.md)
+
+## Why we built it
+
+Following a worked solution is different from being able to solve the problem independently.
+Mistakes get scattered across sheets, and exam revision can become redoing everything without
+a clear picture of what needs practice.
+
+Problem Pal connects those moments: **attempt → guidance → understand mistakes → targeted
+practice → spaced review**. Its Spot the Error mode turns likely misconceptions from your own
+attempts into new worked solutions for you to evaluate and explain.
+
+The design draws on research into retrieval practice, spaced practice and self-explanation.
+It aims to make study time more purposeful; learning gains and time savings still need
+evaluation with students. That is our answer to AI on Campus: help students think by keeping
+them responsible for attempting, explaining and challenging the reasoning.
+
+[Read the full story and research references →](docs/PROJECT_STORY.md)
 
 ## What it does
 
