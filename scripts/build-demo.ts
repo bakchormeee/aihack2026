@@ -9,6 +9,7 @@
 //   --course <name>   a course folder to build (repeatable; default all three)
 //   --sheets <dir>    the folder of course folders (default ../Sample Problem Sheets)
 //   --seed <n>        the history plan's seed (default 2026)
+//   --sheets-per-course <n>  1–3 sheets of each course (default 3; a quicker, smaller run)
 //   --yes             really run
 
 import path from "node:path";
@@ -25,6 +26,7 @@ const { values } = parseArgs({
     course: { type: "string", multiple: true },
     sheets: { type: "string" },
     seed: { type: "string" },
+    "sheets-per-course": { type: "string" },
     yes: { type: "boolean", default: false },
   },
 });
@@ -34,6 +36,9 @@ const sheetsDir = path.resolve(
   values.sheets ?? path.join(process.cwd(), "..", "Sample Problem Sheets"),
 );
 const seed = values.seed ? Number(values.seed) : undefined;
+const sheetsPerCourse = values["sheets-per-course"]
+  ? Number(values["sheets-per-course"])
+  : undefined;
 
 async function main() {
   if (!values.yes) {
@@ -55,6 +60,7 @@ async function main() {
     sheetsDir,
     courses,
     seed,
+    sheetsPerCourse,
     storage: { put: putObject, get: getObjectBytes },
     writeWorking: writeDemoWorking,
     // Erase the previous template's rows. Its files stay in R2: live copies still read

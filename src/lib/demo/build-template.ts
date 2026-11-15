@@ -198,23 +198,18 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     write: count(writeWorking),
   };
 
-  // An old template is erased first (the script passes eraseOld); without it, refuse.
+  // An old template is replaced at the end (the script passes eraseOld); without it, refuse.
   const [old] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.email, DEMO_TEMPLATE_EMAIL));
-  if (old) {
-    ensure(options.eraseOld, "A demo template already exists. Pass eraseOld to replace it.");
-    log(`Erasing the old template ${old.id}`);
-    await options.eraseOld(old.id);
-  }
-  // The template has no account row, so nobody can sign in to it directly.
-  const [user] = await db
-    .insert(users)
-    .values({ email: DEMO_TEMPLATE_EMAIL, name: "Demo student", demoRole: "template" })
-    .returning();
+  if (old) ensure(options.eraseOld, "A demo template already exists. Pass eraseOld to replace it.");
+  // The new template is built hidden (no email, no demo role), so /demo keeps copying the
+  // old, complete one until the swap at the end. It has no account row, so nobody can
+  // sign in to it directly.
+  const [user] = await db.insert(users).values({ name: "Demo student" }).returning();
   const userId = user.id;
-  log(`Template user ${userId}`);
+  log(`New template user ${userId} (hidden until it is finished)`);
 
   // 1. Courses and sheets: upload, parse, hints.
   const built: { courseId: string; sheetId: string; n: number; answers: string | null }[] = [];
@@ -514,6 +509,17 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
   log(`Planned: ${percent(mix(plan.map((a) => a.outcome)))}`);
   log(`Actual:  ${percent(actual)} (${actual.full + actual.partial + actual.stuck} marked)`);
   log(`Common errors: ${misconceptionCount}. AI calls: ${aiCalls}`);
+
+  // 8. Swap: erase the old template, then make the new one the template.
+  if (old) {
+    log(`Erasing the old template ${old.id}`);
+    await options.eraseOld!(old.id);
+  }
+  await db
+    .update(users)
+    .set({ email: DEMO_TEMPLATE_EMAIL, demoRole: "template" })
+    .where(eq(users.id, userId));
+  log(`Template user ${userId} is live`);
 
   return {
     userId,
