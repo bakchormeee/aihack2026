@@ -46,6 +46,7 @@ import { runHintsForSheet } from "@/lib/pipeline/hints";
 import { claimMark, performMark, type MarkIo } from "@/lib/pipeline/mark";
 import { refreshMisconceptions } from "@/lib/pipeline/misconceptions";
 import { runParse } from "@/lib/pipeline/parse";
+import { mapLimit } from "@/lib/concurrency";
 import { performOfficialRemark, startOfficialSolutions } from "@/lib/pipeline/remark";
 import { buildRevisionSession } from "@/lib/pipeline/revision";
 import { answerSpotItem } from "@/lib/pipeline/spot-answer";
@@ -104,6 +105,8 @@ export type BuildDemoOptions = {
   questionsPerSheet?: number;
   /** Upload the official solutions of sheets 1–2 and re-mark (default true). */
   officialSolutions?: boolean;
+  /** Questions answered at the same time (default 1). */
+  concurrency?: number;
   seed?: number;
   /** The end of the history; read when the rows are backdated. */
   now?: () => Date;
@@ -318,11 +321,20 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     return attempt.id;
   };
 
-  const attemptIds: string[] = [];
-  for (const [i, planned] of plan.entries()) {
-    attemptIds.push(await work(planned.questionId, planned));
-    if ((i + 1) % 10 === 0) log(`  ${i + 1}/${plan.length} attempts marked (${aiCalls} AI calls)`);
-  }
+  // Questions are answered side by side; the attempts on one question stay in plan order.
+  const attemptIds = new Array<string>(plan.length);
+  const byQuestion = new Map<string, number[]>();
+  plan.forEach((a, i) =>
+    byQuestion.set(a.questionId, [...(byQuestion.get(a.questionId) ?? []), i]),
+  );
+  let marked = 0;
+  await mapLimit([...byQuestion.values()], options.concurrency ?? 1, async (indexes) => {
+    for (const i of indexes) {
+      attemptIds[i] = await work(plan[i].questionId, plan[i]);
+      marked++;
+      log(`  ${marked} of ${plan.length} attempts marked`);
+    }
+  });
 
   // 3. Official solutions for sheets 1 and 2, which re-mark every attempt on them.
   for (const s of early.filter((s) => s.answers)) {

@@ -69,6 +69,7 @@ async function main() {
       ? Number(values["questions-per-sheet"])
       : undefined,
     officialSolutions: !values["no-official"],
+    concurrency: 6,
     storage: { put: putObject, get: getObjectBytes },
     writeWorking: writeDemoWorking,
     // Erase the previous template's rows. Its files stay in R2: live copies still read
