@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { NotFoundError, requireAttempt, requireCourse, requireSheet } from "@/lib/auth/ownership";
 import { getCurrentUser } from "@/lib/auth/session";
-import { buildKey, UPLOAD_PURPOSES, validateUpload } from "@/lib/storage";
+import { ACCEPTED_IMAGE_MIMES, buildKey, UPLOAD_PURPOSES, validateUpload } from "@/lib/storage";
 import { presignUpload } from "@/lib/storage/s3";
 
 const bodySchema = z.object({
   purpose: z.enum(UPLOAD_PURPOSES),
-  // sheet: the course id; official_solutions: the sheet id; working: the attempt id.
+  // sheet: the course id; official_solutions and batch: the sheet id; working: the attempt id.
   parentId: z.string().min(1).max(100),
   mime: z.string().min(1).max(100),
   size: z.number(),
@@ -25,10 +25,13 @@ export async function POST(request: Request) {
 
   const check = validateUpload({ mime, size });
   if (!check.ok) return NextResponse.json({ error: check.message }, { status: 400 });
+  if (purpose === "batch" && !(ACCEPTED_IMAGE_MIMES as readonly string[]).includes(mime))
+    return NextResponse.json({ error: "Use a JPEG, PNG or WebP photo." }, { status: 400 });
 
   try {
     if (purpose === "sheet") await requireCourse(user.id, parentId);
-    else if (purpose === "official_solutions") await requireSheet(user.id, parentId);
+    else if (purpose === "official_solutions" || purpose === "batch")
+      await requireSheet(user.id, parentId);
     else await requireAttempt(user.id, parentId);
   } catch (error) {
     if (error instanceof NotFoundError)

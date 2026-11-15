@@ -1,8 +1,9 @@
 // Storage keys. The server chooses every key, so a client can never pick a
 // path. Layout: u/<userId>/<purpose>/<parentId>/<uuid>.<ext>
-// Frozen after task F5.
+// Frozen after task F5. `batch` (photos of working for several questions, parent
+// the sheet) was added by the coordinator for SPEC-batch-working.md.
 
-export const UPLOAD_PURPOSES = ["sheet", "official_solutions", "working"] as const;
+export const UPLOAD_PURPOSES = ["sheet", "official_solutions", "working", "batch"] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
 const EXTENSIONS: Record<string, string> = {

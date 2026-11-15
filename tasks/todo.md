@@ -9,7 +9,7 @@ are in [plan.md](plan.md).
 ## Phase 1: Foundations (coordinator)
 
 - [x] **D1: Migration F and bin rules** (M)
-- [ ] **B1: Region rules and the `batch` upload purpose** (M)
+- [x] **B1: Region rules and the `batch` upload purpose** (M)
 
 ### Checkpoint 1
 - [ ] All checks pass; both tracks can start

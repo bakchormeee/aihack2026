@@ -23,6 +23,7 @@ export default defineConfig({
         "src/lib/spaced/**",
         "src/lib/demo/**",
         "src/lib/bin/**",
+        "src/lib/batch/**",
       ],
       exclude: ["**/*.test.ts"],
       thresholds: { lines: 100 },
