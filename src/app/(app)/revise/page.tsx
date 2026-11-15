@@ -8,7 +8,7 @@ import { listCourses } from "@/db/queries/courses";
 import { getCourseMisconceptionState } from "@/db/queries/misconceptions";
 import { listRetryCandidates } from "@/db/queries/revision";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { EmptyState, PageHeader, Panel } from "@/components/page-parts";
+import { EmptyState, PageHeader } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
 import { RevisionForm } from "@/components/revision-form";
@@ -79,14 +79,12 @@ export default async function RevisionPage({ searchParams }: PageProps<"/revise"
           Create a course and mark some work first.
         </EmptyState>
       ) : (
-        <Panel className="sm:max-w-2xl">
-          <RevisionForm
-            courses={options}
-            initialCourseId={initialCourseId!}
-            initialTopicId={wantedTopic ?? null}
-            initialMode={initialMode}
-          />
-        </Panel>
+        <RevisionForm
+          courses={options}
+          initialCourseId={initialCourseId!}
+          initialTopicId={wantedTopic ?? null}
+          initialMode={initialMode}
+        />
       )}
     </section>
   );
