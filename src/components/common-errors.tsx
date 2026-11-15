@@ -31,7 +31,7 @@ export function CommonErrors({
   hideAction: (misconceptionId: string) => Promise<void>;
 }) {
   return (
-    <section className="flex flex-col gap-3 border-t pt-6" aria-labelledby="common-errors-heading">
+    <section className="flex flex-col gap-3" aria-labelledby="common-errors-heading">
       <h2 id="common-errors-heading" className="text-lg font-medium">
         Your common errors
       </h2>
