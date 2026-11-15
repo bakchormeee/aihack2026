@@ -65,7 +65,40 @@ export const DEMO_TEMPLATE_EMAIL = "demo-template@demo.invalid";
 /** The working of a student who did not know how to start (when writing an answer failed). */
 export const GAVE_UP_WORKING =
   "I am not sure how to start this one. I tried a few things but got nowhere.";
-export const DEMO_COURSES = ["Numbers", "Analysis I", "Sequences and Series"];
+export const DEMO_COURSES = ["Numbers", "Analysis I", "Sequences and Series", "Sets and Logic"];
+/** A course whose folder of sheets has another name. */
+export const DEMO_COURSE_FOLDERS: Record<string, string> = { "Sets and Logic": "Logic and Sets" };
+/** The two sheets of a course with answers (default 1 and 2); the others are left empty. */
+export const DEMO_ANSWERED_SHEETS: Record<string, [number, number]> = { "Sets and Logic": [2, 3] };
+const answeredSheets = (course: string) => DEMO_ANSWERED_SHEETS[course] ?? [1, 2];
+
+/**
+ * A label renumbered so that a sheet whose first question is `first` starts from 1:
+ * with first 11, "13(ii)" becomes "3(ii)". Labels that do not start with a number stay.
+ */
+export function renumberLabel(label: string, first: number): string {
+  const match = /^(\d+)(.*)$/.exec(label);
+  if (!match || first <= 1) return label;
+  return `${Number(match[1]) - first + 1}${match[2]}`;
+}
+
+/** Renumbers a sheet's questions from 1 when its numbering continues an earlier sheet. */
+export async function renumberSheet(sheetId: string): Promise<number> {
+  const rows = await db.select().from(questions).where(eq(questions.sheetId, sheetId));
+  const numbers = rows.flatMap((q) => {
+    const match = /^(\d+)/.exec(q.label);
+    return match ? [Number(match[1])] : [];
+  });
+  const first = numbers.length ? Math.min(...numbers) : 1;
+  if (first <= 1) return first;
+  for (const q of rows) {
+    await db
+      .update(questions)
+      .set({ label: renumberLabel(q.label, first) })
+      .where(eq(questions.id, q.id));
+  }
+  return first;
+}
 const DAYS = 21;
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -154,7 +187,7 @@ async function findSheetFiles(dir: string, n: number) {
   const names = await readdir(dir);
   const sheet = names.find((name) => new RegExp(`^Problem Sheet ${n}(\\.pdf)?$`, "i").test(name));
   const answers = names.find((name) =>
-    new RegExp(`^Problem Sheet ${n}\\b.*(answers|solutions)`, "i").test(name),
+    new RegExp(`^Problem Sheet ${n}\\b.*\\b(ans|answers|solutions)\\b`, "i").test(name),
   );
   ensure(sheet, `No "Problem Sheet ${n}" in ${dir}`);
   return { sheet: path.join(dir, sheet), answers: answers ? path.join(dir, answers) : null };
@@ -231,7 +264,8 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     courseNames.map(async (name, c) => {
       const courseId = courseIds[c];
       for (let n = 1; n <= sheetCount; n++) {
-        const files = await findSheetFiles(path.join(options.sheetsDir, name), n);
+        const folder = DEMO_COURSE_FOLDERS[name] ?? name;
+        const files = await findSheetFiles(path.join(options.sheetsDir, folder), n);
         const key = buildKey({
           userId,
           purpose: "sheet",
@@ -247,6 +281,8 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
         const [parsed] = await db.select().from(sheets).where(eq(sheets.id, sheet.id));
         ensure(parsed.status === "ready", `${name} sheet ${n} could not be parsed`);
         await runHintsForSheet(sheet.id, io.hints);
+        const first = await renumberSheet(sheet.id);
+        if (first > 1) log(`${name}: sheet ${n} renumbered from ${first} to start at 1`);
         // Without official solutions, the answers file is ignored.
         const answers = options.officialSolutions === false ? null : files.answers;
         built.push({ courseId, sheetId: sheet.id, n, answers });
@@ -257,7 +293,8 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
   built.sort((a, b) => courseIds.indexOf(a.courseId) - courseIds.indexOf(b.courseId) || a.n - b.n);
 
   // 2. The planned history on sheets 1 and 2 (questions whose hints are ready).
-  const early = built.filter((s) => s.n <= 2);
+  const courseOf = (courseId: string) => courseNames[courseIds.indexOf(courseId)];
+  const early = built.filter((s) => answeredSheets(courseOf(s.courseId)).includes(s.n));
   const rows = await db
     .select({ question: questions, topic: topics.name })
     .from(questions)
@@ -279,7 +316,8 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     const entry = byId.get(question.id) ?? {
       id: question.id,
       course: sheet.courseId,
-      sheet: sheet.n as 1 | 2,
+      // The first answered sheet comes first in the history, the second after it.
+      sheet: (answeredSheets(courseOf(sheet.courseId)).indexOf(sheet.n) + 1) as 1 | 2,
       sheetId: sheet.sheetId,
       position: question.position,
       topics: [],
@@ -422,10 +460,12 @@ export async function buildDemoTemplate(options: BuildDemoOptions): Promise<Buil
     const mine = plan.flatMap((a, i) =>
       byId.get(a.questionId)!.sheetId === s.sheetId ? [attemptIds[i]] : [],
     );
+    // An empty sheet before an answered one was uploaded at the start, one after at the end.
+    const later = early.some((e) => e.courseId === s.courseId && e.n > s.n);
     const uploaded = new Date(
       mine.length
         ? Math.min(...mine.map((id) => startedAt.get(id)!)) - 2 * HOUR
-        : end.getTime() - 2 * DAY,
+        : end.getTime() - (later ? (DAYS + 1) * DAY : 2 * DAY),
     );
     const official =
       mine.length && s.answers

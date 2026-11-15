@@ -31,6 +31,8 @@ import {
   DEMO_TEMPLATE_EMAIL,
   GAVE_UP_WORKING,
   buildDemoTemplate,
+  renumberLabel,
+  renumberSheet,
   type BuildDemoOptions,
 } from "./build-template";
 
@@ -74,6 +76,56 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+
+describe("renumberLabel", () => {
+  it("renumbers a sheet that continues an earlier one so it starts from 1", () => {
+    expect(renumberLabel("11(ii)", 11)).toBe("1(ii)");
+    expect(renumberLabel("13", 11)).toBe("3");
+    expect(renumberLabel("3(a)", 1)).toBe("3(a)");
+    expect(renumberLabel("Bonus", 11)).toBe("Bonus");
+  });
+});
+
+describe("renumberSheet", () => {
+  it("renumbers a sheet's questions from 1, and leaves a sheet that starts at 1", async () => {
+    const [u] = await db.insert(users).values({ name: "R" }).returning();
+    const [c] = await db.insert(courses).values({ userId: u.id, name: "C" }).returning();
+    const [later, first, empty] = await db
+      .insert(sheets)
+      .values([
+        { courseId: c.id, title: "S2" },
+        { courseId: c.id, title: "S1" },
+        { courseId: c.id, title: "S0" },
+      ])
+      .returning();
+    const q = (sheetId: string, position: number, label: string) => ({
+      courseId: c.id,
+      sheetId,
+      position,
+      label,
+      body: "Q",
+      expectedMinutes: 5,
+    });
+    await db
+      .insert(questions)
+      .values([
+        q(later.id, 1, "11(i)"),
+        q(later.id, 2, "12"),
+        q(later.id, 3, "Bonus"),
+        q(first.id, 1, "1"),
+        q(first.id, 2, "2(a)"),
+      ]);
+    expect(await renumberSheet(later.id)).toBe(11);
+    expect(await renumberSheet(first.id)).toBe(1);
+    expect(await renumberSheet(empty.id)).toBe(1);
+    const labels = async (id: string) =>
+      (await db.select().from(questions).where(eq(questions.sheetId, id)))
+        .sort((a, b) => a.position - b.position)
+        .map((x) => x.label);
+    expect(await labels(later.id)).toEqual(["1(i)", "2", "Bonus"]);
+    expect(await labels(first.id)).toEqual(["1", "2(a)"]);
+  });
 });
 
 describe("buildDemoTemplate", () => {
@@ -227,6 +279,44 @@ describe("buildDemoTemplate", () => {
     expect(texts.length).toBeGreaterThan(0);
     expect(texts.every((t) => t.text === GAVE_UP_WORKING)).toBe(true);
     expect(writeWorking.mock.calls.length).toBe(3 * texts.length);
+  });
+
+  it("answers sheets 2 and 3 of Sets and Logic, from its Logic and Sets folder, leaving sheet 1 empty", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "demo-sheets-"));
+    mkdirSync(path.join(dir, "Logic and Sets"));
+    for (const name of [
+      "Problem Sheet 1",
+      "Problem Sheet 2.pdf",
+      "Problem Sheet 2 Ans",
+      "Problem Sheet 3.pdf",
+    ])
+      writeFileSync(path.join(dir, "Logic and Sets", name), pdf(name));
+    const report = await buildDemoTemplate({
+      ...base,
+      sheetsDir: dir,
+      courses: ["Sets and Logic"],
+      sheetsPerCourse: 3,
+      questionsPerSheet: 2,
+      eraseOld,
+    });
+    const rows = await db
+      .select({ sheet: sheets })
+      .from(sheets)
+      .innerJoin(courses, eq(courses.id, sheets.courseId))
+      .where(and(eq(courses.userId, report.userId), eq(courses.name, "Sets and Logic")));
+    const sheetOf = (n: number) => rows.find((r) => r.sheet.title === `Problem Sheet ${n}`)!.sheet;
+    const made = await db
+      .select({ sheetId: questions.sheetId, startedAt: attempts.startedAt })
+      .from(attempts)
+      .innerJoin(questions, eq(questions.id, attempts.questionId))
+      .where(and(eq(attempts.userId, report.userId), eq(attempts.context, "sheet")));
+    const on = (n: number) => made.filter((m) => m.sheetId === sheetOf(n).id);
+    expect(on(1)).toEqual([]);
+    expect(on(2).length).toBeGreaterThan(0);
+    expect(on(3).length).toBeGreaterThan(0);
+    // The empty sheet 1 was uploaded before the answered ones; "Ans" counts as answers.
+    expect(sheetOf(1).uploadedAt.getTime()).toBeLessThan(sheetOf(2).uploadedAt.getTime());
+    expect(sheetOf(2).solutionsStatus).toBe("done");
   });
 
   it("skips the official solutions when asked, keeping only the AI marks", async () => {
