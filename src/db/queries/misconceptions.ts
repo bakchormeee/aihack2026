@@ -16,7 +16,8 @@ import {
   questions,
   topics,
 } from "@/db/schema";
-import { NotFoundError, requireCourse } from "@/lib/auth/ownership";
+import { ownsCourse } from "@/db/queries/bin";
+import { NotFoundError } from "@/lib/auth/ownership";
 import { STALE_JOB_MS, type ErrorType } from "@/lib/domain";
 import { currentMark } from "@/lib/marking/rules";
 import { timesSeen } from "@/lib/spot/rules";
@@ -47,12 +48,16 @@ async function currentMarks(attemptIds: string[]): Promise<Map<string, MarkRow>>
   return result;
 }
 
-/** Every misconception of the course, hidden ones included, most often seen first. */
+/**
+ * Every misconception of the course, hidden ones included, most often seen first. A
+ * binned course is allowed here, so a spot-the-error job that runs while the course is
+ * binned still finishes; pages reach this only through a guarded course.
+ */
 export async function listMisconceptions(
   userId: string,
   courseId: string,
 ): Promise<MisconceptionView[]> {
-  await requireCourse(userId, courseId);
+  if (!(await ownsCourse(userId, courseId))) throw new NotFoundError();
   const rows = await db
     .select()
     .from(misconceptions)
