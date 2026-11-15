@@ -232,7 +232,7 @@ export function sheetStats(records: QuestionRecord[]): SheetStats {
 export type HeatRow = {
   sheetId: string;
   title: string;
-  cells: { label: string; outcome: Outcome | null; hintLevel: HintLevel }[];
+  cells: { label: string; outcome: Outcome | null; hintLevel: HintLevel; questionId: string }[];
 };
 
 export function heatCells(records: QuestionRecord[]): HeatRow["cells"] {
@@ -240,6 +240,7 @@ export function heatCells(records: QuestionRecord[]): HeatRow["cells"] {
     const best = bestAttempt(record.attempts);
     return {
       label: record.question.label,
+      questionId: record.question.id,
       outcome: best?.current?.outcome ?? null,
       hintLevel: best?.hintLevel ?? 0,
     };

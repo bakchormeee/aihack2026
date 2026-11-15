@@ -23,8 +23,8 @@ describe("describeCell", () => {
     expect(describeCell(cell(null, 0))).toBe("Q1: not attempted");
   });
   it("describes outcome and hints with correct plurals", () => {
-    expect(describeCell(cell("full", 0))).toBe("Q1: Full, no hints");
-    expect(describeCell(cell("partial", 1))).toBe("Q1: Partial, 1 hint");
+    expect(describeCell(cell("full", 0))).toBe("Q1: Correct, no hints");
+    expect(describeCell(cell("partial", 1))).toBe("Q1: Partly right, 1 hint");
     expect(describeCell(cell("stuck", 3))).toBe("Q1: Stuck, 3 hints");
   });
 });

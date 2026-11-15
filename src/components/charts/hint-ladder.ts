@@ -4,8 +4,15 @@ export type HintCounts = [number, number, number, number];
 
 export const HINT_LEVEL_LABELS = ["No hint", "Hint 1", "Hint 2", "Hint 3"] as const;
 
-/** Sequential, colour-blind-safe fills (light to dark = more help used). */
-export const HINT_LEVEL_FILLS = ["#009E73", "#56B4E9", "#E69F00", "#CC79A7"] as const;
+/**
+ * Ordinal blue-ink ramp (light to dark = more help used). Validated with the
+ * dataviz checker in --ordinal mode against the paper surface: monotone
+ * lightness, visible steps, light end at 2.09:1.
+ */
+export const HINT_LEVEL_FILLS = ["#86b6ef", "#3987e5", "#256abf", "#104281"] as const;
+
+/** Ink for a number or label drawn on each hint fill. */
+export const HINT_LEVEL_INK = ["#0b0b0b", "#ffffff", "#ffffff", "#ffffff"] as const;
 
 /** Keeps only finite, non-negative whole counts. */
 export function sanitiseCounts(counts: HintCounts): HintCounts {

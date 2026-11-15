@@ -2,9 +2,15 @@ import type { HintLevel, Outcome } from "@/lib/domain";
 
 import { OUTCOME_STYLE } from "./colors";
 
-export type HeatCell = { label: string; outcome: Outcome | null; hintLevel: HintLevel };
+export type HeatCell = {
+  label: string;
+  outcome: Outcome | null;
+  hintLevel: HintLevel;
+  /** When set, the cell links to the question so a student can go straight back to it. */
+  questionId?: string;
+};
 
-/** Text for screen readers and tooltips, e.g. "Q3: Partial, 2 hints". */
+/** Text for screen readers and tooltips, e.g. "Q3: Partly right, 2 hints". */
 export function describeCell(cell: HeatCell): string {
   if (cell.outcome === null) return `${cell.label}: not attempted`;
   const hints =

@@ -6,6 +6,7 @@ import {
   mergeSeries,
   sortedEvents,
   timeDomain,
+  valuesAt,
   type TopicSeries,
 } from "./mastery-over-time-model";
 
@@ -74,9 +75,26 @@ describe("timeDomain", () => {
 });
 
 describe("lineStyle", () => {
-  it("uses distinct colours then changes dash when the palette wraps", () => {
+  it("assigns the eight colours in order and never cycles them", () => {
+    const first8 = LINE_COLORS.map((_, i) => lineStyle(i).color);
+    expect(new Set(first8).size).toBe(8);
     expect(lineStyle(0).dash).toBeUndefined();
-    expect(lineStyle(LINE_COLORS.length).color).toBe(lineStyle(0).color);
-    expect(lineStyle(LINE_COLORS.length).dash).not.toBe(lineStyle(0).dash);
+    const ninth = lineStyle(LINE_COLORS.length);
+    expect(ninth.other).toBe(true);
+    expect(first8).not.toContain(ninth.color);
+    expect(lineStyle(20).color).toBe(ninth.color);
+  });
+});
+
+describe("valuesAt", () => {
+  it("carries each topic's latest value forward", () => {
+    const rows = [
+      { t: 1, a: 0.2 },
+      { t: 2, b: 0.5 },
+      { t: 3, a: 0.6 },
+    ] as unknown as Parameters<typeof valuesAt>[0];
+    expect(valuesAt(rows, ["a", "b"], 0)).toEqual({ a: null, b: null });
+    expect(valuesAt(rows, ["a", "b"], 2)).toEqual({ a: 0.2, b: 0.5 });
+    expect(valuesAt(rows, ["a", "b"], 9)).toEqual({ a: 0.6, b: 0.5 });
   });
 });

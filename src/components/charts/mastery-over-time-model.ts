@@ -1,24 +1,47 @@
 export type TopicSeries = { id: string; name: string; series: { at: string; mastery: number }[] };
 export type TimelineEvent = { at: string; kind: "sheet" | "revision"; label: string };
 
-/** Okabe–Ito palette (colour-blind safe). Lines also differ by dash pattern when the palette wraps. */
+/**
+ * The dataviz categorical order, validated on the paper surface (worst adjacent
+ * CVD ΔE 9.1). Colours are assigned in this order and never cycled: a ninth
+ * topic and beyond is drawn as a thin grey "other" line, still named in the
+ * legend, tooltip and table.
+ */
 export const LINE_COLORS = [
-  "#E69F00",
-  "#56B4E9",
-  "#009E73",
-  "#F0E442",
-  "#0072B2",
-  "#D55E00",
-  "#CC79A7",
-  "#999999",
+  "#2a78d6",
+  "#eb6834",
+  "#1baf7a",
+  "#eda100",
+  "#e87ba4",
+  "#008300",
+  "#6250d6",
+  "#e34948",
 ] as const;
-const DASHES = [undefined, "6 3", "2 3", "8 3 2 3"] as const;
 
-export function lineStyle(index: number): { color: string; dash: string | undefined } {
+/** Colour for topics past the eighth. */
+export const OTHER_LINE_COLOR = "#a8a294";
+
+export function lineStyle(index: number): {
+  color: string;
+  dash: string | undefined;
+  other: boolean;
+} {
+  const other = index >= LINE_COLORS.length;
   return {
-    color: LINE_COLORS[index % LINE_COLORS.length],
-    dash: DASHES[Math.floor(index / LINE_COLORS.length) % DASHES.length],
+    color: other ? OTHER_LINE_COLOR : LINE_COLORS[index],
+    dash: other ? "2 3" : undefined,
+    other,
   };
+}
+
+/** Each topic's latest value at or before time t (null if it has no point yet). */
+export function valuesAt(rows: Row[], keys: string[], t: number): Record<string, number | null> {
+  const out: Record<string, number | null> = Object.fromEntries(keys.map((k) => [k, null]));
+  for (const row of rows) {
+    if (row.t > t) break;
+    for (const k of keys) if (row[k] !== undefined && row[k] !== null) out[k] = row[k];
+  }
+  return out;
 }
 
 export function toTime(at: string): number | null {

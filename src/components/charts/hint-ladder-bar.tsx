@@ -48,7 +48,7 @@ export function HintLadderBar({ counts }: { counts: HintCounts }) {
               dataKey={`l${i}`}
               stackId="hints"
               fill={HINT_LEVEL_FILLS[i]}
-              stroke="var(--background)"
+              stroke="var(--card)"
               strokeWidth={2}
               isAnimationActive={false}
             />

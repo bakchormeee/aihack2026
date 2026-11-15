@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { HintLevel } from "@/lib/domain";
 
-import { HINT_LEVEL_FILLS, rungStates, rungsLabel } from "./hint-ladder";
+import { HINT_LEVEL_FILLS, HINT_LEVEL_INK, rungStates, rungsLabel } from "./hint-ladder";
 
 /** Three rungs that fill as hints are revealed. Filled rungs carry a number; empty ones are outlined. */
 export function HintRungs({ revealed }: { revealed: HintLevel }) {
@@ -14,11 +14,15 @@ export function HintRungs({ revealed }: { revealed: HintLevel }) {
             key={i}
             className={cn(
               "flex size-7 items-center justify-center rounded-md border-2 text-xs font-semibold",
-              filled ? "text-black" : "border-dashed text-muted-foreground",
+              filled ? "" : "border-dashed text-muted-foreground",
             )}
             style={
               filled
-                ? { backgroundColor: HINT_LEVEL_FILLS[i + 1], borderColor: HINT_LEVEL_FILLS[i + 1] }
+                ? {
+                    backgroundColor: HINT_LEVEL_FILLS[i + 1],
+                    borderColor: HINT_LEVEL_FILLS[i + 1],
+                    color: HINT_LEVEL_INK[i + 1],
+                  }
                 : undefined
             }
           >

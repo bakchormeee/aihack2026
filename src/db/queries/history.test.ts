@@ -323,7 +323,9 @@ describe("getCourseSheetOverview", () => {
       marks: [{ score: 1, outcome: "stuck", at: 10 }],
     });
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
-    expect(row.heat.cells).toEqual([{ label: "1", outcome: "full", hintLevel: 1 }]);
+    expect(row.heat.cells).toEqual([
+      { label: "1", outcome: "full", hintLevel: 1, questionId: expect.any(String) },
+    ]);
   });
 
   it("ignores another user's data and course", async () => {

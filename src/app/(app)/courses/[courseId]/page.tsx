@@ -3,6 +3,7 @@ import Link from "next/link";
 import { EmptyState, Meter, PageHeader, Panel, SectionTitle } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { TopicPanel } from "@/components/topic-panel";
+import { FocusNext } from "@/components/insights/focus-next";
 import { getCourseMastery } from "@/db/queries/mastery";
 import { listSheets } from "@/db/queries/sheets";
 import { orNotFound } from "@/lib/auth/guards";
@@ -66,6 +67,7 @@ export default async function CoursePage({
           />
         </Panel>
       )}
+      {topics.length > 0 ? <FocusNext courseId={course.id} topics={topics} /> : null}
       {selected ? (
         <Panel id="topic-actions" className="flex scroll-mt-20 flex-col gap-3" aria-live="polite">
           <SectionTitle>{selected.name}</SectionTitle>
