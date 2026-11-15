@@ -35,18 +35,18 @@ M = 3–5 files.
   - Files: `src/lib/auth/config.ts`, `src/app/demo/*`, `src/app/(app)/layout.tsx`, `src/components/demo-banner.tsx`, `src/app/page.tsx`, `src/app/(auth)/sign-in/page.tsx`
 
 ### Checkpoint 1
-- [ ] A hand-made local template opens through `/demo`, is copied, browsed and expired.
+- [x] A template opens through `/demo`, is copied, browsed and erased (demo e2e on Neon).
 
 ## Phase 2: AI limit and real content
 
-- [ ] **E4: AI limit** (M)
+- [x] **E4: AI limit** (M)
   - Acceptance: `callAi` counts calls for copies only and the 31st throws `AiLimitError`;
     every pipeline entry point runs inside `withAiUser`; AI-starting actions refuse with
     the spec's message once the limit is reached.
   - Verify: checks; counting and limit tests with `AI_FIXTURES`; refusal tests.
   - Files: `src/lib/ai/budget.ts` (+ test), `src/lib/ai/client.ts`, pipeline entry files, AI-starting actions
 
-- [ ] **E5: Template script** (M)
+- [x] **E5: Template script** (M)
   - Acceptance: `planDemoHistory` gives about 40/35/25% outcomes, 3–4 misconceptions
     each used 2+ times across courses, hints on about a third, days over 21, and is
     deterministic; `writeDemoWorking` has a schema, LaTeX check and fixtures; `putObject`
@@ -55,18 +55,18 @@ M = 3–5 files.
   - Files: `scripts/build-demo.ts`, `src/lib/demo/history.ts` (+ test), `scripts/demo/write-demo-working.ts` (+ fixtures), `src/lib/storage/s3.ts`
 
 ### Checkpoint 2
-- [ ] All checks pass; the fixture run builds a template that copies and opens.
+- [x] All checks pass; the fixture run builds a template that copies and opens.
 
 ## Phase 3: Finish and release
 
-- [ ] **E6: End-to-end test and build** (S)
+- [x] **E6: End-to-end test and build** (S)
   - Acceptance: `/demo` with no sign-in shows the banner and courses; Start again gives a
     fresh copy; a second browser context gets a separate copy; 375 px fits; existing
     specs pass.
   - Verify: `npm run e2e`; full checks; `npm run build`.
   - Files: `tests/e2e/demo.spec.ts`, `tests/e2e/helpers.ts`
 
-- [ ] **E7: Release** (each step needs your go-ahead): migrate Neon; push `main`; run
+- [ ] **E7: Release** (each step needs your go-ahead): migrate Neon (done 15 Nov); push `main`; run
   `scripts/build-demo.ts` against Neon and R2 (about 250 real AI calls); walk through the
   live `/demo`; review the content together.
 
