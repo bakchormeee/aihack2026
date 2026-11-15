@@ -8,7 +8,7 @@ M = 3–5 files.
 
 ## Phase 1: Rules (1 h)
 
-- [ ] **R1: Schedule rules** (M)
+- [x] **R1: Schedule rules** (M)
   - Acceptance:
     - The grade table in the spec's section 2 holds for long-form attempts and for spot
       answers.
@@ -27,7 +27,7 @@ M = 3–5 files.
   - Files: `src/lib/spaced/review.ts` (+ test), `src/lib/mastery/evidence.ts`, `vitest.config.mts`
 
 ### Checkpoint 1
-- [ ] Rules at 100% coverage; all checks pass
+- [x] Rules at 100% coverage; all checks pass
 
 ## Phase 2: Using the schedule (1 h 30 min)
 

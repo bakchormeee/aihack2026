@@ -19,12 +19,16 @@ export type MarkedAttempt = {
   kind?: "attempt" | "spot";
 };
 
+/** True when the attempt took more than twice its expected time (never without a time). */
+export function isSlow(a: Pick<MarkedAttempt, "secondsSpent" | "expectedMinutes">): boolean {
+  return a.secondsSpent !== null && a.secondsSpent > 2 * a.expectedMinutes * 60;
+}
+
 /** Evidence in [0, 1] that the student can do this kind of question unaided. */
 export function evidenceScore(a: MarkedAttempt): number {
   // Spot-the-error has no hints and no timing: the outcome is the evidence.
   if (a.kind === "spot") return OUTCOME_VALUE[a.outcome];
-  const tookTooLong = a.secondsSpent !== null && a.secondsSpent > 2 * a.expectedMinutes * 60;
   const value =
     a.outcome === "full" && a.score < 5 ? CARELESS_CORRECT_VALUE : OUTCOME_VALUE[a.outcome];
-  return value * HINT_MULTIPLIER[a.hintLevel] * (tookTooLong ? SLOW_FACTOR : 1);
+  return value * HINT_MULTIPLIER[a.hintLevel] * (isSlow(a) ? SLOW_FACTOR : 1);
 }
