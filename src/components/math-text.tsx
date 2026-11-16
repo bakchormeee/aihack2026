@@ -9,10 +9,24 @@ import { cn } from "@/lib/utils";
  * uses \( \) and \[ \]. Convert those so that both forms render.
  */
 export function normaliseMathDelimiters(text: string): string {
-  return escapeDollarsInMath(
-    text
-      .replace(/\\\[([\s\S]+?)\\\]/g, (_match, body: string) => `$$${body}$$`)
-      .replace(/\\\(([\s\S]+?)\\\)/g, (_match, body: string) => `$${body}$`),
+  return fenceDisplayMath(
+    escapeDollarsInMath(
+      text
+        .replace(/\\\[([\s\S]+?)\\\]/g, (_match, body: string) => `$$${body}$$`)
+        .replace(/\\\(([\s\S]+?)\\\)/g, (_match, body: string) => `$${body}$`),
+    ),
+  );
+}
+
+/**
+ * remark-math renders `$$…$$` as display maths only when the `$$` fences are on lines
+ * of their own; `$$…$$` written on one line comes out as small inline maths. When it
+ * fills a whole line, it was meant as display maths, so put the fences on their own lines.
+ */
+function fenceDisplayMath(text: string): string {
+  return text.replace(
+    /^([ \t]*)\$\$([^$\n]+)\$\$[ \t]*$/gm,
+    (_match, indent: string, body: string) => `${indent}$$\n${body}\n${indent}$$`,
   );
 }
 

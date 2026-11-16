@@ -18,6 +18,15 @@ describe("MathText", () => {
     expect(html).toContain("katex-display");
   });
 
+  it("renders $$…$$ on a line of its own as display maths", () => {
+    const html = renderToStaticMarkup(
+      <MathText>{"Given that the series\n\n$$\\frac{3}{4}+\\frac{8}{9}$$\n\nis convergent"}</MathText>,
+    );
+
+    expect(html).toContain("katex-display");
+    expect(html).not.toContain("katex-error");
+  });
+
   it("renders Markdown structure around the maths", () => {
     const html = renderToStaticMarkup(<MathText>{"**(a)** Show that $x > 0$."}</MathText>);
 
@@ -54,7 +63,18 @@ describe("normaliseMathDelimiters", () => {
   });
 
   it("converts \\[ \\] to display dollar delimiters", () => {
-    expect(normaliseMathDelimiters("\\[x^2\\]")).toBe("$$x^2$$");
+    expect(normaliseMathDelimiters("so \\[x^2\\] holds")).toBe("so $$x^2$$ holds");
+  });
+
+  it("puts the fences of $$…$$ on their own lines when it fills a line", () => {
+    expect(normaliseMathDelimiters("Hence\n\n$$x^2$$\n\nholds")).toBe(
+      "Hence\n\n$$\nx^2\n$$\n\nholds",
+    );
+    expect(normaliseMathDelimiters("\\[x^2\\]")).toBe("$$\nx^2\n$$");
+  });
+
+  it("leaves $$…$$ inside a sentence on its line", () => {
+    expect(normaliseMathDelimiters("the series $$x$$ is less")).toBe("the series $$x$$ is less");
   });
 
   it("leaves dollar-delimited maths unchanged", () => {
@@ -70,7 +90,7 @@ describe("normaliseMathDelimiters", () => {
   });
 
   it("replaces escaped dollar signs inside display maths", () => {
-    expect(normaliseMathDelimiters("$$\\$x$$")).toBe("$${\\char36}x$$");
+    expect(normaliseMathDelimiters("so $$\\$x$$ holds")).toBe("so $${\\char36}x$$ holds");
   });
 
   it("replaces escaped dollar signs inside \\( \\) maths", () => {
