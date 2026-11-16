@@ -74,7 +74,9 @@ export function WorkingInput({
   async function saveNow(value: string): Promise<boolean> {
     if (!attemptId || value === lastSaved.current) return true;
     setSaved("saving");
-    const result = await saveDraftTextAction({ attemptId, text: value });
+    const result = await saveDraftTextAction({ attemptId, text: value }).catch(
+      () => ({ ok: false, error: "Your work could not be saved. Check your connection." }) as const,
+    );
     if (!result.ok) {
       setError(result.error);
       setSaved("idle");

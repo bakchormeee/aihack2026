@@ -74,21 +74,21 @@ export function SpotReveal({
                     <p className="text-muted-foreground text-xs font-medium">Correct line</p>
                     <MathText className="text-sm">{error.correctLine}</MathText>
                   </div>
-                  <p className="text-muted-foreground text-xs">
+                  <div className="text-muted-foreground text-xs">
                     Based on your common error:{" "}
                     <MathText className="inline [&_p]:inline">{error.misconception}</MathText>
-                  </p>
+                  </div>
                   {tick ? (
                     <div className="bg-card mt-1 flex flex-col gap-1 rounded-md border p-2">
                       <p className="text-xs font-medium">Your explanation</p>
                       <MathText className="text-sm">{tick.explanation}</MathText>
                       {verdict ? (
-                        <p className="text-xs font-medium">
+                        <div className="text-xs font-medium">
                           {verdict.right ? "Right: " : "Your explanation did not match: "}
                           <MathText className="inline text-xs [&_p]:inline">
                             {verdict.comment}
                           </MathText>
-                        </p>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}

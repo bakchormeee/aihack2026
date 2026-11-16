@@ -170,7 +170,9 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
 
   async function propose(keys: string[]) {
     setBusy("Matching your working to the questions… This can take a minute.");
-    const result = await proposeBatchAction({ sheetId, photoKeys: keys });
+    const result = await proposeBatchAction({ sheetId, photoKeys: keys }).catch(
+      () => ({ ok: false, error: "Matching failed. Check your connection and try again." }) as const,
+    );
     setBusy(null);
     if (!result.ok) {
       setError(result.error);
