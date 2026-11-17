@@ -11,6 +11,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Most AI tests fake the Claude client (setAiClient); OpenAI tests stub AI_PROVIDER=openai.
+    env: { AI_PROVIDER: "anthropic" },
+    // Hide the per-request usage lines that callAi logs.
+    onConsoleLog: (log) => !log.startsWith("ai.usage"),
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.ts"],
     exclude: ["node_modules/**", "tests/e2e/**"],
     coverage: {

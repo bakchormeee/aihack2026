@@ -1,102 +1,38 @@
-// The one wrapper around the Claude API (contract C2, decision 6 in tasks/plan.md).
-// Every AI module calls `callAi`; nothing else in the app imports the SDK.
-// See README.md in this folder for the model, input limits and output method.
+// The one wrapper around the AI APIs (contract C2, decision 6 in tasks/plan.md).
+// Every AI module calls `callAi`; nothing else in the app imports an AI SDK.
+// Each call's provider, model and effort come from ./routes.ts; the request itself is
+// built in ./providers/. See README.md in this folder.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 
 import { currentAiUser, reserveAiCall } from "./budget";
+import { AiInputError, AiOutputError } from "./errors";
+import { prepareFile, type AiFile } from "./files";
+import { anthropicAdapter } from "./providers/anthropic";
+import type { Adapter, Usage } from "./providers/types";
+import { AiConfigError, maxTokens, routeFor, type Provider, type Route } from "./routes";
 
-export type AiFile = { mime: string; data: Buffer };
+export { AiInputError, AiOutputError } from "./errors";
+export type { AiFile } from "./files";
+export { setAiClient, type AiClient, type AiCreateParams } from "./providers/anthropic";
+export { AiConfigError } from "./routes";
 
-export type AiCreateParams = Anthropic.MessageCreateParamsNonStreaming;
-
-/** The part of the Anthropic client that `callAi` uses. Tests replace it with a fake. */
-export type AiClient = {
-  messages: {
-    create(params: AiCreateParams): Promise<Pick<Anthropic.Message, "content" | "stop_reason">>;
-  };
+const ADAPTERS: Record<Provider, Adapter> = {
+  anthropic: anthropicAdapter,
+  openai: {
+    send() {
+      throw new AiConfigError(
+        "The OpenAI provider is not available yet; set AI_PROVIDER=anthropic.",
+      );
+    },
+  },
 };
 
-/** The model returned output that does not match the schema, twice in a row. */
-export class AiOutputError extends Error {
-  readonly callName: string;
-  constructor(callName: string, reason: string) {
-    super(`AI call "${callName}" returned invalid output: ${reason}`);
-    this.name = "AiOutputError";
-    this.callName = callName;
-  }
-}
-
-/** The input cannot be sent to the API (file type, file size, call name). */
-export class AiInputError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AiInputError";
-  }
-}
-
-export const DEFAULT_AI_MODEL = "claude-sonnet-5-5";
-const DEFAULT_MAX_TOKENS = 16000;
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-type Effort = (typeof EFFORTS)[number];
-
-const IMAGE_MIMES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
-type ImageMime = (typeof IMAGE_MIMES)[number];
-/** API limit: 10 MB for each image, measured on the base64 text. */
-const MAX_IMAGE_BASE64_BYTES = 10 * 1024 * 1024;
-/** Our own limit for one PDF (SPEC: uploads up to 20 MB). The API allows 128 MB for a request. */
-const MAX_PDF_BYTES = 32 * 1024 * 1024;
-
-let injectedClient: AiClient | null = null;
-let defaultClient: AiClient | null = null;
-
-/** Replace the API client (tests), or pass `null` to go back to the real one. */
-export function setAiClient(client: AiClient | null): void {
-  injectedClient = client;
-}
-
-function getClient(): AiClient {
-  if (injectedClient) return injectedClient;
-  if (!defaultClient) {
-    const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
-    defaultClient = { messages: { create: (params) => anthropic.messages.create(params) } };
-  }
-  return defaultClient;
-}
-
-function effort(): Effort {
-  const value = process.env.AI_EFFORT;
-  return EFFORTS.includes(value as Effort) ? (value as Effort) : "medium";
-}
-
-function maxTokens(): number {
-  const value = Number(process.env.AI_MAX_TOKENS);
-  return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_TOKENS;
-}
-
-function fileBlock(file: AiFile): Anthropic.ContentBlockParam {
-  const data = file.data.toString("base64");
-  if (file.mime === "application/pdf") {
-    if (file.data.length > MAX_PDF_BYTES) {
-      throw new AiInputError("PDF is larger than 32 MB and cannot be sent to the AI.");
-    }
-    return { type: "document", source: { type: "base64", media_type: "application/pdf", data } };
-  }
-  if (IMAGE_MIMES.includes(file.mime as ImageMime)) {
-    if (data.length > MAX_IMAGE_BASE64_BYTES) {
-      throw new AiInputError("Image is larger than the 10 MB API limit; resize it before upload.");
-    }
-    return {
-      type: "image",
-      source: { type: "base64", media_type: file.mime as ImageMime, data },
-    };
-  }
-  throw new AiInputError(`File type "${file.mime}" cannot be sent to the AI.`);
+function logUsage(callName: string, route: Route, attempt: number, usage: Usage): void {
+  console.info("ai.usage", JSON.stringify({ callName, ...route, attempt, ...usage }));
 }
 
 type Checked<T> = { ok: true; value: T } | { ok: false; reason: string };
@@ -117,21 +53,6 @@ function check<T>(schema: z.ZodType<T>, raw: string): Checked<T> {
   return { ok: false, reason: issues };
 }
 
-function readReply<T>(
-  schema: z.ZodType<T>,
-  message: Pick<Anthropic.Message, "content" | "stop_reason">,
-): Checked<T> {
-  if (message.stop_reason === "refusal") return { ok: false, reason: "the model refused" };
-  if (message.stop_reason === "max_tokens") {
-    return { ok: false, reason: "the reply was cut off at the token limit" };
-  }
-  const text = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-  return check(schema, text);
-}
-
 async function readFixture<T>(callName: string, schema: z.ZodType<T>): Promise<T> {
   const file = path.join(process.cwd(), "tests", "fixtures", "ai", `${callName}.json`);
   const checked = check(schema, await readFile(file, "utf8"));
@@ -140,12 +61,13 @@ async function readFixture<T>(callName: string, schema: z.ZodType<T>): Promise<T
 }
 
 /**
- * Ask the model for output that matches `schema`.
+ * Ask the model for output that matches `schema`, on the call's route (./routes.ts).
  *
  * Files go first in the message, then the text. The reply is validated with
  * Zod; an invalid reply is asked for once more, and a second invalid reply
  * throws `AiOutputError`. API failures (network, rate limit, bad request) are
- * not caught here: the SDK already retries the retryable ones.
+ * not caught here: the SDK already retries the retryable ones. One `ai.usage` line
+ * (call name, route, attempt, tokens; never prompt text) is logged per request.
  *
  * With `AI_FIXTURES=1` no request is made; the result is read from
  * `tests/fixtures/ai/<callName>.json`.
@@ -175,9 +97,9 @@ export async function callAi<T>(args: {
     return readFixture(callName, schema);
   }
 
-  const fileBlocks = files.map(fileBlock);
-  const format = zodOutputFormat(schema);
-  const client = getClient();
+  const route = routeFor(callName);
+  const prepared = files.map(prepareFile);
+  const adapter = ADAPTERS[route.provider];
 
   let reason = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -186,14 +108,17 @@ export async function callAi<T>(args: {
         ? text
         : `${text}\n\nYour previous reply was rejected (${reason}). Reply again with JSON that matches the schema exactly.`;
     await reserve();
-    const message = await client.messages.create({
-      model: process.env.AI_MODEL || DEFAULT_AI_MODEL,
-      max_tokens: maxTokens(),
+    const reply = await adapter.send({
+      callName,
+      route,
       system,
-      messages: [{ role: "user", content: [...fileBlocks, { type: "text", text: prompt }] }],
-      output_config: { effort: effort(), format: { type: "json_schema", schema: format.schema } },
+      prompt,
+      files: prepared,
+      schema,
+      maxTokens: maxTokens(),
     });
-    const checked = readReply(schema, message);
+    logUsage(callName, route, attempt, reply.usage);
+    const checked = reply.ok ? check(schema, reply.text) : reply;
     if (checked.ok) return checked.value;
     reason = checked.reason;
   }

@@ -22,7 +22,7 @@ function reply(text: string, stopReason = "end_turn") {
 }
 
 /** A fake client that returns the given replies in order and records the requests. */
-function fakeClient(...replies: ReturnType<typeof reply>[]) {
+function fakeClient(...replies: (ReturnType<typeof reply> & { usage?: object })[]) {
   const create = vi.fn(async (params: AiCreateParams) => {
     void params;
     const next = replies.shift();
@@ -177,6 +177,95 @@ describe("callAi", () => {
     expect(result.body).toContain("\\frac{d}{dx}");
     expect(result.body).toContain("\\nabla");
     expect(result.body).toContain("\\theta");
+  });
+});
+
+describe("callAi routes", () => {
+  it("sends a strong call to Claude exactly as before the routes existed", async () => {
+    vi.stubEnv("AI_PROVIDER", "anthropic");
+    const create = fakeClient(reply(JSON.stringify({ answer: "ok", score: 1 })));
+
+    await callAi({
+      ...args,
+      callName: "markAttempt",
+      files: [{ mime: "image/png", data: Buffer.from("png") }],
+    });
+
+    expect(create.mock.calls[0][0]).toEqual({
+      model: "claude-sonnet-5-5",
+      max_tokens: 16000,
+      system: "You are a marker.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/png",
+                data: Buffer.from("png").toString("base64"),
+              },
+            },
+            { type: "text", text: "Mark this." },
+          ],
+        },
+      ],
+      output_config: {
+        effort: "medium",
+        format: { type: "json_schema", schema: expect.objectContaining({ type: "object" }) },
+      },
+    });
+  });
+
+  it("sends a cheap call to the cheap model at its effort", async () => {
+    vi.stubEnv("AI_PROVIDER", "anthropic");
+    const create = fakeClient(reply(JSON.stringify({ answer: "ok", score: 1 })));
+
+    await callAi({ ...args, callName: "summariseSheet" });
+
+    expect(create.mock.calls[0][0].model).toBe("claude-haiku-5-5");
+    expect(create.mock.calls[0][0].output_config?.effort).toBe("low");
+  });
+
+  it("logs one usage line per request, with no prompt text", async () => {
+    vi.stubEnv("AI_PROVIDER", "anthropic");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    fakeClient(
+      {
+        ...reply("not json"),
+        usage: { input_tokens: 120, output_tokens: 30, cache_read_input_tokens: 100 },
+      },
+      reply(JSON.stringify({ answer: "ok", score: 1 })),
+    );
+
+    await callAi({ ...args, callName: "markAttempt" });
+
+    expect(info).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(String(info.mock.calls[0][1]));
+    expect(info.mock.calls[0][0]).toBe("ai.usage");
+    expect(first).toEqual({
+      callName: "markAttempt",
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      effort: "medium",
+      attempt: 1,
+      inputTokens: 120,
+      outputTokens: 30,
+      cachedTokens: 100,
+    });
+    expect(JSON.parse(String(info.mock.calls[1][1])).attempt).toBe(2);
+    expect(JSON.stringify(info.mock.calls)).not.toContain("Mark this.");
+  });
+
+  it("fails with the variable's name when a route is malformed, before any request", async () => {
+    vi.stubEnv("AI_ROUTE_markAttempt", "openai");
+    const create = fakeClient();
+
+    await expect(callAi({ ...args, callName: "markAttempt" })).rejects.toThrow(
+      /AI_ROUTE_markAttempt/,
+    );
+    expect(create).not.toHaveBeenCalled();
   });
 });
 
