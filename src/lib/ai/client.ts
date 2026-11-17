@@ -12,24 +12,17 @@ import { currentAiUser, reserveAiCall } from "./budget";
 import { AiInputError, AiOutputError } from "./errors";
 import { prepareFile, type AiFile } from "./files";
 import { anthropicAdapter } from "./providers/anthropic";
+import { openAiAdapter } from "./providers/openai";
 import type { Adapter, Usage } from "./providers/types";
-import { AiConfigError, maxTokens, routeFor, type Provider, type Route } from "./routes";
+import { maxTokens, routeFor, type Provider, type Route } from "./routes";
 
 export { AiInputError, AiOutputError } from "./errors";
 export type { AiFile } from "./files";
 export { setAiClient, type AiClient, type AiCreateParams } from "./providers/anthropic";
+export { setOpenAiClient, type OpenAiClient } from "./providers/openai";
 export { AiConfigError } from "./routes";
 
-const ADAPTERS: Record<Provider, Adapter> = {
-  anthropic: anthropicAdapter,
-  openai: {
-    send() {
-      throw new AiConfigError(
-        "The OpenAI provider is not available yet; set AI_PROVIDER=anthropic.",
-      );
-    },
-  },
-};
+const ADAPTERS: Record<Provider, Adapter> = { anthropic: anthropicAdapter, openai: openAiAdapter };
 
 function logUsage(callName: string, route: Route, attempt: number, usage: Usage): void {
   console.info("ai.usage", JSON.stringify({ callName, ...route, attempt, ...usage }));
