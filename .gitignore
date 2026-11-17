@@ -53,3 +53,6 @@ next-env.d.ts
 
 # end-to-end test build
 /.next-e2e/
+
+# Output of scripts/compare-ai.ts (contains student work)
+ai-comparison*.md

@@ -1,6 +1,6 @@
 # Spec Delta: OpenAI as an AI provider, and a cheaper model for easy calls
 
-Status: approved (owner, 17 November 2026); being built.
+Status: implemented (17 November 2026); not yet deployed. `scripts/compare-ai.ts` not yet run.
 Original spec: [SPEC.md](SPEC.md), "Tech stack" (row "AI") and "AI calls" ("The model id is read
 from `AI_MODEL` (default `claude-sonnet-5-5`)"); [src/lib/ai/README.md](src/lib/ai/README.md).
 
