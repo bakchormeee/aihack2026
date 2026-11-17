@@ -1,8 +1,58 @@
 # AI calls (`src/lib/ai`)
 
-All Claude API use goes through `callAi` in `client.ts`. The modules beside it
+All AI use goes through `callAi` in `client.ts`. The modules beside it
 (`parse-sheet.ts`, `generate-hints.ts`, …) hold one prompt and one Zod schema
 each. They take file bytes (`AiFile`) and never touch storage or the database.
+
+`callAi` holds the shared logic (call-name check, demo budget, fixture mode,
+Zod check and one retry). It picks each call's **route** (provider, model,
+effort) from `routes.ts` and sends the request through the provider's adapter
+in `providers/` (`anthropic.ts`, `openai.ts`). Only those two files import an
+AI SDK.
+
+## Routes
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `AI_PROVIDER` | Provider of every call without an override: `openai` or `anthropic` | `openai` |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | Key of each provider; needed only if a call is routed there. Missing key: `AiConfigError` at the first call | — |
+| `AI_MODEL_STRONG` | Model of the strong tier | openai `gpt-6.2-sol`, anthropic `claude-sonnet-5-5` |
+| `AI_MODEL_CHEAP` | Model of the cheap tier | openai `gpt-6-luna`, anthropic `claude-haiku-5-5` |
+| `AI_EFFORT_STRONG` / `AI_EFFORT_CHEAP` | `low`, `medium`, `high`, `xhigh`, `max` | `medium` / `low` |
+| `AI_ROUTE_<callName>` | One call's route: `provider:model[:effort]` | — |
+| `AI_MODEL` / `AI_EFFORT` | Old names; used for the strong tier with `anthropic` only | — |
+| `AI_MAX_TOKENS` | Output token limit, both providers | 16000 |
+
+Cheap tier: `summariseSheet`, `judgeSpotAnswer`, `groupMisconceptions` (short,
+text-only, low-harm). Every other call name is strong. A value that cannot be
+used throws `AiConfigError` naming the variable, before any request.
+
+After every request `callAi` logs one line, `ai.usage {callName, provider,
+model, effort, attempt, inputTokens, outputTokens, cachedTokens}`. It never
+logs prompt text or student work.
+
+OpenAI prices read on 17 November 2026 (per 1M tokens, input / output):
+`gpt-6.2-astra` $8 / $40, `gpt-6.2-sol` $2 / $10 (cached input $0.10),
+`gpt-6.1-terra` $1 / $5, `gpt-6-luna` $0.10 / $0.50 (cached input $0.01).
+All four accept text and image input.
+
+## OpenAI requests (`providers/openai.ts`)
+
+- `client.responses.create` from `openai` 7.47.0: `instructions` = system
+  prompt; one user input with the files first (a PDF as `input_file` with a
+  base64 `file_data` URL, an image as `input_image` with `detail: "auto"`),
+  then `input_text`.
+- Output: `text.format = {type: "json_schema", name: callName, strict: true,
+  schema}`. The schema comes from `zodTextFormat` (`openai/helpers/zod`, Zod 4
+  supported): every property required, objects closed. `minLength` and
+  `maxLength` are removed before sending; Zod checks them on the reply.
+- `reasoning.effort` = route effort; `max_output_tokens` = `AI_MAX_TOKENS`;
+  `store: false`.
+- A `refusal` content part, or `status: "incomplete"` (for example
+  `max_output_tokens`), is an invalid reply and is retried once.
+- `setOpenAiClient(fake)` replaces the client in tests.
+
+The sections below describe the Claude requests (`providers/anthropic.ts`).
 
 Facts below were read from the Claude API documentation on 14 November 2026
 (Messages API, vision, PDF support, structured outputs) and from the installed
@@ -11,18 +61,18 @@ no API key when this was written. Run `scripts/try-ai.ts` once a key exists.
 
 ## Model
 
-- Model id: read from `AI_MODEL`; default **`claude-sonnet-5-5`** (1M context,
-  128K maximum output). Model ids are used as written, with no date suffix.
+- Model id: from the route; strong default **`claude-sonnet-5-5`** (1M context,
+  128K maximum output), cheap default `claude-haiku-5-5`. Model ids are used as written, with no date suffix.
 - Thinking: adaptive and always on for this model. `callAi` sends no
   `thinking` field (`{type: "disabled"}` and `budget_tokens` return a 400).
-- Effort: `output_config.effort`, read from `AI_EFFORT`, default `medium`
+- Effort: `output_config.effort`, from the route, default `medium`
   (the API default is `high`; `medium` is used for speed). Values: `low`,
   `medium`, `high`, `xhigh`, `max`.
 - `max_tokens`: read from `AI_MAX_TOKENS`, default 16000. Requests are not
   streamed; 16000 keeps a non-streamed request inside the SDK's timeout.
 - Not sent, because this model rejects them: `temperature`/`top_p`/`top_k`,
   an assistant prefill, forced `tool_choice`.
-- If `AI_MODEL` is set to another model, check that it supports
+- If a route names another Claude model, check that it supports
   `output_config.effort` and `output_config.format` (Haiku 4.5 rejects
   `effort`).
 
@@ -82,8 +132,10 @@ is unlikely for mathematics; if one happens it surfaces as `AiOutputError`.
 
 ## Tests
 
-`setAiClient(fake)` replaces the API client; `setAiClient(null)` restores it.
-Unit tests never reach the network. Each module has two fixtures in
+`setAiClient(fake)` replaces the Claude client and `setOpenAiClient(fake)` the
+OpenAI client; `null` restores the real one. Vitest sets `AI_PROVIDER=anthropic`
+(`vitest.config.mts`), so tests that do not choose a provider use the Claude
+fake. Unit tests never reach the network. Each module has two fixtures in
 `tests/fixtures/ai/`: `<callName>.json` (valid, used by fixture mode) and
 `<callName>.invalid.json` (must be rejected by the schema). Every fixture
 contains LaTeX with backslashes.

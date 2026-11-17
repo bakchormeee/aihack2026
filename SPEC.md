@@ -330,7 +330,7 @@ Versions are the latest stable at scaffold time, pinned exactly in
 | Data | PostgreSQL (Neon) through Drizzle ORM **[A]** |
 | Files | S3-compatible object storage (Cloudflare R2), private bucket, signed URLs for upload and download, through `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` **[A]** |
 | Auth | Auth.js v5: Google provider (email magic link via Resend deferred) **[A]** |
-| AI | Claude API through `@anthropic-ai/sdk`, PDF and image input, structured output |
+| AI | OpenAI API (`openai`, Responses API; default) or Claude API (`@anthropic-ai/sdk`), chosen per call; PDF and image input, structured output |
 | Hosting | Vercel **[A]** |
 | Tests | Vitest (unit, contract, integration on an in-memory PGlite database), Playwright (end to end) |
 
@@ -338,8 +338,11 @@ Versions are the latest stable at scaffold time, pinned exactly in
 
 Each call lives in `src/lib/ai/`, takes typed input, and returns output
 validated by a Zod schema. Invalid output is retried once, then reported as a
-failure. The model id is read from `AI_MODEL` (default `claude-sonnet-5-5`)
-**[A]**. The API key is used only on the server.
+failure. Each call has a route (provider, model, effort) from
+`src/lib/ai/routes.ts`: OpenAI by default (`AI_PROVIDER`), a strong model for
+calls that read files or mark work and a cheap model for `summariseSheet`,
+`judgeSpotAnswer` and `groupMisconceptions` (SPEC-ai-providers.md) **[A]**.
+The API keys are used only on the server.
 
 | Call | Input | Output |
 |---|---|---|
@@ -401,7 +404,7 @@ Migrate:        npm run db:migrate               # drizzle-kit migrate
 
 Environment variables, listed in `.env.example` and never committed with
 values: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
-`AUTH_RESEND_KEY`, `ENABLE_TEST_SIGN_IN`, `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_FIXTURES`,
+`AUTH_RESEND_KEY`, `ENABLE_TEST_SIGN_IN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `AI_PROVIDER`, `AI_MODEL_STRONG`, `AI_MODEL_CHEAP`, `AI_EFFORT_STRONG`, `AI_EFFORT_CHEAP`, `AI_ROUTE_<callName>`, `AI_FIXTURES`,
 `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
 
 ## Project Structure
@@ -415,7 +418,7 @@ src/app/                    Routes and route handlers
   revise/                     start and run a revision session
   api/                        route handlers (uploads, AI jobs, status)
 src/components/             UI components; charts in src/components/charts/
-src/lib/ai/                 Claude client, one file per AI call, Zod schemas, prompts
+src/lib/ai/                 AI client and routes, providers/, one file per AI call, Zod schemas, prompts
 src/lib/mastery/            Weakness model and revision queue (pure, no I/O)
 src/lib/marking/            Current-mark and solution-lock rules (pure, no I/O)
 src/lib/storage/            Object storage and signed URLs
@@ -489,7 +492,7 @@ and for agents checking their work: it signs in as a named test user without
 Google. It works only when `NODE_ENV` is not `production` and
 `ENABLE_TEST_SIGN_IN=1`; this variable is never set on Vercel.
 
-Tests never call the real Claude API. Fixtures contain synthetic sheets and
+Tests never call a real AI API. Fixtures contain synthetic sheets and
 working only, never real student uploads. `npm run lint`, `npx tsc --noEmit`
 and `npm test` must pass before every commit.
 
@@ -515,7 +518,7 @@ and `npm test` must pass before every commit.
   - expose one user's files, working or marks to another user;
   - update or delete an attempt, submission, hint reveal or mark;
   - commit secrets, `.env` files or uploaded student work;
-  - call the real Claude API from automated tests;
+  - call a real AI API (OpenAI or Claude) from automated tests;
   - enable the test sign-in in production;
   - remove or skip a failing test without approval.
 
@@ -604,7 +607,8 @@ Each of these was not stated by you. Correct any of them before approval.
    factor 0.9, confidence half-life 30 days, start value 0.5.
 10. Revision sessions are about 60% retry and 40% variant by time.
 11. Providers: Neon (Postgres), Cloudflare R2 (files), Resend (magic-link
-    email), Vercel (hosting); default model `claude-sonnet-5-5`.
+    email), Vercel (hosting); default AI provider OpenAI (strong `gpt-6.2-sol`,
+    cheap `gpt-6-luna`), Claude available per call.
 
 ## Out of Scope (Deferred)
 

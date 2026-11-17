@@ -8,7 +8,8 @@
 // file as { "path": "relative/or/absolute/file.pdf" }; the script reads the
 // bytes and works out the type from the extension.
 //
-// Needs ANTHROPIC_API_KEY (read from .env.local when present). Costs money.
+// Uses the call's route (src/lib/ai/routes.ts): OPENAI_API_KEY for openai, ANTHROPIC_API_KEY for
+// anthropic, read from .env.local when present. Prints the route first. Costs money.
 
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -68,6 +69,10 @@ async function main() {
     process.exit(1);
   }
   if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+
+  const { routeFor } = await import("../src/lib/ai/routes.ts");
+  const route = routeFor(callName);
+  console.error(`${callName} → ${route.provider} ${route.model} (effort ${route.effort})`);
 
   const loaded: Record<string, unknown> = await import(`../src/lib/ai/${moduleName}.ts`);
   const call = loaded[callName] as Call;
