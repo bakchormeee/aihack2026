@@ -4,6 +4,7 @@ import { signOutOfApp } from "@/app/demo/actions";
 import { BrandMark } from "@/components/brand-mark";
 import { DemoBanner } from "@/components/demo-banner";
 import { MainNav } from "@/components/main-nav";
+import { SoundToggle } from "@/components/sound-toggle";
 import { Button } from "@/components/ui/button";
 import { demoAccess, getDemoInfo } from "@/lib/auth/demo-sign-in";
 import { requireUser } from "@/lib/auth/session";
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-muted-foreground hidden max-w-48 truncate text-sm md:inline">
               {user.email ?? user.name}
             </span>
+            <SoundToggle />
             <Button type="submit" variant="outline" size="sm">
               Sign out
             </Button>

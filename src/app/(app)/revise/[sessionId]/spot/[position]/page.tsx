@@ -5,6 +5,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader, Panel } from "@/components/page-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { SpotAnswerForm } from "@/components/spot-answer-form";
+import { PlaySound } from "@/components/play-sound";
 import { SpotReveal } from "@/components/spot-reveal";
 import {
   getSpotSession,
@@ -15,6 +16,7 @@ import {
 } from "@/db/queries/spot";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireUser } from "@/lib/auth/session";
+import { speechEnabled } from "@/lib/speech/transcribe";
 
 // Judging the explanations calls the AI, which can take a little while.
 export const maxDuration = 120;
@@ -62,6 +64,10 @@ export default async function SpotQuestionPage({
 
       {answered && answer && answer.outcome ? (
         <>
+          <PlaySound
+            sound={answer.outcome === "full" ? "success" : answer.outcome}
+            once={`spot:${sessionId}:${position}`}
+          />
           <SpotReveal
             lines={item.lines}
             planted={item.planted.map((p) => ({
@@ -90,7 +96,12 @@ export default async function SpotQuestionPage({
           <AutoRefresh active />
         </p>
       ) : (
-        <SpotAnswerForm sessionId={session.id} position={item.position} lines={item.lines} />
+        <SpotAnswerForm
+          sessionId={session.id}
+          position={item.position}
+          lines={item.lines}
+          speech={speechEnabled()}
+        />
       )}
     </section>
   );

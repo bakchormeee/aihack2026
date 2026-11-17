@@ -12,6 +12,7 @@ import { MathText } from "@/components/math-text";
 import { Panel } from "@/components/page-parts";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { HintLevel } from "@/lib/domain";
+import { playSfx } from "@/lib/sfx";
 import {
   openAttempt,
   revealNextHint,
@@ -97,6 +98,7 @@ export function QuestionView({
     startTransition(async () => {
       const result = await revealNextHint({ attemptId });
       if (!result.ok) return setError(result.error);
+      playSfx("hint");
       // The third hint unlocks the worked solution, which the server renders.
       if (result.level === 3) router.refresh();
       setShown((all) =>
