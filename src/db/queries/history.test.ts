@@ -27,7 +27,11 @@ import {
   finishSummary,
   getCourseSheetOverview,
   getSheetHistory,
+  getSheetQuestionStatuses,
   getSheetSummaryInput,
+  latestSubmitted,
+  markOfQuestion,
+  statusOfQuestion,
   listMistakes,
   readSummary,
   retrySummary,
@@ -94,6 +98,8 @@ async function addAttempt(
     inherited?: number;
     reveals?: number[];
     submitted?: boolean;
+    /** Defaults to done. */
+    markStatus?: "none" | "pending" | "done" | "failed" | "awaiting_official";
     text?: string;
     files?: { path: string; mime: string }[];
     marks?: MarkSpec[];
@@ -123,7 +129,7 @@ async function addAttempt(
         attemptId: attempt.id,
         text: o.text ?? "x = 1",
         submittedAt: at(o.startedAt + 1),
-        markStatus: "done",
+        markStatus: o.markStatus ?? "done",
       })
       .returning();
     for (const [i, file] of (o.files ?? []).entries())
@@ -625,5 +631,88 @@ describe("history and the bin", () => {
     expect(await getCourseSheetOverview(w.user.id, w.course.id)).toEqual([]);
     expect((await listMistakes(w.user.id, w.course.id, {})).items).toEqual([]);
     expect(await getSheetHistory(w.user.id, w.sheet.id)).toEqual([]);
+  });
+});
+
+describe("the mark of a question (question-marks)", () => {
+  it("is the latest submitted attempt's mark, not the best", async () => {
+    const w = await world("h-latest@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 5, outcome: "full", at: 5 }],
+    });
+    const second = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 20,
+      marks: [{ score: 2, outcome: "partial", at: 25 }],
+    });
+    const [record] = await getSheetHistory(w.user.id, w.sheet.id);
+
+    expect(latestSubmitted(record)?.id).toBe(second.id);
+    expect(markOfQuestion(record)?.score).toBe(2);
+    expect(statusOfQuestion(record)).toMatchObject({
+      kind: "marked",
+      score: 2,
+      outcomeLabel: "Partial",
+      attempts: 2,
+    });
+  });
+
+  it("uses the official mark once it exists", async () => {
+    const w = await world("h-official@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [
+        { score: 2, outcome: "partial", at: 5 },
+        { score: 4, outcome: "full", basis: "official", at: 9 },
+      ],
+    });
+    const [record] = await getSheetHistory(w.user.id, w.sheet.id);
+    expect(statusOfQuestion(record)).toMatchObject({
+      kind: "marked",
+      score: 4,
+      outcomeLabel: "Correct, slips",
+    });
+  });
+
+  it("gives each question its status", async () => {
+    const w = await world("h-status@test.local", ["1", "2", "3", "4", "5", "6"]);
+    const [q1, q2, q3, q4, q5] = w.qs;
+    await addAttempt(w.user.id, q1.id, {
+      startedAt: 1,
+      marks: [{ score: 5, outcome: "full", at: 5 }],
+    });
+    await addAttempt(w.user.id, q2.id, { startedAt: 1, submitted: true, markStatus: "pending" });
+    await addAttempt(w.user.id, q3.id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+    await addAttempt(w.user.id, q4.id, { startedAt: 1, submitted: true, markStatus: "failed" });
+    // A draft: a submission row that was never submitted, and one with no working.
+    const draft = await addAttempt(w.user.id, q5.id, { startedAt: 1, submitted: false });
+    await db.insert(submissions).values({ attemptId: draft.id, text: "half done" });
+
+    const statuses = await getSheetQuestionStatuses(w.user.id, w.sheet.id);
+
+    expect(w.qs.map((q) => statuses[q.id].kind)).toEqual([
+      "marked",
+      "marking",
+      "waiting",
+      "failed",
+      "draft",
+      "none",
+    ]);
+  });
+
+  it("shows an empty submission row as not started, and gives nothing for another user's sheet", async () => {
+    const w = await world("h-empty@test.local", ["1"]);
+    const attempt = await addAttempt(w.user.id, w.qs[0].id, { startedAt: 1, submitted: false });
+    await db.insert(submissions).values({ attemptId: attempt.id, text: "  " });
+    expect((await getSheetQuestionStatuses(w.user.id, w.sheet.id))[w.qs[0].id]).toEqual({
+      kind: "none",
+    });
+
+    const other = await world("h-empty2@test.local", ["1"]);
+    expect(await getSheetQuestionStatuses(other.user.id, w.sheet.id)).toEqual({});
   });
 });

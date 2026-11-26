@@ -19,9 +19,10 @@ import {
   submissions,
   topics,
 } from "@/db/schema";
-import type { ErrorType, HintLevel, MarkBasis, Outcome } from "@/lib/domain";
+import type { ErrorType, HintLevel, MarkBasis, MarkStatus, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
+import { questionStatus, type QuestionStatus } from "@/lib/scores/status";
 
 import { binnedQuestionIdsOf, liveCourse } from "./bin";
 import { listSheets } from "./sheets";
@@ -42,7 +43,7 @@ export type AttemptRecord = {
     id: string;
     text: string | null;
     submittedAt: Date | null;
-    markStatus: string;
+    markStatus: MarkStatus;
     files: { id: string; mime: string; position: number }[];
   } | null;
   /** Oldest first. */
@@ -60,6 +61,53 @@ export type QuestionRecord = {
 };
 
 const isSubmitted = (a: AttemptRecord) => a.submission?.submittedAt != null;
+
+// ── The mark of a question (SPEC-study-views.md, question-marks) ──
+// One definition, used by the Questions tab, the sheet score, the Summary and the question page:
+// the mark of a question is the current mark (official beats AI) of its LATEST submitted attempt,
+// not the best one. A latest attempt with no mark yet (marking, waiting, failed) gives no mark.
+
+/** The question's latest submitted attempt (records are oldest first); null when none. */
+export function latestSubmitted(record: QuestionRecord): AttemptRecord | null {
+  return [...record.attempts].reverse().find(isSubmitted) ?? null;
+}
+
+/** The mark of the question by the rule above; null when it has none. */
+export function markOfQuestion(record: QuestionRecord): Mark | null {
+  return latestSubmitted(record)?.current ?? null;
+}
+
+/** The status shown on the question's row. */
+export function statusOfQuestion(record: QuestionRecord): QuestionStatus {
+  const latest = latestSubmitted(record);
+  const current = latest?.current ?? null;
+  return questionStatus({
+    submittedAttempts: record.attempts.filter(isSubmitted).length,
+    latest: latest
+      ? {
+          markStatus: latest.submission!.markStatus,
+          mark: current ? { score: current.score, outcome: current.outcome } : null,
+        }
+      : null,
+    hasDraft: record.attempts.some(
+      (a) =>
+        a.submission !== null &&
+        a.submission.submittedAt === null &&
+        ((a.submission.text ?? "").trim().length > 0 || a.submission.files.length > 0),
+    ),
+  });
+}
+
+/** Status of every question of the sheet, by question id. */
+export async function getSheetQuestionStatuses(
+  userId: string,
+  sheetId: string,
+): Promise<Record<string, QuestionStatus>> {
+  const records = await loadRecords(userId, { sheetId });
+  return Object.fromEntries(
+    records.map((record) => [record.question.id, statusOfQuestion(record)]),
+  );
+}
 
 /**
  * Loads the user's questions (all of a course, or of one sheet) with every
