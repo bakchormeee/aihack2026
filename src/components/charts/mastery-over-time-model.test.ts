@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BAND_REGIONS,
   LINE_COLORS,
+  bandChange,
+  bandLabelAt,
   lineStyle,
   mergeSeries,
   sortedEvents,
@@ -96,5 +99,44 @@ describe("valuesAt", () => {
     expect(valuesAt(rows, ["a", "b"], 0)).toEqual({ a: null, b: null });
     expect(valuesAt(rows, ["a", "b"], 2)).toEqual({ a: 0.2, b: 0.5 });
     expect(valuesAt(rows, ["a", "b"], 9)).toEqual({ a: 0.6, b: 0.5 });
+  });
+});
+
+describe("BAND_REGIONS", () => {
+  it("covers 0 to 1 with Needs work, Getting there and Solid, from the shared cut-offs", () => {
+    expect(BAND_REGIONS.map((r) => [r.label, r.from, r.to])).toEqual([
+      ["Needs work", 0, 0.45],
+      ["Getting there", 0.45, 0.7],
+      ["Solid", 0.7, 1],
+    ]);
+  });
+
+  it("gives each band its own tint", () => {
+    expect(new Set(BAND_REGIONS.map((r) => r.fill)).size).toBe(3);
+  });
+});
+
+describe("bandLabelAt", () => {
+  it("names the band of a mastery value at and around the cut-offs", () => {
+    expect(bandLabelAt(0)).toBe("Needs work");
+    expect(bandLabelAt(0.4499)).toBe("Needs work");
+    expect(bandLabelAt(0.45)).toBe("Getting there");
+    expect(bandLabelAt(0.7)).toBe("Getting there");
+    expect(bandLabelAt(0.7001)).toBe("Solid");
+    expect(bandLabelAt(1)).toBe("Solid");
+  });
+});
+
+describe("bandChange", () => {
+  it("says up, down or steady by the band, with no number of points", () => {
+    expect(bandChange(0.2, 0.8)).toBe("Up");
+    expect(bandChange(0.8, 0.2)).toBe("Down");
+    expect(bandChange(0.46, 0.69)).toBe("Same band");
+    expect(bandChange(0.1, 0.4)).toBe("Same band");
+  });
+
+  it("has no change to report without two values", () => {
+    expect(bandChange(null, 0.5)).toBe("–");
+    expect(bandChange(0.5, null)).toBe("–");
   });
 });

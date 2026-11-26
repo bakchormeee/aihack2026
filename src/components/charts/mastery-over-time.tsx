@@ -6,14 +6,17 @@ import {
   LabelList,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-import { masteryBand } from "./colors";
 import {
+  BAND_REGIONS,
+  bandChange,
+  bandLabelAt,
   formatDay,
   lineStyle,
   mergeSeries,
@@ -37,8 +40,6 @@ const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom - 30;
 const LABEL_GAP_PX = 15;
 /** Topics up to this count get their name written at the end of their line. */
 const DIRECT_LABEL_MAX = 4;
-
-const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 /** The last row index holding a value for each topic. */
 function lastIndexByTopic(rows: Row[], keys: string[]): Map<string, number> {
@@ -107,7 +108,7 @@ function ChartTooltip({ active, label, rows, topics, hidden }: TipProps) {
                   strokeDasharray={dash}
                 />
               </svg>
-              <strong className="w-9 tabular-nums">{pct(v as number)}</strong>
+              <strong className="w-24 shrink-0">{bandLabelAt(v as number)}</strong>
               <span className="text-muted-foreground truncate">{t.name}</span>
             </li>
           );
@@ -169,8 +170,26 @@ export function MasteryOverTime({ topics, events }: MasteryOverTimeProps) {
           className="text-muted-foreground"
         >
           <CartesianGrid stroke="currentColor" strokeOpacity={0.14} vertical={false} />
-          {/* The 50% line: below it a topic still needs work. */}
-          <ReferenceLine y={0.5} stroke="currentColor" strokeOpacity={0.45} strokeDasharray="2 3" />
+          {/* The vertical axis is three shaded bands, not a percentage scale. */}
+          {BAND_REGIONS.map((band) => (
+            <ReferenceArea
+              key={band.id}
+              y1={band.from}
+              y2={band.to}
+              fill={band.fill}
+              fillOpacity={0.08}
+              stroke="none"
+              ifOverflow="visible"
+              label={{
+                value: band.label,
+                position: "insideTopLeft",
+                fontSize: 11,
+                fontWeight: 600,
+                fill: "currentColor",
+                fillOpacity: 0.75,
+              }}
+            />
+          ))}
           <XAxis
             dataKey="t"
             type="number"
@@ -184,15 +203,7 @@ export function MasteryOverTime({ topics, events }: MasteryOverTimeProps) {
             tickCount={5}
             minTickGap={28}
           />
-          <YAxis
-            domain={[0, 1]}
-            ticks={[0, 0.25, 0.5, 0.75, 1]}
-            tickFormatter={pct}
-            tick={{ fill: "currentColor", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={40}
-          />
+          <YAxis domain={[0, 1]} hide />
           {evs.map((e, i) => (
             <ReferenceLine
               key={i}
@@ -260,8 +271,7 @@ export function MasteryOverTime({ topics, events }: MasteryOverTimeProps) {
                           fill="var(--foreground)"
                           opacity={dim ? 0.35 : 1}
                         >
-                          <tspan fontWeight={600}>{pct(Number(props.value))}</tspan>
-                          <tspan dx={5} fill="var(--muted-foreground)">
+                          <tspan fill="var(--muted-foreground)">
                             {topic.name.length > 13 ? `${topic.name.slice(0, 12)}…` : topic.name}
                           </tspan>
                         </text>
@@ -355,26 +365,19 @@ export function MasteryOverTime({ topics, events }: MasteryOverTimeProps) {
                   <th className="py-1 pr-4 font-medium">Topic</th>
                   <th className="py-1 pr-4 font-medium">First</th>
                   <th className="py-1 pr-4 font-medium">Latest</th>
-                  <th className="py-1 pr-4 font-medium">Change</th>
-                  <th className="py-1 font-medium">Now</th>
+                  <th className="py-1 font-medium">Change</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {table.map(({ t, first, latest }) => {
-                  const change = first !== null && latest !== null ? latest - first : null;
                   return (
                     <tr key={t.id}>
                       <td className="py-1.5 pr-4">{t.name}</td>
-                      <td className="py-1.5 pr-4">{first === null ? "–" : pct(first)}</td>
+                      <td className="py-1.5 pr-4">{first === null ? "–" : bandLabelAt(first)}</td>
                       <td className="py-1.5 pr-4 font-medium">
-                        {latest === null ? "–" : pct(latest)}
+                        {latest === null ? "–" : bandLabelAt(latest)}
                       </td>
-                      <td className="py-1.5 pr-4">
-                        {change === null
-                          ? "–"
-                          : `${change > 0 ? "▲ +" : change < 0 ? "▼ " : ""}${Math.round(change * 100)} pts`}
-                      </td>
-                      <td className="py-1.5 text-muted-foreground">{masteryBand(latest)}</td>
+                      <td className="py-1.5 text-muted-foreground">{bandChange(first, latest)}</td>
                     </tr>
                   );
                 })}

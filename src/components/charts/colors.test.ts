@@ -3,14 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ERROR_TYPES } from "@/lib/domain";
 import { severityOf } from "@/lib/marking/rules";
 
-import {
-  ERROR_TYPE_ORDER,
-  masteryBand,
-  masteryColor,
-  NEUTRAL_FILL,
-  OUTCOME_STYLE,
-  textColorOn,
-} from "./colors";
+import { ERROR_TYPE_ORDER, masteryColor, NEUTRAL_FILL, OUTCOME_STYLE, textColorOn } from "./colors";
 
 describe("masteryColor", () => {
   it("is neutral grey for null", () => {
@@ -30,16 +23,6 @@ describe("masteryColor", () => {
     const colours = [0, 0.25, 0.5, 0.75, 1].map(masteryColor);
     expect(new Set(colours).size).toBe(5);
     expect(colours).not.toContain(NEUTRAL_FILL);
-  });
-});
-
-describe("masteryBand", () => {
-  it("names every part of the scale", () => {
-    expect(masteryBand(null)).toBe("Not tried yet");
-    expect(masteryBand(0.1)).toBe("Needs work");
-    expect(masteryBand(0.4)).toBe("Shaky");
-    expect(masteryBand(0.6)).toBe("Getting there");
-    expect(masteryBand(0.9)).toBe("Secure");
   });
 });
 

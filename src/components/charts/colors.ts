@@ -50,15 +50,6 @@ export function masteryColor(mastery: number | null): string {
   return rgbToHex([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]);
 }
 
-/** A plain-words band for a mastery value, so colour is never the only cue. */
-export function masteryBand(mastery: number | null): string {
-  if (mastery === null || Number.isNaN(mastery)) return "Not tried yet";
-  if (mastery < 0.35) return "Needs work";
-  if (mastery < 0.5) return "Shaky";
-  if (mastery < 0.7) return "Getting there";
-  return "Secure";
-}
-
 /** Black or white, whichever reads better on the given hex fill. */
 export function textColorOn(hex: string): "#000000" | "#ffffff" {
   const [r, g, b] = hexToRgb(hex).map((v) => {
