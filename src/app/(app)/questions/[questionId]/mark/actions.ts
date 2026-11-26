@@ -26,7 +26,7 @@ export async function retryMarkAction(questionId: string, attemptId: string): Pr
     const claim = await claimMark({ submissionId: work.submissionId, basis: "ai" });
     if (claim) after(() => performMark(claim));
   }
-  revalidatePath(`/questions/${questionId}/mark`);
+  revalidatePath(`/questions/${questionId}`);
 }
 
 const questionHref = (questionId: string, sessionId?: string) =>
@@ -80,6 +80,6 @@ export async function disputeAction(
     if (error instanceof NotFoundError) return { error: "Attempt not found." };
     throw error;
   }
-  revalidatePath(`/questions/${questionId}/mark`);
+  revalidatePath(`/questions/${questionId}`);
   return {};
 }

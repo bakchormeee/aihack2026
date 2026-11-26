@@ -50,7 +50,7 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
   // Get one answer marked: its mistakes become the student's common errors.
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
-  await page.getByRole("link", { name: "See the mark" }).click();
+  // The mark is on the question page itself: there is no "See the mark" step.
   await expect(page.getByText("3/5", { exact: true })).toBeVisible();
 
   // Mastery of the topic before any spot-the-error answer.

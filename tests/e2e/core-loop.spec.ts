@@ -50,10 +50,10 @@ test("sign in, upload a sheet, use a hint, submit working and see the mark", asy
     "By parts, $\\int_0^{\\pi} \\sin x \\, dx = \\big[ \\cos x \\big]_0^{\\pi}$, so the integral is $-2$.";
   await page.getByLabel(/Type it/).fill(working);
   await page.getByRole("button", { name: "Submit working" }).click();
-  await expect(page.getByText("Your working has been submitted.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your working (submitted)" })).toBeVisible();
 
   // The mark arrives, labelled as provisional AI marking.
-  await page.getByRole("link", { name: "See the mark" }).click();
+  // The mark is on the question page itself: there is no "See the mark" step.
   await expect(page.getByText("AI-marked, provisional")).toBeVisible();
   await expect(page.getByText("3/5", { exact: true })).toBeVisible();
   await expect(page.getByText("Partly right").first()).toBeVisible();

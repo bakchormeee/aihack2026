@@ -57,7 +57,7 @@ test("a mark can be disputed twice, keeping every earlier mark, and then no more
   await openQuestion(page, sheetUrl, "2(a)");
   questionUrl = page.url();
   await submitTypedWorking(page, "Integrating by parts, the integral is $-2$.");
-  await page.getByRole("link", { name: "See the mark" }).click();
+  // The mark is on the question page itself: there is no "See the mark" step.
   await expect(page.getByText("3/5", { exact: true })).toBeVisible();
   markUrl = page.url();
 
