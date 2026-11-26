@@ -9,6 +9,7 @@ import {
   submitWorkingAction,
   type WorkingFile,
 } from "@/app/(app)/questions/[questionId]/submit-actions";
+import { MarkWithAiSwitch } from "@/components/mark-with-ai-switch";
 import { MathText } from "@/components/math-text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,10 @@ type Props = {
   initialText: string;
   initialFiles: WorkingFile[];
   submitted: boolean;
+  /** The sheet's last position of the "Mark with AI now" switch. */
+  markWithAi?: boolean;
+  /** True when the question has an official solution: it is marked against it, switch locked. */
+  hasOfficial?: boolean;
   /** Called after a successful submit, so the page can show the mark. */
   onSubmitted: () => void;
   /** Runs just before the working is submitted (for example, to save the timer). */
@@ -60,9 +65,12 @@ export function WorkingInput({
   initialText,
   initialFiles,
   submitted,
+  markWithAi = true,
+  hasOfficial = false,
   onSubmitted,
   beforeSubmit,
 }: Props) {
+  const [aiNow, setAiNow] = useState(markWithAi);
   const [text, setText] = useState(initialText);
   const [files, setFiles] = useState(initialFiles);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +134,7 @@ export function WorkingInput({
     startTransition(async () => {
       if (!(await saveNow(text))) return;
       await beforeSubmit?.();
-      const result = await submitWorkingAction({ attemptId });
+      const result = await submitWorkingAction({ attemptId, markWithAi: aiNow });
       if (result.ok) onSubmitted();
       else setError(result.error);
     });
@@ -207,9 +215,18 @@ export function WorkingInput({
       </div>
 
       <div className="flex flex-col items-start gap-2">
-        <Button type="button" onClick={submit} disabled={!attemptId || !hasWorking || pending}>
-          {pending ? "Working…" : "Submit working"}
-        </Button>
+        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+          <Button type="button" onClick={submit} disabled={!attemptId || !hasWorking || pending}>
+            {pending ? "Working…" : "Submit working"}
+          </Button>
+          <MarkWithAiSwitch
+            checked={aiNow}
+            onCheckedChange={setAiNow}
+            total={1}
+            official={hasOfficial ? 1 : 0}
+            disabled={pending}
+          />
+        </div>
         <p className="text-muted-foreground text-xs">
           You cannot change working after you submit it.
         </p>

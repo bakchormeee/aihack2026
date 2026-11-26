@@ -9,6 +9,7 @@ import { QuestionView } from "@/components/question-view";
 import { getLatestAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
 import { getQuestionTimeline } from "@/db/queries/history";
 import { getVisibleSolution } from "@/db/queries/marking";
+import { officialQuestionIds } from "@/db/queries/mark-switch";
 import { getWorkingFor } from "@/db/queries/working";
 import { SolutionPanel } from "@/components/solution-panel";
 import { db } from "@/db";
@@ -60,6 +61,7 @@ export default async function QuestionPage({
     ? await db.select().from(sheets).where(eq(sheets.id, question.sheetId))
     : [];
   const timerEnabled = sheet?.timerEnabled ?? true;
+  const hasOfficial = (await officialQuestionIds([question.id])).length > 0;
 
   return (
     <section className="flex flex-col gap-6">
@@ -93,6 +95,8 @@ export default async function QuestionPage({
         initialHints={visible.hints}
         hintsReady={hintsReady}
         timerEnabled={timerEnabled}
+        markWithAi={sheet?.markWithAi ?? true}
+        hasOfficial={hasOfficial}
         initialSeconds={attempt?.secondsSpent ?? 0}
         initialRating={attempt?.difficultyRating ?? null}
         initialText={working?.text ?? ""}

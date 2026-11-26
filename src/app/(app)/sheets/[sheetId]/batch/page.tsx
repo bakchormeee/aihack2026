@@ -1,7 +1,9 @@
 import { BatchWorking } from "@/components/batch/review";
 import { PageHeader, Panel } from "@/components/page-parts";
 import { getBatchQuestions } from "@/db/queries/batch-working";
+import { officialQuestionIds } from "@/db/queries/mark-switch";
 import { orNotFound } from "@/lib/auth/guards";
+import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 
 // The matching call reads up to 10 photos and can take a while.
@@ -11,6 +13,8 @@ export default async function BatchWorkingPage({ params }: PageProps<"/sheets/[s
   const user = await requireUser();
   const { sheetId } = await params;
   const { ready, questions } = await orNotFound(getBatchQuestions(user.id, sheetId));
+  const sheet = await orNotFound(requireSheet(user.id, sheetId));
+  const official = await officialQuestionIds(questions.map((q) => q.id));
   const open = questions.filter((q) => q.canTakeWorking).length;
   const sheetHref = `/sheets/${sheetId}`;
 
@@ -26,7 +30,12 @@ export default async function BatchWorkingPage({ params }: PageProps<"/sheets/[s
       ) : open === 0 ? (
         <Panel role="status">Every question on this sheet already has submitted working.</Panel>
       ) : (
-        <BatchWorking sheetId={sheetId} sheetHref={sheetHref} />
+        <BatchWorking
+          sheetId={sheetId}
+          sheetHref={sheetHref}
+          initialMarkWithAi={sheet.markWithAi}
+          officialQuestionIds={official}
+        />
       )}
     </section>
   );

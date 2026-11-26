@@ -40,6 +40,10 @@ type Props = {
   hintsReady: boolean;
   /** Whether the sheet's timer is on. */
   timerEnabled: boolean;
+  /** The sheet's last position of the "Mark with AI now" switch. */
+  markWithAi: boolean;
+  /** True when the question has an official solution: it is marked against it, switch locked. */
+  hasOfficial: boolean;
   initialSeconds: number;
   initialRating: number | null;
   initialText: string;
@@ -63,6 +67,8 @@ export function QuestionView({
   initialHints,
   hintsReady,
   timerEnabled,
+  markWithAi,
+  hasOfficial,
   initialSeconds,
   initialRating,
   initialText,
@@ -211,6 +217,8 @@ export function QuestionView({
           initialText={initialText}
           initialFiles={initialFiles}
           submitted={submitted}
+          markWithAi={markWithAi}
+          hasOfficial={hasOfficial}
           beforeSubmit={() => flushTimer.current()}
           onSubmitted={() => router.refresh()}
         />

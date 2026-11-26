@@ -20,3 +20,30 @@ export function parseSwitch(value: unknown): boolean | undefined {
   if (value === false || value === "false" || value === "off") return false;
   return undefined;
 }
+
+export type SwitchView = {
+  /** True when every question is marked against its official solution: the switch cannot change. */
+  locked: boolean;
+  /** The line under the switch. */
+  text: string;
+  /** "Applies to N of M questions", when only some of several questions have official solutions. */
+  scope: string | null;
+};
+
+/**
+ * What the "Mark with AI now" switch says. `total` is the number of questions the submit covers
+ * and `official` how many of them already have an official solution.
+ */
+export function switchView(i: { checked: boolean; total: number; official: number }): SwitchView {
+  if (i.total > 0 && i.official >= i.total) {
+    return { locked: true, text: "Marked against the official solution", scope: null };
+  }
+  const text = i.checked
+    ? "The AI marks it in about a minute."
+    : "Not marked until the official solutions are uploaded.";
+  const scope =
+    i.official > 0 && i.total > 1
+      ? `Applies to ${i.total - i.official} of ${i.total} questions`
+      : null;
+  return { locked: false, text, scope };
+}

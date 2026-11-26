@@ -13,6 +13,7 @@ import {
   proposeBatchAction,
   submitBatchAction,
 } from "@/app/(app)/sheets/[sheetId]/batch/actions";
+import { MarkWithAiSwitch } from "@/components/mark-with-ai-switch";
 import { MathText } from "@/components/math-text";
 import { Panel, SectionTitle } from "@/components/page-parts";
 import { Button } from "@/components/ui/button";
@@ -122,8 +123,21 @@ function QuestionSelect({
   );
 }
 
-export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHref: string }) {
+export function BatchWorking({
+  sheetId,
+  sheetHref,
+  initialMarkWithAi = true,
+  officialQuestionIds = [],
+}: {
+  sheetId: string;
+  sheetHref: string;
+  /** The sheet's last position of the "Mark with AI now" switch. */
+  initialMarkWithAi?: boolean;
+  /** Questions of this sheet that already have an official solution. */
+  officialQuestionIds?: string[];
+}) {
   const router = useRouter();
+  const [aiNow, setAiNow] = useState(initialMarkWithAi);
   const [chosen, setChosen] = useState<File[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -277,7 +291,7 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
       }
 
       setBusy("Submitting…");
-      const result = await submitBatchAction({ sheetId, questions: confirmed });
+      const result = await submitBatchAction({ sheetId, markWithAi: aiNow, questions: confirmed });
       if (!result.ok) throw new Error(result.error);
       finished.current = true;
       router.push(sheetHref);
@@ -548,6 +562,13 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
       {groups.map((g) => (
         <Panel key={g.question.id} className="flex flex-col gap-3">
           <SectionTitle>Question {g.question.label}</SectionTitle>
+          <p className="text-muted-foreground text-xs">
+            {officialQuestionIds.includes(g.question.id)
+              ? "Marked against the official solution"
+              : aiNow
+                ? "AI marks now"
+                : "Waits for official solution"}
+          </p>
           <div className="text-muted-foreground max-h-24 overflow-hidden text-sm [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
             <MathText>{g.question.body}</MathText>
           </div>
@@ -605,6 +626,14 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
 
       {busyText}
       {errorText}
+
+      <MarkWithAiSwitch
+        checked={aiNow}
+        onCheckedChange={setAiNow}
+        total={groups.length}
+        official={groups.filter((g) => officialQuestionIds.includes(g.question.id)).length}
+        disabled={!!busy}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button

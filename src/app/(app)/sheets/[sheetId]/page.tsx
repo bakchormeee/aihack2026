@@ -5,7 +5,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-parts";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSheetQuestionStatuses } from "@/db/queries/history";
 import { QuestionStatusView } from "@/components/question-status";
@@ -20,7 +20,9 @@ import { deleteSentence } from "@/lib/bin/rules";
 import { deleteLeftoverBatchPhotos } from "@/lib/storage/batch-photos";
 
 import { deleteSheetAction } from "../../courses/[courseId]/delete-actions";
-import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } from "./actions";
+import { SubmitAllForm } from "./submit-all-form";
+import { officialQuestionIds } from "@/db/queries/mark-switch";
+import { retryHintsAction, retryParseAction, setTimerAction } from "./actions";
 
 // The retry button starts the background parse again, which can run for a few minutes.
 export const maxDuration = 300;
@@ -43,6 +45,7 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
     ),
   );
   const questions = sheet.status === "ready" ? await listQuestionsWithTopics(user.id, sheetId) : [];
+  const official = new Set(await officialQuestionIds(questions.map((q) => q.id)));
   const statuses = questions.length > 0 ? await getSheetQuestionStatuses(user.id, sheetId) : {};
 
   const stuck = sheet.status === "parsing" && isStale(sheet.statusUpdatedAt);
@@ -120,20 +123,20 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
       ) : null}
 
       {questions.length > 0 ? (
-        <form
-          action={submitAllAction.bind(null, sheet.id)}
-          className="flex flex-wrap items-center gap-3"
-        >
-          <Link href={`/sheets/${sheet.id}/batch`} className={buttonVariants()}>
-            Upload working for several questions
-          </Link>
-          <Button type="submit" variant="outline">
-            Submit all drafts
-          </Button>
-          <span className="text-muted-foreground text-sm">
-            Submits the working you have written or attached on any question but not yet submitted.
-          </span>
-        </form>
+        <SubmitAllForm
+          sheetId={sheet.id}
+          initialMarkWithAi={sheet.markWithAi}
+          total={
+            questions.filter((q) => ["none", "draft"].includes(statuses[q.id]?.kind ?? "none"))
+              .length
+          }
+          official={
+            questions.filter(
+              (q) =>
+                official.has(q.id) && ["none", "draft"].includes(statuses[q.id]?.kind ?? "none"),
+            ).length
+          }
+        />
       ) : null}
 
       {questions.length > 0 ? (
