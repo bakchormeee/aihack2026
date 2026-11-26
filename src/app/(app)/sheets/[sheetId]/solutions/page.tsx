@@ -16,6 +16,8 @@ import { isStale } from "@/lib/pipeline/stale";
 
 import { retryNowAction } from "@/app/(app)/questions/[questionId]/mark/actions";
 import { retryRemarkAction } from "./actions";
+import { getOfficialSolutions } from "@/db/queries/official-solutions";
+import { OfficialSolutionsList } from "./official-solutions-list";
 import { SolutionsUploadForm } from "./solutions-upload-form";
 
 // The actions on this page start AI work that can run for several minutes.
@@ -96,10 +98,14 @@ export default async function OfficialSolutionsPage({
 }
 
 async function Review({ sheetId, userId }: { sheetId: string; userId: string }) {
-  const { changed, notFull } = await getSolutionsReview(userId, sheetId);
+  const [{ changed, notFull }, official] = await Promise.all([
+    getSolutionsReview(userId, sheetId),
+    getOfficialSolutions(userId, sheetId),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
+      <OfficialSolutionsList questions={official.questions} files={official.files} />
       <p className="text-muted-foreground text-sm">
         Marks given against the official solutions are labelled as such on each mark screen.
       </p>

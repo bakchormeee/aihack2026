@@ -100,7 +100,19 @@ test("uploading the official solutions re-marks the answers and shows the review
   await expect(page.getByRole("heading", { name: "Still to get right" })).toBeVisible({
     timeout: 90_000,
   });
-  await expect(page.getByText(/Integrating by parts with/).first()).toBeVisible();
+  await expect(
+    page
+      .getByRole("article")
+      .getByText(/Integrating by parts with/)
+      .first(),
+  ).toBeVisible();
+
+  // Every question's official solution can be read on the Solutions tab, folded by question.
+  const list = page.getByRole("region", { name: "Solutions by question" });
+  await expect(list.getByText(/of 4 questions have an official solution/)).toBeVisible();
+  await expect(list.getByRole("link", { name: "Open the uploaded solutions" })).toBeVisible();
+  await list.getByText("Question 1", { exact: true }).click();
+  await expect(list.locator("details[open]")).toHaveCount(1);
 
   // The mark screen now says the mark is against the official solutions.
   await page.goto(markUrl);
