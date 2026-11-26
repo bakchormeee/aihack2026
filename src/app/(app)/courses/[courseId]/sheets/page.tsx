@@ -15,6 +15,7 @@ import { getCourseSheetOverview } from "@/db/queries/history";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireCourse } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { formatScore } from "@/lib/scores/score";
 
 import { SheetUploadForm } from "./sheet-upload-form";
 
@@ -59,17 +60,17 @@ export default async function SheetsPage({ params }: PageProps<"/courses/[course
                   </span>
                   {sheet.status === "ready" ? (
                     <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-5">
-                      <Stat label="Submitted" value={`${stats.submitted} / ${stats.total}`} />
                       <Stat
-                        label="Average score"
-                        value={stats.averageScore === null ? "–" : `${stats.averageScore}/5`}
+                        label="Attempted"
+                        value={`${stats.score.attempted} / ${stats.score.total}`}
                       />
+                      <Stat label="Score" value={formatScore(stats.score)} />
                       <Stat label="Hints used" value={String(stats.hintsRevealed)} />
                       <Stat label="Time" value={formatDuration(stats.secondsSpent)} />
                       <Stat
                         label="Marks"
                         value={
-                          stats.averageScore === null
+                          stats.score.percent === null
                             ? "–"
                             : stats.confirmed
                               ? "Confirmed"

@@ -22,6 +22,7 @@ import {
 import type { ErrorType, HintLevel, MarkBasis, MarkStatus, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
+import { sheetScore, type PartMark, type SheetScore } from "@/lib/scores/score";
 import { questionStatus, type QuestionStatus } from "@/lib/scores/status";
 
 import { binnedQuestionIdsOf, liveCourse } from "./bin";
@@ -242,44 +243,39 @@ export function bestAttempt(list: AttemptRecord[]): AttemptRecord | null {
 }
 
 export type SheetStats = {
-  total: number;
-  submitted: number;
-  /** Mean over marked questions of the best current score; null when nothing is marked. */
-  averageScore: number | null;
+  /** Attempted-only score and counts (SPEC-study-views.md, attempted-score). */
+  score: SheetScore;
   hintsRevealed: number;
   secondsSpent: number;
   /** True once any mark on the sheet is official. */
   confirmed: boolean;
 };
 
+/** Each part's mark by the one rule above, ready for `sheetScore`. */
+export function partMarks(records: QuestionRecord[]): PartMark[] {
+  return records.map((record) => ({
+    label: record.question.label,
+    mark: markOfQuestion(record)?.score ?? null,
+  }));
+}
+
 export function sheetStats(records: QuestionRecord[]): SheetStats {
-  const scores: number[] = [];
-  let submitted = 0;
   let hintsRevealed = 0;
   let secondsSpent = 0;
   let confirmed = false;
   for (const record of records) {
-    if (record.attempts.some(isSubmitted)) submitted += 1;
-    const bestScore = record.attempts
-      .map((a) => a.current?.score)
-      .filter((score): score is number => score !== undefined);
-    if (bestScore.length) scores.push(Math.max(...bestScore));
     for (const attempt of record.attempts) {
       hintsRevealed += attempt.revealedLevels.length;
       secondsSpent += attempt.secondsSpent ?? 0;
       if (attempt.marks.some((mark) => mark.basis === "official")) confirmed = true;
     }
   }
-  return {
-    total: records.length,
-    submitted,
-    averageScore: scores.length
-      ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
-      : null,
-    hintsRevealed,
-    secondsSpent,
-    confirmed,
-  };
+  return { score: sheetScore(partMarks(records)), hintsRevealed, secondsSpent, confirmed };
+}
+
+/** The sheet's score; all zeros for a sheet that is not the user's. */
+export async function getSheetScore(userId: string, sheetId: string): Promise<SheetScore> {
+  return sheetScore(partMarks(await loadRecords(userId, { sheetId })));
 }
 
 export type HeatRow = {
