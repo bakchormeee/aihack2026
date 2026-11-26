@@ -1,4 +1,5 @@
 import { MathText } from "@/components/math-text";
+import { MistakeTarget } from "@/components/mistake-focus";
 import { SEVERITY_CLASS } from "@/components/mistake-list";
 import type { Mistake } from "@/lib/domain";
 import { locateQuotes, splitByRanges } from "@/lib/marking/locate-quotes";
@@ -19,7 +20,16 @@ function Lines({ children }: { children: string }) {
  * quoted. Numbers match the list under it. A quote that cannot be found in the
  * text is left out here and stays in the list only.
  */
-export function WorkingWithBoxes({ text, mistakes }: { text: string; mistakes: Mistake[] }) {
+export function WorkingWithBoxes({
+  text,
+  mistakes,
+  numbers,
+}: {
+  text: string;
+  mistakes: Mistake[];
+  /** The number of each mistake (see numberMistakes); default is its position in the list. */
+  numbers?: (number | null)[];
+}) {
   // Positions in `mistakes` are kept, so the numbers agree with the list even when
   // some mistakes are in a photo or a PDF and have no box here.
   const ranges = locateQuotes(
@@ -35,21 +45,26 @@ export function WorkingWithBoxes({ text, mistakes }: { text: string; mistakes: M
           return <Lines key={i}>{piece.text}</Lines>;
         }
         const severity = severityOf(mistakes[piece.box].type);
+        const number = numbers ? numbers[piece.box] : piece.box + 1;
+        if (number === null) return <Lines key={i}>{piece.text}</Lines>;
         return (
-          <span
+          <MistakeTarget
             key={i}
-            data-mistake={piece.box + 1}
+            number={number}
+            role="box"
+            as="span"
+            data-mistake={number}
             data-severity={severity}
-            className={`ring-once rounded border-2 px-1 py-1.5 [box-decoration-break:clone] ${SEVERITY_CLASS[severity].box}`}
+            className={`ring-once rounded border-2 px-1 py-1.5 [box-decoration-break:clone] data-[active=true]:ring-foreground data-[active=true]:ring-2 ${SEVERITY_CLASS[severity].box}`}
             style={{ "--delay": `${600 + piece.box * 250}ms` } as React.CSSProperties}
           >
             <sup
               className={`mr-1 rounded px-1 text-[10px] font-semibold ${SEVERITY_CLASS[severity].badge}`}
             >
-              {piece.box + 1}
+              {number}
             </sup>
             <Lines>{piece.text}</Lines>
-          </span>
+          </MistakeTarget>
         );
       })}
     </div>

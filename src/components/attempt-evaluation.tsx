@@ -6,18 +6,18 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { MarkingScheme, MistakeList } from "@/components/mistake-list";
+import { MistakeFocusProvider } from "@/components/mistake-focus";
 import { Panel, SectionTitle } from "@/components/page-parts";
 import { PhotoWithBoxes } from "@/components/photo-with-boxes";
 import { PlaySound } from "@/components/play-sound";
 import { WorkingWithBoxes } from "@/components/working-with-boxes";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { SolutionPanel } from "@/components/solution-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { visibleHintsFor } from "@/db/queries/attempts";
-import { getMarkScreenData, getVisibleSolution } from "@/db/queries/marking";
-import type { Outcome } from "@/lib/domain";
-import { ERROR_LABEL, OUTCOME_LABEL } from "@/lib/marking/labels";
+import { getMarkScreenData, getVisibleSolution, hasOfficialSolution } from "@/db/queries/marking";
+import { ERROR_LABEL, OUTCOME_LABEL, solutionLabel } from "@/lib/marking/labels";
+import { numberMistakes } from "@/lib/marking/numbering";
+import { outcomeLabel } from "@/lib/scores/status";
 import { canDispute } from "@/lib/marking/rules";
 import { getNextHref } from "@/lib/navigation";
 import { isStale } from "@/lib/pipeline/stale";
@@ -29,12 +29,6 @@ import {
 } from "@/app/(app)/questions/[questionId]/mark/actions";
 
 const OUTCOME_SOUND = { full: "success", partial: "partial", stuck: "stuck" } as const;
-
-const OUTCOME_VARIANT: Record<Outcome, "default" | "secondary" | "destructive"> = {
-  full: "default",
-  partial: "secondary",
-  stuck: "destructive",
-};
 
 type Props = {
   userId: string;
@@ -53,6 +47,7 @@ export async function AttemptEvaluation({ userId, question, attemptId, sessionId
   const disputeCount = data.marks.filter((mark) => mark.isDispute).length;
   // Null while the solution is locked: nothing of it is sent to the browser.
   const solution = await getVisibleSolution(userId, questionId);
+  const official = await hasOfficialSolution(userId, questionId);
   const hintLevel = (await visibleHintsFor(userId, attemptId)).level;
   const nextHref = await getNextHref({ userId, questionId, sessionId });
   const marking = submission?.submittedAt && !current && submission.markStatus === "pending";
@@ -69,155 +64,149 @@ export async function AttemptEvaluation({ userId, question, attemptId, sessionId
     !current &&
     (submission.markStatus === "failed" || stuck || submission.markStatus === "none");
 
+  const mistakes = current?.mistakes ?? [];
+  const numbers = numberMistakes(mistakes, {
+    text: submission?.text ?? null,
+    fileMimes: (submission?.files ?? []).map((file) => file.mime),
+  });
+
   return (
-    <div className="flex flex-col gap-6">
-      <AutoRefresh active={Boolean(waiting || remarking)} />
-      {waiting ? (
-        <div className="flex flex-col gap-3" aria-live="polite">
-          <p className="text-muted-foreground">Marking your working…</p>
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      ) : null}
+    <MistakeFocusProvider>
+      <div className="flex flex-col gap-6">
+        <AutoRefresh active={Boolean(waiting || remarking)} />
+        {waiting ? (
+          <div className="flex flex-col gap-3" aria-live="polite">
+            <p className="text-muted-foreground">Marking your working…</p>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : null}
 
-      {remarking ? (
-        <p className="text-muted-foreground text-sm" aria-live="polite">
-          Marking again… the earlier mark stays below until the new one is ready.
-        </p>
-      ) : null}
-
-      {failed ? (
-        <Panel role="alert" className="flex flex-col items-start gap-3">
-          <p>
-            {submission?.markStatus === "none"
-              ? "Your working has not been marked yet."
-              : stuck
-                ? "Marking is taking longer than expected."
-                : "We could not mark your working."}
+        {remarking ? (
+          <p className="text-muted-foreground text-sm" aria-live="polite">
+            {official && current?.basis === "ai"
+              ? "Re-marking against the official solution… the AI mark stays until it is ready."
+              : "Marking again… the earlier mark stays until the new one is ready."}
           </p>
-          <form action={retryMarkAction.bind(null, questionId, attemptId)}>
-            <Button type="submit">Mark my working</Button>
-          </form>
-        </Panel>
-      ) : null}
+        ) : null}
 
-      {current ? (
-        <div className="flex flex-col gap-5">
-          <Panel className="border-foreground/80 relative flex flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden border-t-2">
+        {failed ? (
+          <Panel role="alert" className="flex flex-col items-start gap-3">
+            <p>
+              {submission?.markStatus === "none"
+                ? "Your working has not been marked yet."
+                : stuck
+                  ? "Marking is taking longer than expected."
+                  : "We could not mark your working."}
+            </p>
+            <form action={retryMarkAction.bind(null, questionId, attemptId)}>
+              <Button type="submit">Mark my working</Button>
+            </form>
+          </Panel>
+        ) : null}
+
+        {submission?.submittedAt ? (
+          <section aria-labelledby="working-heading" className="flex flex-col gap-3">
+            <h2 id="working-heading" className="text-lg font-medium">
+              Your working (submitted)
+            </h2>
+            {mistakes.length > 0 ? (
+              <p className="text-muted-foreground text-xs">
+                Red is a structural mistake, amber a careless slip. The numbers match the notes
+                below.
+              </p>
+            ) : null}
+            {submission.text?.trim() ? (
+              <div className="bg-muted/40 rounded-md border p-3">
+                <WorkingWithBoxes text={submission.text} mistakes={mistakes} numbers={numbers} />
+              </div>
+            ) : null}
+            {submission.files.map((file, index) =>
+              file.mime.startsWith("image/") ? (
+                <PhotoWithBoxes
+                  key={file.id}
+                  src={`/api/files/submission/${file.id}`}
+                  fileIndex={index}
+                  mistakes={mistakes}
+                  numbers={numbers}
+                />
+              ) : (
+                <a
+                  key={file.id}
+                  href={`/api/files/submission/${file.id}`}
+                  className="text-sm underline underline-offset-4"
+                >
+                  Open the PDF
+                </a>
+              ),
+            )}
+          </section>
+        ) : null}
+
+        {current ? (
+          <div className="flex flex-col gap-5">
             <PlaySound
               sound={OUTCOME_SOUND[current.outcome]}
               once={`mark:${attemptId}:${current.score}:${current.outcome}`}
             />
-            <span className="font-heading text-pen stamp rounded-full border-[3px] border-current px-4 py-3 text-5xl leading-none italic tabular-nums">
-              {current.score}/5
-            </span>
-            <div className="flex flex-col gap-2">
-              <ScorePips score={current.score} />
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={OUTCOME_VARIANT[current.outcome]}>
-                  {OUTCOME_LABEL[current.outcome]}
-                </Badge>
-                {current.errorType ? (
-                  <Badge variant="outline">{ERROR_LABEL[current.errorType]}</Badge>
-                ) : null}
-              </div>
-              <span className="text-muted-foreground text-xs">
-                {current.basis === "official"
-                  ? "AI-marked against the official solutions"
-                  : "AI-marked, provisional"}
-              </span>
-            </div>
-            {current.outcome === "full" ? (
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="text-pen ml-auto size-16 shrink-0 max-sm:hidden"
-              >
-                <path
-                  d="M4 13.5 9.2 19 20 5"
-                  pathLength={100}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="pen-draw [--delay:650ms]"
-                />
-              </svg>
-            ) : null}
-          </Panel>
-
-          {current.mistakes && current.mistakes.length > 0 && submission?.text?.trim() ? (
-            <Panel className="flex flex-col gap-3">
-              <SectionTitle>Your working</SectionTitle>
+            <div className="flex flex-col gap-1">
+              <p className="flex flex-wrap items-baseline gap-x-3">
+                <span className="font-heading text-4xl tabular-nums">{current.score} / 5</span>
+                <span className="text-lg">· {outcomeLabel(current.outcome, current.score)}</span>
+              </p>
               <p className="text-muted-foreground text-xs">
-                Red is a structural mistake, amber a careless slip. The numbers match the list
-                below.
+                {[
+                  current.errorType ? ERROR_LABEL[current.errorType] : null,
+                  hintsText(hintLevel),
+                  current.basis === "official"
+                    ? "AI-marked against the official solutions"
+                    : "AI-marked, provisional",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
-              <WorkingWithBoxes text={submission.text} mistakes={current.mistakes} />
-            </Panel>
-          ) : null}
-
-          {current.mistakes &&
-          current.mistakes.length > 0 &&
-          submission?.files.some((file) => file.mime.startsWith("image/")) ? (
-            <Panel className="flex flex-col gap-3">
-              <SectionTitle>Your photos</SectionTitle>
-              {submission.files.map((file, index) =>
-                file.mime.startsWith("image/") ? (
-                  <PhotoWithBoxes
-                    key={file.id}
-                    src={`/api/files/submission/${file.id}`}
-                    fileIndex={index}
-                    mistakes={current.mistakes ?? []}
-                  />
-                ) : null,
-              )}
-            </Panel>
-          ) : null}
-
-          {current.mistakes && current.mistakes.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <SectionTitle>What to check</SectionTitle>
-              <MistakeList mistakes={current.mistakes} />
             </div>
-          ) : current.firstWrongStep ? (
-            <Panel>
-              <p className="text-muted-foreground mb-1 text-xs font-medium">
-                Where it first goes wrong
-              </p>
-              <MathText>{current.firstWrongStep}</MathText>
-            </Panel>
-          ) : null}
 
-          <Panel className="divide-y p-0">
-            <div className="px-5 py-4">
-              <p className="text-muted-foreground mb-1 text-xs font-medium">Feedback</p>
+            <div className="flex flex-col gap-2">
               <MathText>{current.feedback}</MathText>
+              {current.overallFeedback && current.overallFeedback !== current.feedback ? (
+                <MathText className="text-muted-foreground">{current.overallFeedback}</MathText>
+              ) : null}
             </div>
-            <div className="px-5 py-4">
-              <p className="text-muted-foreground mb-1 text-xs font-medium">Overall</p>
-              <MathText>{current.overallFeedback}</MathText>
-            </div>
-          </Panel>
 
-          <details className="bg-card rounded-lg border px-5 py-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              How marks out of 5 work
-            </summary>
-            <div className="mt-3">
-              <MarkingScheme score={current.score} />
-            </div>
-          </details>
-
-          {current.outcome !== "full" ? (
-            <Panel className="flex flex-col gap-4">
-              <p>
-                {solution
-                  ? "You can try again, with the worked solution below to help."
-                  : "Not there yet. Try again, or take a hint first. The worked solution unlocks when you get it fully right, or after all three hints."}
+            {mistakes.length > 0 ? (
+              <MistakeList mistakes={mistakes} numbers={numbers} />
+            ) : current.firstWrongStep ? (
+              <p className="text-sm">
+                <span className="text-muted-foreground text-xs font-medium">
+                  Where it first goes wrong:{" "}
+                </span>
+                <MathText className="inline">{current.firstWrongStep}</MathText>
               </p>
-              <div className="flex flex-wrap gap-3">
+            ) : null}
+
+            <details className="text-sm">
+              <summary className="text-muted-foreground cursor-pointer">
+                How marks out of 5 work
+              </summary>
+              <div className="mt-3">
+                <MarkingScheme score={current.score} />
+              </div>
+            </details>
+
+            {solution ? (
+              <details className="text-sm">
+                <summary className="cursor-pointer font-medium">
+                  {solutionLabel(solution.basis)}
+                </summary>
+                <div className="mt-3">
+                  <MathText>{solution.body}</MathText>
+                </div>
+              </details>
+            ) : null}
+
+            {current.outcome !== "full" ? (
+              <div className="flex flex-wrap items-center gap-3">
                 <form action={retryNowAction.bind(null, questionId, sessionId)}>
                   <Button type="submit">Retry now</Button>
                 </form>
@@ -228,71 +217,72 @@ export async function AttemptEvaluation({ userId, question, attemptId, sessionId
                     </Button>
                   </form>
                 ) : null}
+                {!solution ? (
+                  <span className="text-muted-foreground text-xs">
+                    The worked solution unlocks when you get it fully right, or after all three
+                    hints.
+                  </span>
+                ) : null}
               </div>
-            </Panel>
-          ) : null}
+            ) : null}
 
-          {submission?.markStatus === "done" && current.outcome !== "full" ? (
-            canDispute(disputeCount) ? (
-              <DisputeForm
-                questionId={questionId}
-                attemptId={attemptId}
-                remaining={2 - disputeCount}
-              />
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                You have asked for this attempt to be looked at again twice.
-              </p>
-            )
-          ) : null}
+            {submission?.markStatus === "done" ? (
+              canDispute(disputeCount) ? (
+                <details className="text-sm">
+                  <summary className="text-muted-foreground cursor-pointer underline-offset-4 hover:underline">
+                    Ask for a re-mark ({2 - disputeCount} left)
+                  </summary>
+                  <div className="mt-3">
+                    <DisputeForm
+                      questionId={questionId}
+                      attemptId={attemptId}
+                      remaining={2 - disputeCount}
+                    />
+                  </div>
+                </details>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  You have asked for this attempt to be looked at again twice.
+                </p>
+              )
+            ) : null}
 
-          {solution ? <SolutionPanel solution={solution} /> : null}
-
-          {data.marks.length > 1 ? (
-            <section className="bg-card flex flex-col gap-3 rounded-lg border p-5">
-              <SectionTitle>All marks for this attempt</SectionTitle>
-              <ul className="flex flex-col divide-y text-sm">
-                {data.marks.map((mark) => (
-                  <li key={mark.id} className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
-                    <span>
-                      {mark.score}/5 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
-                      {mark.basis === "official" ? "official solutions" : "AI, provisional"}
-                      {mark.isDispute ? " · you disputed this" : ""}
-                      {mark.id === current.id ? " (current)" : ""}
-                    </span>
-                    {mark.disputeReason ? (
-                      <span className="text-muted-foreground text-xs">
-                        Your reason: {mark.disputeReason}
+            {data.marks.length > 1 ? (
+              <section className="flex flex-col gap-3">
+                <SectionTitle>All marks for this attempt</SectionTitle>
+                <ul className="flex flex-col divide-y text-sm">
+                  {data.marks.map((mark) => (
+                    <li key={mark.id} className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
+                      <span>
+                        {mark.score}/5 · {OUTCOME_LABEL[mark.outcome]} ·{" "}
+                        {mark.basis === "official" ? "official solutions" : "AI, provisional"}
+                        {mark.isDispute ? " · you disputed this" : ""}
+                        {mark.id === current.id ? " (current)" : ""}
                       </span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+                      {mark.disputeReason ? (
+                        <span className="text-muted-foreground text-xs">
+                          Your reason: {mark.disputeReason}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
-          <div className="flex justify-end border-t pt-4">
-            <Link href={nextHref} className={buttonVariants({ variant: "outline" })}>
-              Next →
-            </Link>
+            <div className="flex justify-end border-t pt-4">
+              <Link href={nextHref} className={buttonVariants({ variant: "outline" })}>
+                Next →
+              </Link>
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </MistakeFocusProvider>
   );
 }
 
-/** Five marks in a row, the earned ones in red pen. */
-function ScorePips({ score }: { score: number }) {
-  return (
-    <div className="flex gap-1.5" aria-hidden="true">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span
-          key={n}
-          className={`pip-in h-2 w-7 rounded-full ${n <= score ? "bg-pen" : "bg-muted"}`}
-          style={{ animationDelay: `${400 + n * 80}ms` }}
-        />
-      ))}
-    </div>
-  );
+/** "no hints", "1 hint", "2 hints": the hints visible to the attempt. */
+export function hintsText(level: number): string {
+  return level === 0 ? "no hints" : `${level} ${level === 1 ? "hint" : "hints"}`;
 }

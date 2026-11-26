@@ -203,16 +203,18 @@ export function QuestionView({
         </div>
       )}
 
-      <WorkingInput
-        // A new attempt starts with an empty draft, so remount to drop the old text.
-        key={attemptId ?? "none"}
-        attemptId={attemptId}
-        initialText={initialText}
-        initialFiles={initialFiles}
-        submitted={submitted}
-        beforeSubmit={() => flushTimer.current()}
-        onSubmitted={() => router.refresh()}
-      />
+      {submitted ? null : (
+        <WorkingInput
+          // A new attempt starts with an empty draft, so remount to drop the old text.
+          key={attemptId ?? "none"}
+          attemptId={attemptId}
+          initialText={initialText}
+          initialFiles={initialFiles}
+          submitted={submitted}
+          beforeSubmit={() => flushTimer.current()}
+          onSubmitted={() => router.refresh()}
+        />
+      )}
 
       {children}
 

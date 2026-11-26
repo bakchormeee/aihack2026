@@ -51,7 +51,7 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
   // The mark is on the question page itself: there is no "See the mark" step.
-  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 / 5", { exact: true })).toBeVisible();
 
   // Mastery of the topic before any spot-the-error answer.
   await page.goto(courseUrl);

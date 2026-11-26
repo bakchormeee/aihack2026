@@ -50,7 +50,7 @@ export async function ensureDemoTemplate(browser: Browser): Promise<string> {
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
   // The mark is on the question page itself: there is no "See the mark" step.
-  await page.getByText("3/5", { exact: true }).waitFor();
+  await page.getByText("3 / 5", { exact: true }).waitFor();
   await context.close();
 
   const [user] = await db<{ id: string }[]>`

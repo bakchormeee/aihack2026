@@ -45,4 +45,19 @@ describe("PhotoWithBoxes", () => {
     expect(html).toContain('src="/x"');
     expect(html.toLowerCase()).not.toContain("approximate");
   });
+
+  it("uses the numbers it is given and draws no box for a mistake with none", () => {
+    const html = renderToStaticMarkup(
+      <PhotoWithBoxes
+        src="/x"
+        fileIndex={0}
+        mistakes={[typed, onPhoto(0), onPhoto(0)]}
+        numbers={[null, 1, null]}
+      />,
+    );
+
+    expect(html.match(/data-mistake="/g)).toHaveLength(1);
+    expect(html).toContain('data-mistake="1"');
+    expect(html).toContain('id="mistake-box-1"');
+  });
 });

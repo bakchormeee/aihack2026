@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { ERROR_TYPES, OUTCOMES, SEVERITIES } from "@/lib/domain";
 
-import { ERROR_LABEL, MARKING_SCHEME, OUTCOME_LABEL, SEVERITY_LABEL } from "./labels";
+import {
+  ERROR_LABEL,
+  MARKING_SCHEME,
+  OUTCOME_LABEL,
+  SEVERITY_LABEL,
+  solutionLabel,
+} from "./labels";
 
 describe("labels", () => {
   it("has a label for every error type, outcome and severity", () => {
@@ -18,5 +24,10 @@ describe("labels", () => {
 
   it("explains every score from 5 down to 0, once each, in order", () => {
     expect(MARKING_SCHEME.map((row) => row.score)).toEqual([5, 4, 3, 2, 1, 0]);
+  });
+
+  it("says whether a solution is the official one or the AI's", () => {
+    expect(solutionLabel("official")).toBe("Official solution");
+    expect(solutionLabel("ai")).toBe("AI-written solution");
   });
 });

@@ -43,8 +43,20 @@ describe("MistakeList", () => {
   it("says where a mistake is in a PDF or a photo", () => {
     const html = renderToStaticMarkup(<MistakeList mistakes={mistakes} />);
 
-    expect(html).toContain("PDF, page 2");
+    expect(html).toContain("Page 2");
     expect(html).toContain("Photo 2");
+  });
+
+  it("lists a mistake with no place on the working without a number", () => {
+    const html = renderToStaticMarkup(<MistakeList mistakes={mistakes} numbers={[null, 1, 2]} />);
+
+    // Notes that have a number can be matched to their box; the bare one cannot.
+    expect(html.match(/data-note="/g)).toHaveLength(2);
+    expect(html).toContain('data-note="1"');
+    expect(html).toContain('data-note="2"');
+    expect(html).not.toContain('data-note="3"');
+    expect(html).toContain("Check the sign."); // still listed
+    expect(html).toContain("–");
   });
 
   it("shows nothing for an empty list", () => {

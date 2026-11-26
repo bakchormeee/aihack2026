@@ -30,7 +30,7 @@ test("Focus next shows when a marked topic is next due for review", async ({ pag
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
   // The mark is on the question page itself: there is no "See the mark" step.
-  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 / 5", { exact: true })).toBeVisible();
 
   await page.goto(courseUrl);
   const due = `Next review in 1 day (${tomorrowInLondon()})`;

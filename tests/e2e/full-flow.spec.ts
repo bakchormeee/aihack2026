@@ -58,10 +58,16 @@ test("a mark can be disputed twice, keeping every earlier mark, and then no more
   questionUrl = page.url();
   await submitTypedWorking(page, "Integrating by parts, the integral is $-2$.");
   // The mark is on the question page itself: there is no "See the mark" step.
-  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 / 5", { exact: true })).toBeVisible();
   markUrl = page.url();
 
+  // The re-mark form is folded under "Ask for a re-mark".
+  const openRemark = async () => {
+    const field = page.getByLabel(/Do you think your working is right/);
+    if (!(await field.isVisible())) await page.getByText(/Ask for a re-mark/).click();
+  };
   const dispute = page.getByRole("button", { name: "I think this is right" });
+  await openRemark();
   await page
     .getByLabel(/Do you think your working is right/)
     .fill("I used integration by parts correctly");
@@ -70,6 +76,7 @@ test("a mark can be disputed twice, keeping every earlier mark, and then no more
   await expect(page.getByText(/you disputed this/)).toBeVisible();
   await expect(page.getByText("Your reason: I used integration by parts correctly")).toBeVisible();
 
+  await openRemark();
   await page.getByRole("button", { name: "I think this is right" }).click();
   await expect(
     page.getByText("You have asked for this attempt to be looked at again twice."),

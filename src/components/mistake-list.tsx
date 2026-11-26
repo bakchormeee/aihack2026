@@ -1,4 +1,5 @@
 import { MathText } from "@/components/math-text";
+import { MistakeTarget } from "@/components/mistake-focus";
 import type { Mistake, Severity } from "@/lib/domain";
 import { ERROR_LABEL, MARKING_SCHEME, SEVERITY_LABEL } from "@/lib/marking/labels";
 import { severityOf } from "@/lib/marking/rules";
@@ -17,28 +18,53 @@ export const SEVERITY_CLASS: Record<Severity, { box: string; badge: string }> = 
 
 function where(mistake: Mistake): string | null {
   const { location } = mistake;
-  if (location.kind === "pdf") return `PDF, page ${location.page}`;
+  if (location.kind === "pdf") return `Page ${location.page}`;
   if (location.kind === "image") return `Photo ${location.fileIndex + 1}`;
   return null;
 }
 
-export function MistakeList({ mistakes }: { mistakes: Mistake[] }) {
+/**
+ * The notes under the working. `numbers` says which mistake has which number on the working (see
+ * numberMistakes); a mistake with no place is listed without a number. By default every mistake
+ * is numbered by its position.
+ */
+export function MistakeList({
+  mistakes,
+  numbers,
+}: {
+  mistakes: Mistake[];
+  numbers?: (number | null)[];
+}) {
   if (mistakes.length === 0) return null;
   return (
-    <ol className="flex flex-col gap-3">
+    <ol className="flex list-none flex-col gap-3">
       {mistakes.map((mistake, index) => {
         const severity = severityOf(mistake.type);
         const place = where(mistake);
+        const number = numbers ? numbers[index] : index + 1;
         return (
-          <li
+          <MistakeTarget
             key={index}
-            className={`flex gap-3 rounded-lg border-l-4 border p-3 ${SEVERITY_CLASS[severity].box}`}
+            number={number}
+            role="note"
+            as="li"
+            data-note={number ?? undefined}
+            className={`flex gap-3 rounded-lg border-l-4 border p-3 data-[active=true]:ring-foreground data-[active=true]:ring-2 ${SEVERITY_CLASS[severity].box}`}
           >
-            <span
-              className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${SEVERITY_CLASS[severity].badge}`}
-            >
-              {index + 1}
-            </span>
+            {number === null ? (
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center text-xs"
+              >
+                –
+              </span>
+            ) : (
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${SEVERITY_CLASS[severity].badge}`}
+              >
+                {number}
+              </span>
+            )}
             <div className="flex min-w-0 flex-col gap-1 text-sm">
               <p className="text-xs font-medium">
                 {SEVERITY_LABEL[severity]} · {ERROR_LABEL[mistake.type]}
@@ -47,7 +73,7 @@ export function MistakeList({ mistakes }: { mistakes: Mistake[] }) {
               <MathText className="text-sm">{mistake.quote}</MathText>
               <MathText className="text-sm">{mistake.hint}</MathText>
             </div>
-          </li>
+          </MistakeTarget>
         );
       })}
     </ol>

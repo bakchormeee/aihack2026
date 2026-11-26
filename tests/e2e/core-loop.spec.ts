@@ -55,8 +55,8 @@ test("sign in, upload a sheet, use a hint, submit working and see the mark", asy
   // The mark arrives, labelled as provisional AI marking.
   // The mark is on the question page itself: there is no "See the mark" step.
   await expect(page.getByText("AI-marked, provisional")).toBeVisible();
-  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
-  await expect(page.getByText("Partly right").first()).toBeVisible();
+  await expect(page.getByText("3 / 5", { exact: true })).toBeVisible();
+  await expect(page.getByText("· Partial").first()).toBeVisible();
 
   // The marking scheme is there, with the current score highlighted.
   await page.getByText("How marks out of 5 work").click();
