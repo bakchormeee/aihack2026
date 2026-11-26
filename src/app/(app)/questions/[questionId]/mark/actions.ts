@@ -16,6 +16,7 @@ import { demoAiRefusal } from "@/lib/ai/budget";
 import { NotFoundError, requireAttempt } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { claimMark, performMark } from "@/lib/pipeline/mark";
+import { startMarking } from "@/lib/pipeline/start-marking";
 
 /** Runs the marking again for a submission whose mark failed or got stuck. Does nothing otherwise. */
 export async function retryMarkAction(questionId: string, attemptId: string): Promise<void> {
@@ -25,6 +26,32 @@ export async function retryMarkAction(questionId: string, attemptId: string): Pr
   if (work.submissionId && work.submittedAt) {
     const claim = await claimMark({ submissionId: work.submissionId, basis: "ai" });
     if (claim) after(() => performMark(claim));
+  }
+  revalidatePath(`/questions/${questionId}`);
+}
+
+/**
+ * "Mark with AI instead": marks a submission that is waiting for the official solutions now,
+ * against the AI-written solution (or the official one, if it has arrived since). Counts
+ * against a demo copy's AI budget like any mark. Does nothing for a submission that is not
+ * waiting.
+ */
+export async function markWithAiInsteadAction(
+  questionId: string,
+  attemptId: string,
+): Promise<void> {
+  const user = await requireUser();
+  if (await demoAiRefusal(user.id)) return; // a demo copy at its AI limit: nothing starts
+  const attempt = await requireAttempt(user.id, attemptId);
+  const work = await getWorkingFor(user.id, attemptId);
+  if (
+    attempt.questionId === questionId &&
+    work.submissionId &&
+    work.markStatus === "awaiting_official"
+  ) {
+    for (const claim of await startMarking([work.submissionId], true)) {
+      after(() => performMark(claim));
+    }
   }
   revalidatePath(`/questions/${questionId}`);
 }

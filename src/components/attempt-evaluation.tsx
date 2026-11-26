@@ -23,6 +23,7 @@ import { getNextHref } from "@/lib/navigation";
 import { isStale } from "@/lib/pipeline/stale";
 import { DisputeForm } from "@/app/(app)/questions/[questionId]/mark/dispute-form";
 import {
+  markWithAiInsteadAction,
   retryMarkAction,
   retryNowAction,
   retryWithNextHintAction,
@@ -88,6 +89,20 @@ export async function AttemptEvaluation({ userId, question, attemptId, sessionId
               ? "Re-marking against the official solution… the AI mark stays until it is ready."
               : "Marking again… the earlier mark stays until the new one is ready."}
           </p>
+        ) : null}
+
+        {submission?.submittedAt && !current && submission.markStatus === "awaiting_official" ? (
+          <div className="flex flex-col items-start gap-2" data-testid="waiting-for-official">
+            <p>Marked when the official solutions are uploaded.</p>
+            <form action={markWithAiInsteadAction.bind(null, questionId, attemptId)}>
+              <button
+                type="submit"
+                className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+              >
+                Mark with AI instead
+              </button>
+            </form>
+          </div>
         ) : null}
 
         {failed ? (

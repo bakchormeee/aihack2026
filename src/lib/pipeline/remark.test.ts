@@ -83,6 +83,27 @@ async function setup(email: string, labels = ["1", "2"]) {
   return { user, sheet, qs };
 }
 
+/** A submitted attempt left waiting for the official solutions: no mark, no AI call was made. */
+async function waiting(userId: string, questionId: string) {
+  const [attempt] = await db
+    .insert(attempts)
+    .values({ userId, questionId, context: "sheet" })
+    .returning();
+  const [submission] = await db
+    .insert(submissions)
+    .values({
+      attemptId: attempt.id,
+      text: "work",
+      submittedAt: new Date(),
+      markStatus: "awaiting_official",
+    })
+    .returning();
+  return { attempt, submission };
+}
+
+const statusOf = async (id: string) =>
+  (await db.select().from(submissions).where(eq(submissions.id, id)))[0].markStatus;
+
 /** A submitted attempt with an earlier AI mark of `aiScore`. */
 async function submitted(userId: string, questionId: string, aiScore: number, isSubmitted = true) {
   const [attempt] = await db
@@ -293,5 +314,88 @@ describe("runOfficialRemark", () => {
     vi.unstubAllEnvs();
     expect((await sheetRow(sheet.id)).solutionsStatus).toBe("done");
     expect(await demoCallsOf(user.id)).toBe(3);
+  });
+});
+
+describe("runOfficialRemark and waiting submissions", () => {
+  it("marks each waiting submission against the official solution, with basis official and no AI mark", async () => {
+    const { user, sheet, qs } = await setup("rm-wait@test.local");
+    await addFiles(sheet.id);
+    const w1 = await waiting(user.id, qs[0].id);
+    const w2 = await waiting(user.id, qs[1].id);
+    const fake = io({ scores: { Q1: 4, Q2: 2 } });
+
+    await runOfficialRemark(sheet.id, fake.value);
+
+    for (const w of [w1, w2]) {
+      expect(await statusOf(w.submission.id)).toBe("done");
+      const all = await db.select().from(marks).where(eq(marks.attemptId, w.attempt.id));
+      expect(all.map((m) => m.basis)).toEqual(["official"]);
+    }
+    expect((await officialMarks(w1.attempt.id))[0]).toMatchObject({ score: 4, outcome: "full" });
+    expect((await officialMarks(w2.attempt.id))[0]).toMatchObject({ score: 2, outcome: "partial" });
+    // The first official mark of an attempt did not change an earlier mark's outcome.
+    expect((await officialMarks(w1.attempt.id))[0].outcomeChanged).toBe(false);
+    expect((await sheetRow(sheet.id)).solutionsStatus).toBe("done");
+  });
+
+  it("marks waiting work alongside the re-marks it already does", async () => {
+    const { user, sheet, qs } = await setup("rm-wait-mix@test.local");
+    await addFiles(sheet.id);
+    const marked = await submitted(user.id, qs[0].id, 3);
+    const wait = await waiting(user.id, qs[1].id);
+
+    await runOfficialRemark(sheet.id, io().value);
+
+    expect(await officialMarks(marked.attempt.id)).toHaveLength(1);
+    expect(await officialMarks(wait.attempt.id)).toHaveLength(1);
+  });
+
+  it("keeps waiting the submission of a question the document has no solution for", async () => {
+    const { user, sheet, qs } = await setup("rm-wait-missing@test.local");
+    await addFiles(sheet.id);
+    const found = await waiting(user.id, qs[0].id);
+    const notFound = await waiting(user.id, qs[1].id);
+    const fake = io({ missing: ["2"] });
+
+    await runOfficialRemark(sheet.id, fake.value);
+
+    expect(await statusOf(found.submission.id)).toBe("done");
+    expect(await statusOf(notFound.submission.id)).toBe("awaiting_official");
+    expect(await db.select().from(marks).where(eq(marks.attemptId, notFound.attempt.id))).toEqual(
+      [],
+    );
+    expect(fake.mark).toHaveBeenCalledTimes(1);
+    expect((await sheetRow(sheet.id)).solutionsStatus).toBe("done");
+  });
+
+  it("is waiting again later: a second upload that does cover the question marks it", async () => {
+    const { user, sheet, qs } = await setup("rm-wait-later@test.local");
+    const w = await waiting(user.id, qs[1].id);
+    await startOfficialSolutions(user.id, sheet.id, [{ path: "a.pdf", mime: "application/pdf" }]);
+    await runOfficialRemarkAfterStart(sheet.id, io({ missing: ["2"] }).value);
+    expect(await statusOf(w.submission.id)).toBe("awaiting_official");
+
+    await startOfficialSolutions(user.id, sheet.id, [{ path: "b.pdf", mime: "application/pdf" }]);
+    await runOfficialRemarkAfterStart(sheet.id, io().value);
+
+    expect(await statusOf(w.submission.id)).toBe("done");
+    expect(await officialMarks(w.attempt.id)).toHaveLength(1);
+  });
+
+  it("marks only the user's own waiting submissions", async () => {
+    const { user, sheet, qs } = await setup("rm-wait-own@test.local");
+    const [other] = await db
+      .insert(users)
+      .values({ email: "rm-wait-other@test.local" })
+      .returning();
+    await addFiles(sheet.id);
+    const mine = await waiting(user.id, qs[0].id);
+    const theirs = await waiting(other.id, qs[0].id);
+
+    await runOfficialRemark(sheet.id, io().value);
+
+    expect(await statusOf(mine.submission.id)).toBe("done");
+    expect(await statusOf(theirs.submission.id)).toBe("awaiting_official");
   });
 });

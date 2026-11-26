@@ -295,6 +295,24 @@ describe("getCourseSheetOverview", () => {
     expect(await getSheetScore(w.user.id, w.sheet.id)).toEqual(row.stats.score);
   });
 
+  it("does not count a submission that is waiting for the official solutions", async () => {
+    const w = await world("h-wait-score@test.local", ["1", "2"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 4, outcome: "full", at: 5 }],
+    });
+    await addAttempt(w.user.id, w.qs[1].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+
+    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
+    expect(row.stats.score).toEqual({ attempted: 1, total: 2, points: 4, max: 5, percent: 80 });
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input.items.map((item) => item.label)).toEqual(["1"]);
+  });
+
   it("counts a question by its latest submitted attempt, not the best", async () => {
     const w = await world("h-latest-score@test.local", ["1"]);
     await addAttempt(w.user.id, w.qs[0].id, {

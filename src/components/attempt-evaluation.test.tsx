@@ -141,6 +141,26 @@ describe("AttemptEvaluation", () => {
     expect(out).toContain("x = 1");
   });
 
+  it("shows a waiting submission with its working and the way to mark it with the AI", async () => {
+    const out = await html(
+      await world("ae-waiting@test.local", { markStatus: "awaiting_official", mark: null }),
+    );
+    expect(out).toContain("Marked when the official solutions are uploaded.");
+    expect(out).toContain("Mark with AI instead");
+    expect(out).toContain("Your working (submitted)");
+    expect(out).toContain("x = 1");
+    // No score, feedback or marking state while it waits.
+    expect(out).not.toContain(" / 5");
+    expect(out).not.toContain("Marking your working…");
+    expect(out).not.toContain("Mark my working");
+  });
+
+  it("does not offer that when the submission is marked", async () => {
+    expect(await html(await world("ae-notwaiting@test.local"))).not.toContain(
+      "Mark with AI instead",
+    );
+  });
+
   it("offers to mark again when marking failed", async () => {
     const out = await html(
       await world("ae-failed@test.local", { markStatus: "failed", mark: null }),
