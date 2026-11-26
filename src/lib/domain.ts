@@ -21,7 +21,7 @@ export const MARK_BASES = ["ai", "official"] as const;
 export const SHEET_STATUSES = ["parsing", "ready", "failed"] as const;
 export const SOLUTIONS_STATUSES = ["none", "extracting", "remarking", "done", "failed"] as const;
 export const HINTS_STATUSES = ["pending", "ready", "failed"] as const;
-export const MARK_STATUSES = ["none", "pending", "done", "failed"] as const;
+export const MARK_STATUSES = ["none", "pending", "done", "failed", "awaiting_official"] as const;
 export const SESSION_STATUSES = ["building", "ready", "failed"] as const;
 
 export const SHEET_FILE_KINDS = ["sheet", "official_solutions"] as const;

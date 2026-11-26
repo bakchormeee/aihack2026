@@ -43,6 +43,13 @@
       "when": 1794763110891,
       "tag": "0005_bin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795729699498,
+      "tag": "0006_study_views",
+      "breakpoints": true
     }
   ]
 }

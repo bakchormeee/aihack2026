@@ -28,6 +28,7 @@ export default defineConfig({
         "src/lib/demo/**",
         "src/lib/bin/**",
         "src/lib/batch/**",
+        "src/lib/scores/**",
       ],
       exclude: ["**/*.test.ts"],
       thresholds: { lines: 100 },

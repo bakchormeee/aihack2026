@@ -68,12 +68,29 @@ const markRow = async (db: PGlite, id: string) =>
   ).rows[0];
 
 describe("migration files", () => {
-  it("has the six migrations in order: initial, additive A, conversion B, additive C, E and F", () => {
-    expect(files).toHaveLength(6);
+  it("has the seven migrations in order: initial, additive A, conversion B, additive C, E, F and G", () => {
+    expect(files).toHaveLength(7);
     expect(files[2]).toMatch(/^0002_convert_marks_to_five/);
     expect(files[3]).toMatch(/^0003_spot_the_error/);
     expect(files[4]).toMatch(/^0004_demo_account/);
     expect(files[5]).toMatch(/^0005_bin/);
+    expect(files[6]).toMatch(/^0006_study_views/);
+  });
+
+  it("migration G adds the waiting mark status and the sheet switch, true for existing sheets", async () => {
+    const db = new PGlite();
+    for (const file of files) await applyMigration(db, file);
+    await db.exec(`
+      insert into "user" (id, email) values ('u1', 'g@test.local');
+      insert into course (id, user_id, name) values ('c1', 'u1', 'C');
+      insert into sheet (id, course_id, title) values ('s1', 'c1', 'S');
+    `);
+    const sheet = await db.query<{ mark_with_ai: boolean }>("select mark_with_ai from sheet");
+    expect(sheet.rows[0].mark_with_ai).toBe(true);
+    const labels = await db.query<{ v: string }>(
+      "select enumlabel as v from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'mark_status'",
+    );
+    expect(labels.rows.map((r) => r.v)).toContain("awaiting_official");
   });
 });
 

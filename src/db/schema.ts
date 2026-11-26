@@ -175,6 +175,7 @@ export const sheets = pgTable(
     statusUpdatedAt: createdAt("status_updated_at"),
     error: text("error"),
     timerEnabled: boolean("timer_enabled").notNull().default(true),
+    markWithAi: boolean("mark_with_ai").notNull().default(true),
     uploadedAt: createdAt("uploaded_at"),
     solutionsStatus: solutionsStatusEnum("solutions_status").notNull().default("none"),
     solutionsStatusUpdatedAt: instant("solutions_status_updated_at"),
