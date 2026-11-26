@@ -53,7 +53,7 @@ Every task is built test first and gets one commit. "Checks" means `npm run lint
 
 ## Phase 6: Finish and release
 
-- [ ] **E1: End-to-end tests for the new screens** (M)
+- [x] **E1: End-to-end tests for the new screens** (M)
 - [ ] **R1: Release** (each step needs your go-ahead): migration 0006 to Neon; full checks,
   `npm run e2e` and the build; push `main`; check live; spec Status → implemented.
 

@@ -24,6 +24,8 @@ type Props = {
   submitted: boolean;
   /** The sheet's last position of the "Mark with AI now" switch. */
   markWithAi?: boolean;
+  /** Called when the switch is changed; the screen keeps the position when this form is remounted. */
+  onMarkWithAiChange?: (value: boolean) => void;
   /** True when the question has an official solution: it is marked against it, switch locked. */
   hasOfficial?: boolean;
   /** Called after a successful submit, so the page can show the mark. */
@@ -66,11 +68,11 @@ export function WorkingInput({
   initialFiles,
   submitted,
   markWithAi = true,
+  onMarkWithAiChange,
   hasOfficial = false,
   onSubmitted,
   beforeSubmit,
 }: Props) {
-  const [aiNow, setAiNow] = useState(markWithAi);
   const [text, setText] = useState(initialText);
   const [files, setFiles] = useState(initialFiles);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export function WorkingInput({
     startTransition(async () => {
       if (!(await saveNow(text))) return;
       await beforeSubmit?.();
-      const result = await submitWorkingAction({ attemptId, markWithAi: aiNow });
+      const result = await submitWorkingAction({ attemptId, markWithAi });
       if (result.ok) onSubmitted();
       else setError(result.error);
     });
@@ -220,8 +222,8 @@ export function WorkingInput({
             {pending ? "Working…" : "Submit working"}
           </Button>
           <MarkWithAiSwitch
-            checked={aiNow}
-            onCheckedChange={setAiNow}
+            checked={markWithAi}
+            onCheckedChange={(value) => onMarkWithAiChange?.(value)}
             total={1}
             official={hasOfficial ? 1 : 0}
             disabled={pending}

@@ -67,7 +67,7 @@ export function QuestionView({
   initialHints,
   hintsReady,
   timerEnabled,
-  markWithAi,
+  markWithAi: initialMarkWithAi,
   hasOfficial,
   initialSeconds,
   initialRating,
@@ -81,6 +81,8 @@ export function QuestionView({
   children,
 }: Props) {
   const [attemptId, setAttemptId] = useState(initialAttemptId);
+  // Kept here, not in the working form, which is remounted when the attempt opens.
+  const [markWithAi, setMarkWithAi] = useState(initialMarkWithAi);
   const [shown, setShown] = useState<ShownHint[]>(initialHints);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -218,6 +220,7 @@ export function QuestionView({
           initialFiles={initialFiles}
           submitted={submitted}
           markWithAi={markWithAi}
+          onMarkWithAiChange={setMarkWithAi}
           hasOfficial={hasOfficial}
           beforeSubmit={() => flushTimer.current()}
           onSubmitted={() => router.refresh()}

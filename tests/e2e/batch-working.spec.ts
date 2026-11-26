@@ -140,13 +140,13 @@ test("a 3-page PDF is matched, submitted and marked like photos; an 11-page PDF 
   // An 11-page PDF is refused before anything is uploaded.
   await picker.setInputFiles(pdfFile("long.pdf", 11));
   await page.getByRole("button", { name: "Upload and match" }).click();
-  await expect(page.getByRole("alert")).toContainText("at most 10 pages");
+  await expect(page.locator("p[role=alert]")).toContainText("at most 10 pages");
   await page.getByRole("button", { name: "Remove" }).click();
 
   // A PDF with a photo is refused at once, and the PDF stays chosen on its own.
   await picker.setInputFiles(pdfFile("three.pdf", 3));
   await picker.setInputFiles(await drawnPhoto(page, "extra.png", ["1. x = 2"]));
-  await expect(page.getByRole("alert")).toContainText("one PDF or up to 10 photos, not both");
+  await expect(page.locator("p[role=alert]")).toContainText("one PDF or up to 10 photos, not both");
   await expect(page.getByText("PDF: three.pdf")).toBeVisible();
   await expect(page.getByText("extra.png")).toBeHidden();
 
@@ -163,6 +163,5 @@ test("a 3-page PDF is matched, submitted and marked like photos; an 11-page PDF 
   await page.getByRole("button", { name: "Submit and mark" }).click();
   await expect(page).toHaveURL(new RegExp(`${sheetUrl}$`), { timeout: 60_000 });
   await openQuestion(page, sheetUrl, "1");
-  await page.getByRole("link", { name: "See the mark" }).click();
   await expect(page.getByText("AI-marked, provisional")).toBeVisible();
 });
