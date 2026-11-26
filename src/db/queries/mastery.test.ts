@@ -309,6 +309,20 @@ describe("getCourseMastery with spot-the-error answers", () => {
     expect(topic.mastery).toBeCloseTo(afterFirst + 0.3 * 0.25 * (0 - afterFirst));
     expect(topic.attempts).toBe(2);
   });
+
+  it("counts only marked long-form attempts in longFormAttempts, not spot answers", async () => {
+    const w = await setup("ms-spot-longform@test.local");
+    await attemptWithMark(w.user.id, w.question.id, "full", "ai", 5);
+    await spotAnswer(w, { topicIds: [w.algebra.id], outcome: "stuck" });
+    await spotAnswer(w, { topicIds: [w.algebra.id], outcome: "full" });
+
+    const result = await getCourseMastery(w.user.id, w.course.id);
+
+    const topic = result.topics.find((t) => t.id === w.algebra.id)!;
+    expect(topic.attempts).toBe(3);
+    expect(topic.longFormAttempts).toBe(1);
+    expect(result.topics.find((t) => t.id === w.child.id)!.longFormAttempts).toBe(0);
+  });
 });
 
 describe("getCourseEvents", () => {

@@ -55,8 +55,13 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
 
   // Mastery of the topic before any spot-the-error answer.
   await page.goto(`${courseUrl}/topics`);
-  await page.getByRole("link", { name: /Product rule/ }).click();
-  await expect(page.getByText(/Mastery \d+% from 1 attempt\b/)).toBeVisible();
+  await page.getByRole("button", { name: /Product rule/ }).click();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Product rule" })
+      .getByText(/Mastery \d+% · 1 attempt\b/),
+  ).toBeVisible();
 
   // The Revise page offers both kinds, and Spot the error shows the common errors.
   await page.goto("/revise");
@@ -128,8 +133,13 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
 
   // The answers count on the topic: one marked attempt plus five spot-the-error answers.
   await page.goto(`${courseUrl}/topics`);
-  await page.getByRole("link", { name: /Product rule/ }).click();
-  await expect(page.getByText(/Mastery \d+% from 6 attempts/)).toBeVisible();
+  await page.getByRole("button", { name: /Product rule/ }).click();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Product rule" })
+      .getByText(/Mastery \d+% · 6 attempts/),
+  ).toBeVisible();
 
   // Phone width for the session page and a question.
   await page.setViewportSize({ width: 375, height: 812 });

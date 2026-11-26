@@ -123,11 +123,14 @@ test("history lists the attempts and the hand-in export downloads a PDF", async 
   }
 });
 
-test("the skill map leads to a revision session with a fresh variant", async () => {
+test("the topics list leads to a revision session with a fresh variant", async () => {
   await page.goto(`${courseUrl}/topics`);
-  await page.getByRole("link", { name: /Integration by parts/ }).click();
-  await expect(page).toHaveURL(/topic=/);
-  await page.getByRole("link", { name: "Revise this topic" }).click();
+  await page.getByRole("button", { name: /Integration by parts/ }).click();
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Integration by parts" })
+    .getByRole("link", { name: "Revise", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/revise\?/);
 
   await page.getByRole("button", { name: "Start revision" }).click();

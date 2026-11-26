@@ -34,6 +34,8 @@ export type TopicMastery = {
   confidence: number;
   priority: number;
   attempts: number;
+  /** Marked long-form attempts only (spot-the-error answers left out): what the topic's word label counts. */
+  longFormAttempts: number;
   series: { at: Date; mastery: number }[];
   /** The topic's spaced-review schedule, replayed from the same marks; null when untried. */
   review: Schedule | null;
@@ -174,6 +176,7 @@ export async function getCourseMastery(userId: string, courseId: string): Promis
         confidence: replay.confidence,
         priority: replay.priority,
         attempts: list.length,
+        longFormAttempts: list.filter((a) => a.kind !== "spot").length,
         series: replay.series,
         review: replaySchedule(
           list.map((a) => ({ at: a.at, grade: gradeOf(a) })),
