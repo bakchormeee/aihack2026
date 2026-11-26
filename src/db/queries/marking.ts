@@ -114,6 +114,16 @@ export async function getVisibleSolution(
   return chosen ? { basis: chosen.basis, body: chosen.body } : null;
 }
 
+/** True when the question has an official solution (uploaded on its sheet's Solutions tab). */
+export async function hasOfficialSolution(userId: string, questionId: string): Promise<boolean> {
+  await requireQuestion(userId, questionId);
+  const rows = await db
+    .select({ id: solutions.questionId })
+    .from(solutions)
+    .where(and(eq(solutions.questionId, questionId), eq(solutions.basis, "official")));
+  return rows.length > 0;
+}
+
 export type ReviewItem = {
   question: { id: string; label: string; body: string };
   attemptId: string;

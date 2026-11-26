@@ -19,9 +19,12 @@ import {
   submissions,
   topics,
 } from "@/db/schema";
-import type { ErrorType, HintLevel, MarkBasis, Outcome } from "@/lib/domain";
+import type { ErrorType, HintLevel, MarkBasis, MarkStatus, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
+import { coverageText, sheetScore, type PartMark, type SheetScore } from "@/lib/scores/score";
+import type { TimelineAttempt } from "@/lib/scores/timeline";
+import { questionStatus, type QuestionStatus } from "@/lib/scores/status";
 
 import { binnedQuestionIdsOf, liveCourse } from "./bin";
 import { listSheets } from "./sheets";
@@ -31,6 +34,8 @@ type Mark = typeof marks.$inferSelect;
 export type AttemptRecord = {
   id: string;
   questionId: string;
+  /** Set for an attempt made in a revision session. */
+  revisionSessionId: string | null;
   startedAt: Date;
   secondsSpent: number | null;
   inheritedHintLevel: number;
@@ -42,7 +47,7 @@ export type AttemptRecord = {
     id: string;
     text: string | null;
     submittedAt: Date | null;
-    markStatus: string;
+    markStatus: MarkStatus;
     files: { id: string; mime: string; position: number }[];
   } | null;
   /** Oldest first. */
@@ -61,6 +66,76 @@ export type QuestionRecord = {
 
 const isSubmitted = (a: AttemptRecord) => a.submission?.submittedAt != null;
 
+// ── The mark of a question (SPEC-study-views.md, question-marks) ──
+// One definition, used by the Questions tab, the sheet score, the Summary and the question page:
+// the mark of a question is the current mark (official beats AI) of its LATEST submitted attempt,
+// not the best one. A latest attempt with no mark yet (marking, waiting, failed) gives no mark.
+
+/** The question's latest submitted attempt (records are oldest first); null when none. */
+export function latestSubmitted(record: QuestionRecord): AttemptRecord | null {
+  return [...record.attempts].reverse().find(isSubmitted) ?? null;
+}
+
+/** The mark of the question by the rule above; null when it has none. */
+export function markOfQuestion(record: QuestionRecord): Mark | null {
+  return latestSubmitted(record)?.current ?? null;
+}
+
+/** The status shown on the question's row. */
+export function statusOfQuestion(record: QuestionRecord): QuestionStatus {
+  const latest = latestSubmitted(record);
+  const current = latest?.current ?? null;
+  return questionStatus({
+    submittedAttempts: record.attempts.filter(isSubmitted).length,
+    latest: latest
+      ? {
+          markStatus: latest.submission!.markStatus,
+          mark: current ? { score: current.score, outcome: current.outcome } : null,
+        }
+      : null,
+    hasDraft: record.attempts.some(
+      (a) =>
+        a.submission !== null &&
+        a.submission.submittedAt === null &&
+        ((a.submission.text ?? "").trim().length > 0 || a.submission.files.length > 0),
+    ),
+  });
+}
+
+/**
+ * The question's submitted attempts for the timeline, oldest first, each with its current
+ * mark. `sessionId` limits them to one revision session; without it, to attempts made outside
+ * revision sessions.
+ */
+export async function getQuestionTimeline(
+  userId: string,
+  questionId: string,
+  sessionId?: string,
+): Promise<TimelineAttempt[]> {
+  const [record] = await loadRecords(userId, { questionId });
+  return (record?.attempts ?? [])
+    .filter(
+      (attempt) => isSubmitted(attempt) && (attempt.revisionSessionId ?? undefined) === sessionId,
+    )
+    .map((attempt) => ({
+      id: attempt.id,
+      date: attempt.submission?.submittedAt ?? attempt.startedAt,
+      score: attempt.current?.score ?? null,
+      outcome: attempt.current?.outcome ?? null,
+    }));
+}
+
+/** Status of every question of the sheet, by question id. */
+export async function getSheetQuestionStatuses(
+  userId: string,
+  sheetId: string,
+): Promise<Record<string, QuestionStatus>> {
+  const records = await loadRecords(userId, { sheetId });
+  return Object.fromEntries(
+    records.map((record) => [record.question.id, statusOfQuestion(record)]),
+  );
+}
+
 /**
  * Loads the user's questions (all of a course, or of one sheet) with every
  * attempt, its working, hint reveals and marks. Questions come in sheet order.
@@ -68,12 +143,14 @@ const isSubmitted = (a: AttemptRecord) => a.submission?.submittedAt != null;
  */
 async function loadRecords(
   userId: string,
-  where: { courseId: string } | { sheetId: string },
+  where: { courseId: string } | { sheetId: string } | { questionId: string },
 ): Promise<QuestionRecord[]> {
   const scope =
     "sheetId" in where
       ? eq(questions.sheetId, where.sheetId)
-      : eq(questions.courseId, where.courseId);
+      : "questionId" in where
+        ? eq(questions.id, where.questionId)
+        : eq(questions.courseId, where.courseId);
   const all = await db
     .select({ question: questions, sheetTitle: sheets.title, sheetUploadedAt: sheets.uploadedAt })
     .from(questions)
@@ -136,6 +213,7 @@ async function loadRecords(
     return {
       id: attempt.id,
       questionId: attempt.questionId,
+      revisionSessionId: attempt.revisionSessionId,
       startedAt: attempt.startedAt,
       secondsSpent: attempt.secondsSpent,
       inheritedHintLevel: attempt.inheritedHintLevel,
@@ -194,44 +272,39 @@ export function bestAttempt(list: AttemptRecord[]): AttemptRecord | null {
 }
 
 export type SheetStats = {
-  total: number;
-  submitted: number;
-  /** Mean over marked questions of the best current score; null when nothing is marked. */
-  averageScore: number | null;
+  /** Attempted-only score and counts (SPEC-study-views.md, attempted-score). */
+  score: SheetScore;
   hintsRevealed: number;
   secondsSpent: number;
   /** True once any mark on the sheet is official. */
   confirmed: boolean;
 };
 
+/** Each part's mark by the one rule above, ready for `sheetScore`. */
+export function partMarks(records: QuestionRecord[]): PartMark[] {
+  return records.map((record) => ({
+    label: record.question.label,
+    mark: markOfQuestion(record)?.score ?? null,
+  }));
+}
+
 export function sheetStats(records: QuestionRecord[]): SheetStats {
-  const scores: number[] = [];
-  let submitted = 0;
   let hintsRevealed = 0;
   let secondsSpent = 0;
   let confirmed = false;
   for (const record of records) {
-    if (record.attempts.some(isSubmitted)) submitted += 1;
-    const bestScore = record.attempts
-      .map((a) => a.current?.score)
-      .filter((score): score is number => score !== undefined);
-    if (bestScore.length) scores.push(Math.max(...bestScore));
     for (const attempt of record.attempts) {
       hintsRevealed += attempt.revealedLevels.length;
       secondsSpent += attempt.secondsSpent ?? 0;
       if (attempt.marks.some((mark) => mark.basis === "official")) confirmed = true;
     }
   }
-  return {
-    total: records.length,
-    submitted,
-    averageScore: scores.length
-      ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
-      : null,
-    hintsRevealed,
-    secondsSpent,
-    confirmed,
-  };
+  return { score: sheetScore(partMarks(records)), hintsRevealed, secondsSpent, confirmed };
+}
+
+/** The sheet's score; all zeros for a sheet that is not the user's. */
+export async function getSheetScore(userId: string, sheetId: string): Promise<SheetScore> {
+  return sheetScore(partMarks(await loadRecords(userId, { sheetId })));
 }
 
 export type HeatRow = {
@@ -335,7 +408,10 @@ export async function listMistakes(
 
 // ── Sheet summary ──
 
-/** The newest marked attempt of each question, ready for the summary and the hint ladder. */
+/**
+ * The marked parts, one item each (the mark of a question by the one rule above), ready for the
+ * summary and the hint ladder. The summary needs at least one mark: `hasMarks`.
+ */
 export async function getSheetSummaryInput(userId: string, sheetId: string) {
   const records = await loadRecords(userId, { sheetId });
   const items: {
@@ -355,7 +431,7 @@ export async function getSheetSummaryInput(userId: string, sheetId: string) {
         if (newestMarkAt === null || mark.createdAt > newestMarkAt) newestMarkAt = mark.createdAt;
       }
     }
-    const newest = [...record.attempts].reverse().find((attempt) => attempt.current !== null);
+    const newest = latestSubmitted(record);
     if (!newest?.current) continue;
     items.push({
       label: record.question.label,
@@ -372,7 +448,9 @@ export async function getSheetSummaryInput(userId: string, sheetId: string) {
   return {
     total: records.length,
     marked: items.length,
-    complete: records.length > 0 && items.length === records.length,
+    hasMarks: items.length > 0,
+    /** "Based on questions 1, 2(a) and 4"; empty with no marks. */
+    covers: coverageText(partMarks(records)),
     items,
     ladder,
     newestMarkAt,

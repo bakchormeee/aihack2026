@@ -28,10 +28,11 @@ export default async function SummaryPage({ params }: PageProps<"/sheets/[sheetI
         <p className="text-muted-foreground text-sm">
           {state.total === 0
             ? "This sheet has no questions yet."
-            : `The summary is available once every question has a marked attempt. ${state.remaining} of ${state.total} ${state.remaining === 1 ? "question remains" : "questions remain"}.`}
+            : "The summary is written once at least one question has a mark."}
         </p>
       ) : (
         <>
+          <p className="text-muted-foreground text-sm">{state.covers}</p>
           <div className="flex flex-col gap-2 bg-card rounded-lg border p-5">
             <h2 className="font-medium">Questions solved, by hints used</h2>
             <HintLadderBar counts={state.ladder} />

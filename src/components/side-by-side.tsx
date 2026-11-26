@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { MathText } from "@/components/math-text";
+import { solutionLabel } from "@/lib/marking/labels";
 
 /**
  * The official solution next to the student's submitted working. `solution`
@@ -19,7 +20,7 @@ export function SideBySide({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <section className="flex min-w-0 flex-col gap-2 bg-card rounded-lg border p-5">
         <h3 className="text-sm font-semibold">
-          {solution?.basis === "official" ? "Official solution" : "Worked solution"}
+          {solution ? solutionLabel(solution.basis) : "Worked solution"}
         </h3>
         {solution ? (
           <MathText className="text-sm">{solution.body}</MathText>

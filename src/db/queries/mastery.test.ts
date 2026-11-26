@@ -9,6 +9,7 @@ import {
   questionTopics,
   revisionSessions,
   sheets,
+  submissions,
   spotAnswers,
   spotItems,
   topicPrereqs,
@@ -97,6 +98,32 @@ describe("getCourseMastery", () => {
     expect(a.mastery).toBeGreaterThan(0.5);
     expect(a.series).toHaveLength(1);
     expect(result.topics.find((t) => t.id === groups.id)!.mastery).toBeNull();
+  });
+
+  it("does not count a submission that is waiting for the official solutions", async () => {
+    const { user, course, algebra, question } = await setup("m-waiting@test.local");
+    await attemptWithMark(user.id, question.id, "partial", "ai", 3);
+    const before = (await getCourseMastery(user.id, course.id)).topics.find(
+      (t) => t.id === algebra.id,
+    )!;
+    const [later] = await db
+      .insert(attempts)
+      .values({ userId: user.id, questionId: question.id, context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({
+      attemptId: later.id,
+      text: "x",
+      submittedAt: new Date(),
+      markStatus: "awaiting_official",
+    });
+
+    const after = (await getCourseMastery(user.id, course.id)).topics.find(
+      (t) => t.id === algebra.id,
+    )!;
+
+    expect(after.attempts).toBe(before.attempts);
+    expect(after.mastery).toBe(before.mastery);
+    expect(after.series).toEqual(before.series);
   });
 
   it("ignores another user's attempts on the same question", async () => {

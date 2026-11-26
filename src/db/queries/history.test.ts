@@ -10,6 +10,7 @@ import {
   marks,
   questions,
   questionTopics,
+  revisionSessions,
   sheetSummaries,
   sheets,
   submissionFiles,
@@ -26,8 +27,14 @@ import {
   failSummary,
   finishSummary,
   getCourseSheetOverview,
+  getQuestionTimeline,
+  getSheetScore,
   getSheetHistory,
+  getSheetQuestionStatuses,
   getSheetSummaryInput,
+  latestSubmitted,
+  markOfQuestion,
+  statusOfQuestion,
   listMistakes,
   readSummary,
   retrySummary,
@@ -94,6 +101,8 @@ async function addAttempt(
     inherited?: number;
     reveals?: number[];
     submitted?: boolean;
+    /** Defaults to done. */
+    markStatus?: "none" | "pending" | "done" | "failed" | "awaiting_official";
     text?: string;
     files?: { path: string; mime: string }[];
     marks?: MarkSpec[];
@@ -123,7 +132,7 @@ async function addAttempt(
         attemptId: attempt.id,
         text: o.text ?? "x = 1",
         submittedAt: at(o.startedAt + 1),
-        markStatus: "done",
+        markStatus: o.markStatus ?? "done",
       })
       .returning();
     for (const [i, file] of (o.files ?? []).entries())
@@ -235,7 +244,7 @@ describe("getSheetHistory", () => {
 });
 
 describe("getCourseSheetOverview", () => {
-  it("counts submitted, averages best scores, adds hints and time, and flags confirmed marks", async () => {
+  it("scores the latest mark of attempted questions, adds hints and time, and flags confirmed marks", async () => {
     const w = await world("h-ov@test.local", ["1", "2", "3"]);
     const [q1, q2] = w.qs;
     await addAttempt(w.user.id, q1.id, {
@@ -248,7 +257,7 @@ describe("getCourseSheetOverview", () => {
       startedAt: 10,
       seconds: 50,
       reveals: [1, 2],
-      marks: [{ score: 4, outcome: "partial", at: 15 }],
+      marks: [{ score: 4, outcome: "full", at: 15 }],
     });
     await addAttempt(w.user.id, q2.id, {
       startedAt: 20,
@@ -260,14 +269,62 @@ describe("getCourseSheetOverview", () => {
 
     expect(row.sheet.id).toBe(w.sheet.id);
     expect(row.stats).toEqual({
-      total: 3,
-      submitted: 2,
-      averageScore: 3.5, // best per marked question: 4 and 3, to one decimal place
+      // Questions 1 and 2 are attempted (4 and 3); question 3 is not and does not lower it.
+      score: { attempted: 2, total: 3, points: 7, max: 10, percent: 70 },
       hintsRevealed: 3,
       secondsSpent: 150,
       confirmed: false,
     });
-    expect(row.heat.cells.map((c) => c.outcome)).toEqual(["partial", "partial", null]);
+    expect(row.heat.cells.map((c) => c.outcome)).toEqual(["full", "partial", null]);
+  });
+
+  it("scores the spec's example: question 2 is 4/5, 9 / 10 and Attempted 2 / 4", async () => {
+    const w = await world("h-ex@test.local", ["1", "2(a)", "2(b)", "3", "4"]);
+    const [q1, q2a, q2b, q3] = w.qs;
+    const full = { score: 5, outcome: "full" as const, at: 5 };
+    await addAttempt(w.user.id, q1.id, { startedAt: 1, marks: [full] });
+    await addAttempt(w.user.id, q2a.id, { startedAt: 1, marks: [full] });
+    await addAttempt(w.user.id, q2b.id, {
+      startedAt: 1,
+      marks: [{ score: 3, outcome: "partial", at: 5 }],
+    });
+    await addAttempt(w.user.id, q3.id, { startedAt: 1, submitted: true, markStatus: "pending" });
+
+    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
+    expect(row.stats.score).toEqual({ attempted: 2, total: 4, points: 9, max: 10, percent: 90 });
+    expect(await getSheetScore(w.user.id, w.sheet.id)).toEqual(row.stats.score);
+  });
+
+  it("does not count a submission that is waiting for the official solutions", async () => {
+    const w = await world("h-wait-score@test.local", ["1", "2"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 4, outcome: "full", at: 5 }],
+    });
+    await addAttempt(w.user.id, w.qs[1].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+
+    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
+    expect(row.stats.score).toEqual({ attempted: 1, total: 2, points: 4, max: 5, percent: 80 });
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input.items.map((item) => item.label)).toEqual(["1"]);
+  });
+
+  it("counts a question by its latest submitted attempt, not the best", async () => {
+    const w = await world("h-latest-score@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 5, outcome: "full", at: 5 }],
+    });
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 10,
+      marks: [{ score: 2, outcome: "partial", at: 15 }],
+    });
+    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
+    expect(row.stats.score).toMatchObject({ points: 2, max: 5, percent: 40 });
   });
 
   it("is confirmed once any mark is official, and an official mark beats the AI mark", async () => {
@@ -281,29 +338,14 @@ describe("getCourseSheetOverview", () => {
     });
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
     expect(row.stats.confirmed).toBe(true);
-    expect(row.stats.averageScore).toBe(2);
+    expect(row.stats.score.points).toBe(2);
     expect(row.heat.cells[0].outcome).toBe("partial");
   });
 
-  it("rounds the average to one decimal place", async () => {
-    const w = await world("h-dec@test.local", ["1", "2", "3"]);
-    for (const [index, score] of [3, 3, 4].entries()) {
-      await addAttempt(w.user.id, w.qs[index].id, {
-        startedAt: 1,
-        marks: [{ score, outcome: score === 4 ? "full" : "partial", at: 5 }],
-      });
-    }
-
-    const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
-
-    expect(row.stats.averageScore).toBe(3.3); // 10 / 3 = 3.33...
-  });
-
-  it("has no average for an unmarked sheet", async () => {
+  it("has no score for an unmarked sheet", async () => {
     const w = await world("h-nomark@test.local");
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
-    expect(row.stats.averageScore).toBeNull();
-    expect(row.stats.submitted).toBe(0);
+    expect(row.stats.score).toEqual({ attempted: 0, total: 2, points: 0, max: 0, percent: null });
   });
 
   it("heat cell takes the best outcome, then fewest hints", async () => {
@@ -338,7 +380,7 @@ describe("getCourseSheetOverview", () => {
     });
     expect(await getCourseSheetOverview(other.user.id, w.course.id)).toEqual([]);
     const [row] = await getCourseSheetOverview(w.user.id, w.course.id);
-    expect(row.stats.submitted).toBe(0);
+    expect(row.stats.score.attempted).toBe(0);
   });
 });
 
@@ -422,7 +464,7 @@ describe("listMistakes", () => {
 });
 
 describe("getSheetSummaryInput", () => {
-  it("is incomplete until every question has a marked attempt, and counts what remains", async () => {
+  it("has marks from the first marked part, and counts what is marked", async () => {
     const w = await world("h-sum@test.local", ["1", "2", "3"]);
     await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 1,
@@ -430,10 +472,44 @@ describe("getSheetSummaryInput", () => {
     });
     await addAttempt(w.user.id, w.qs[1].id, { startedAt: 3, submitted: true }); // submitted, not marked
     const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
-    expect(input).toMatchObject({ total: 3, marked: 1, complete: false });
+    expect(input).toMatchObject({
+      total: 3,
+      marked: 1,
+      hasMarks: true,
+      covers: "Based on question 1",
+    });
   });
 
-  it("uses each question's newest marked attempt for items and the hint ladder", async () => {
+  it("has no marks while parts are only marking or waiting", async () => {
+    const w = await world("h-sum0@test.local", ["1", "2"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "pending",
+    });
+    await addAttempt(w.user.id, w.qs[1].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input).toMatchObject({ marked: 0, hasMarks: false, covers: "", items: [] });
+  });
+
+  it("names a partly marked question by its marked parts", async () => {
+    const w = await world("h-sum00@test.local", ["1", "2(a)", "2(b)", "3"]);
+    for (const q of [w.qs[0], w.qs[1], w.qs[3]]) {
+      await addAttempt(w.user.id, q.id, {
+        startedAt: 1,
+        marks: [{ score: 4, outcome: "full", at: 2 }],
+      });
+    }
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input.covers).toBe("Based on questions 1, 2(a) and 3");
+    expect(input.items.map((item) => item.label)).toEqual(["1", "2(a)", "3"]);
+  });
+
+  it("uses each question's latest submitted attempt for items and the hint ladder", async () => {
     const w = await world("h-sum2@test.local", ["1", "2", "3"]);
     const [q1, q2, q3] = w.qs;
     // q1: first full with 3 hints, newest full with none -> level 0
@@ -458,12 +534,10 @@ describe("getSheetSummaryInput", () => {
       reveals: [1],
       marks: [{ score: 3, outcome: "partial", errorType: "algebra_slip", feedback: "slip", at: 6 }],
     });
-    // an unmarked later attempt does not replace the marked one
-    await addAttempt(w.user.id, q3.id, { startedAt: 50, submitted: true });
 
     const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
 
-    expect(input.complete).toBe(true);
+    expect(input.hasMarks).toBe(true);
     expect(input.ladder).toEqual([1, 0, 1, 0]);
     expect(input.newestMarkAt).toEqual(at(11));
     expect(input.items[2]).toEqual({
@@ -480,7 +554,7 @@ describe("getSheetSummaryInput", () => {
     const w = await world("h-sum3@test.local");
     const other = await world("h-sum3-other@test.local");
     const input = await getSheetSummaryInput(other.user.id, w.sheet.id);
-    expect(input).toMatchObject({ total: 0, complete: false, items: [] });
+    expect(input).toMatchObject({ total: 0, hasMarks: false, items: [] });
   });
 });
 
@@ -625,5 +699,142 @@ describe("history and the bin", () => {
     expect(await getCourseSheetOverview(w.user.id, w.course.id)).toEqual([]);
     expect((await listMistakes(w.user.id, w.course.id, {})).items).toEqual([]);
     expect(await getSheetHistory(w.user.id, w.sheet.id)).toEqual([]);
+  });
+});
+
+describe("the mark of a question (question-marks)", () => {
+  it("is the latest submitted attempt's mark, not the best", async () => {
+    const w = await world("h-latest@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 5, outcome: "full", at: 5 }],
+    });
+    const second = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 20,
+      marks: [{ score: 2, outcome: "partial", at: 25 }],
+    });
+    const [record] = await getSheetHistory(w.user.id, w.sheet.id);
+
+    expect(latestSubmitted(record)?.id).toBe(second.id);
+    expect(markOfQuestion(record)?.score).toBe(2);
+    expect(statusOfQuestion(record)).toMatchObject({
+      kind: "marked",
+      score: 2,
+      outcomeLabel: "Partial",
+      attempts: 2,
+    });
+  });
+
+  it("uses the official mark once it exists", async () => {
+    const w = await world("h-official@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [
+        { score: 2, outcome: "partial", at: 5 },
+        { score: 4, outcome: "full", basis: "official", at: 9 },
+      ],
+    });
+    const [record] = await getSheetHistory(w.user.id, w.sheet.id);
+    expect(statusOfQuestion(record)).toMatchObject({
+      kind: "marked",
+      score: 4,
+      outcomeLabel: "Correct, slips",
+    });
+  });
+
+  it("gives each question its status", async () => {
+    const w = await world("h-status@test.local", ["1", "2", "3", "4", "5", "6"]);
+    const [q1, q2, q3, q4, q5] = w.qs;
+    await addAttempt(w.user.id, q1.id, {
+      startedAt: 1,
+      marks: [{ score: 5, outcome: "full", at: 5 }],
+    });
+    await addAttempt(w.user.id, q2.id, { startedAt: 1, submitted: true, markStatus: "pending" });
+    await addAttempt(w.user.id, q3.id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+    await addAttempt(w.user.id, q4.id, { startedAt: 1, submitted: true, markStatus: "failed" });
+    // A draft: a submission row that was never submitted, and one with no working.
+    const draft = await addAttempt(w.user.id, q5.id, { startedAt: 1, submitted: false });
+    await db.insert(submissions).values({ attemptId: draft.id, text: "half done" });
+
+    const statuses = await getSheetQuestionStatuses(w.user.id, w.sheet.id);
+
+    expect(w.qs.map((q) => statuses[q.id].kind)).toEqual([
+      "marked",
+      "marking",
+      "waiting",
+      "failed",
+      "draft",
+      "none",
+    ]);
+  });
+
+  it("shows an empty submission row as not started, and gives nothing for another user's sheet", async () => {
+    const w = await world("h-empty@test.local", ["1"]);
+    const attempt = await addAttempt(w.user.id, w.qs[0].id, { startedAt: 1, submitted: false });
+    await db.insert(submissions).values({ attemptId: attempt.id, text: "  " });
+    expect((await getSheetQuestionStatuses(w.user.id, w.sheet.id))[w.qs[0].id]).toEqual({
+      kind: "none",
+    });
+
+    const other = await world("h-empty2@test.local", ["1"]);
+    expect(await getSheetQuestionStatuses(other.user.id, w.sheet.id)).toEqual({});
+  });
+});
+
+describe("getQuestionTimeline", () => {
+  it("lists the submitted attempts oldest first with their current marks", async () => {
+    const w = await world("h-tl@test.local", ["1"]);
+    const first = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [
+        { score: 2, outcome: "partial", at: 5 },
+        { score: 4, outcome: "full", basis: "official", at: 9 },
+      ],
+    });
+    const second = await addAttempt(w.user.id, w.qs[0].id, { startedAt: 20, submitted: true });
+    await addAttempt(w.user.id, w.qs[0].id, { startedAt: 40, submitted: false });
+
+    const timeline = await getQuestionTimeline(w.user.id, w.qs[0].id);
+
+    expect(timeline).toEqual([
+      { id: first.id, date: at(2), score: 4, outcome: "full" },
+      { id: second.id, date: at(21), score: null, outcome: null },
+    ]);
+  });
+
+  it("keeps revision-session attempts apart from the sheet's", async () => {
+    const w = await world("h-tls@test.local", ["1"]);
+    const plain = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 3, outcome: "partial", at: 2 }],
+    });
+    const inSession = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 5,
+      marks: [{ score: 5, outcome: "full", at: 6 }],
+    });
+    const [session] = await db
+      .insert(revisionSessions)
+      .values({ userId: w.user.id, courseId: w.course.id })
+      .returning();
+    await db
+      .update(attempts)
+      .set({ revisionSessionId: session.id })
+      .where(eq(attempts.id, inSession.id));
+
+    expect((await getQuestionTimeline(w.user.id, w.qs[0].id)).map((a) => a.id)).toEqual([plain.id]);
+    expect((await getQuestionTimeline(w.user.id, w.qs[0].id, session.id)).map((a) => a.id)).toEqual(
+      [inSession.id],
+    );
+  });
+
+  it("is empty for another user's question", async () => {
+    const w = await world("h-tlo@test.local", ["1"]);
+    const other = await world("h-tlo2@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, { startedAt: 1, submitted: true });
+    expect(await getQuestionTimeline(other.user.id, w.qs[0].id)).toEqual([]);
   });
 });

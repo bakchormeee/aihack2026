@@ -175,6 +175,39 @@ describe("listRetryCandidates", () => {
     expect(await listRetryCandidates(other.user.id, other.course.id)).toEqual([]);
   });
 
+  it("leaves out a question whose only submission is waiting for the official solutions", async () => {
+    const { user, course, t1 } = await setup("rv-waiting@test.local");
+    const waitingOnly = await question(course.id, [t1.id], { position: 1 });
+    const earlier = await question(course.id, [t1.id], { position: 2 });
+    const [a] = await db
+      .insert(attempts)
+      .values({ userId: user.id, questionId: waitingOnly.id, context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({
+      attemptId: a.id,
+      text: "x",
+      submittedAt: new Date(),
+      markStatus: "awaiting_official",
+    });
+    // Marked first, then a newer submission that waits: the marked attempt is still the evidence.
+    await attempt(user.id, earlier.id, "partial", 5);
+    const [b] = await db
+      .insert(attempts)
+      .values({ userId: user.id, questionId: earlier.id, context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({
+      attemptId: b.id,
+      text: "x",
+      submittedAt: new Date(),
+      markStatus: "awaiting_official",
+    });
+
+    const candidates = await listRetryCandidates(user.id, course.id);
+
+    expect(candidates.map((c) => c.questionId)).toEqual([earlier.id]);
+    expect(candidates[0].lastOutcome).toBe("partial");
+  });
+
   it("filters by topic", async () => {
     const { user, course, t1, t2 } = await setup("rv-topic@test.local");
     const a = await question(course.id, [t1.id], { position: 1 });

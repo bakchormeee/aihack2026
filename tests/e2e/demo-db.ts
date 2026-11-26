@@ -49,8 +49,8 @@ export async function ensureDemoTemplate(browser: Browser): Promise<string> {
   const { sheetUrl } = await createCourseWithSheet(page, "Demo Calculus");
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
-  await page.getByRole("link", { name: "See the mark" }).click();
-  await page.getByText("3/5", { exact: true }).waitFor();
+  // The mark is on the question page itself: there is no "See the mark" step.
+  await page.getByText("3 / 5", { exact: true }).waitFor();
   await context.close();
 
   const [user] = await db<{ id: string }[]>`

@@ -9,7 +9,6 @@ import { HintRungs } from "@/components/charts/hint-rungs";
 import { DifficultyRating } from "@/components/difficulty-rating";
 import { WorkingInput } from "@/components/working-input";
 import { MathText } from "@/components/math-text";
-import { Panel } from "@/components/page-parts";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { HintLevel } from "@/lib/domain";
 import { playSfx } from "@/lib/sfx";
@@ -19,6 +18,14 @@ import {
   startAttempt,
 } from "@/app/(app)/questions/[questionId]/actions";
 import type { WorkingFile } from "@/app/(app)/questions/[questionId]/submit-actions";
+
+/** "2 hints used · 12:40": what is left of the hints and the timer once an attempt is submitted. */
+export function lockedHintsLine(hintsUsed: number, seconds: number | null): string {
+  const hints =
+    hintsUsed === 0 ? "No hints used" : `${hintsUsed} ${hintsUsed === 1 ? "hint" : "hints"} used`;
+  if (seconds === null) return hints;
+  return `${hints} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 const HINT_NAMES = ["Nudge", "Approach", "Skeleton"] as const;
 
@@ -37,8 +44,12 @@ type Props = {
   initialRating: number | null;
   initialText: string;
   initialFiles: WorkingFile[];
-  /** True when the newest attempt's working has been submitted. */
+  /** True when the shown attempt's working has been submitted: its evaluation is the children. */
   submitted: boolean;
+  /** When the shown attempt is not the newest one, where the newest one is. */
+  newestHref?: string | null;
+  /** The attempt timeline, shown under the locked hints line once submitted. */
+  timeline?: React.ReactNode;
   prevHref: string | null;
   nextHref: string | null;
   children?: React.ReactNode;
@@ -57,6 +68,8 @@ export function QuestionView({
   initialText,
   initialFiles,
   submitted,
+  newestHref = null,
+  timeline,
   prevHref,
   nextHref,
   children,
@@ -88,6 +101,8 @@ export function QuestionView({
     setError(null);
     startTransition(async () => {
       await startAttempt({ questionId, mode: "fresh", sessionId });
+      // Drop ?attempt= so the page shows the new attempt, not the one that was selected.
+      router.replace(`/questions/${questionId}${sessionId ? `?session=${sessionId}` : ""}`);
       router.refresh();
     });
   }
@@ -111,105 +126,110 @@ export function QuestionView({
 
   return (
     <div className="flex flex-col gap-6">
-      <section
-        aria-labelledby="hints-heading"
-        className="bg-card flex flex-col gap-4 rounded-lg border p-5"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="hints-heading" className="text-lg font-medium">
-            Hints
-          </h2>
-          <HintRungs revealed={level} />
-        </div>
-
-        {shown.length > 0 ? (
-          <ol className="flex flex-col gap-3">
-            {shown.map((hint) => (
-              <li key={hint.level} className="border-foreground/25 border-l-2 py-0.5 pl-4">
-                <p className="text-muted-foreground mb-1 text-xs font-medium">
-                  Hint {hint.level} · {HINT_NAMES[hint.level - 1]}
-                </p>
-                <MathText>{hint.body}</MathText>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-
-        {level < 3 && !submitted ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={reveal}
-              disabled={!attemptId || !hintsReady || pending}
-            >
-              {pending ? "Showing…" : `Show hint ${level + 1} (${HINT_NAMES[level as 0 | 1 | 2]})`}
-            </Button>
-            {!hintsReady ? (
-              <span className="text-muted-foreground text-sm">Hints are being prepared…</span>
-            ) : (
-              <span className="text-muted-foreground text-sm">
-                Try first. Each hint gives away a little more.
-              </span>
-            )}
+      {submitted ? (
+        <p className="text-muted-foreground text-sm" data-testid="locked-hints">
+          {lockedHintsLine(shown.length, timerEnabled ? initialSeconds : null)}
+        </p>
+      ) : (
+        <section
+          aria-labelledby="hints-heading"
+          className="bg-card flex flex-col gap-4 rounded-lg border p-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="hints-heading" className="text-lg font-medium">
+              Hints
+            </h2>
+            <HintRungs revealed={level} />
           </div>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            {submitted ? "Hints are locked once you submit." : "All three hints are showing."}
-          </p>
-        )}
-        {error ? (
-          <p role="alert" className="text-destructive text-sm">
-            {error}
-          </p>
-        ) : null}
-      </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        {!timerEnabled ? (
-          <span />
-        ) : submitted ? (
-          <span className="text-muted-foreground text-sm">
-            Time spent: {Math.floor(initialSeconds / 60)}:
-            {String(initialSeconds % 60).padStart(2, "0")}
-          </span>
-        ) : (
-          <AttemptTimer
-            attemptId={attemptId}
-            initialSeconds={initialSeconds}
-            registerFlush={registerFlush}
-          />
-        )}
-        <DifficultyRating attemptId={attemptId} initialRating={initialRating} />
-      </div>
+          {shown.length > 0 ? (
+            <ol className="flex flex-col gap-3">
+              {shown.map((hint) => (
+                <li key={hint.level} className="border-foreground/25 border-l-2 py-0.5 pl-4">
+                  <p className="text-muted-foreground mb-1 text-xs font-medium">
+                    Hint {hint.level} · {HINT_NAMES[hint.level - 1]}
+                  </p>
+                  <MathText>{hint.body}</MathText>
+                </li>
+              ))}
+            </ol>
+          ) : null}
 
-      <WorkingInput
-        // A new attempt starts with an empty draft, so remount to drop the old text.
-        key={attemptId ?? "none"}
-        attemptId={attemptId}
-        initialText={initialText}
-        initialFiles={initialFiles}
-        submitted={submitted}
-        beforeSubmit={() => flushTimer.current()}
-        onSubmitted={() => router.refresh()}
-      />
+          {level < 3 && !submitted ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={reveal}
+                disabled={!attemptId || !hintsReady || pending}
+              >
+                {pending
+                  ? "Showing…"
+                  : `Show hint ${level + 1} (${HINT_NAMES[level as 0 | 1 | 2]})`}
+              </Button>
+              {!hintsReady ? (
+                <span className="text-muted-foreground text-sm">Hints are being prepared…</span>
+              ) : (
+                <span className="text-muted-foreground text-sm">
+                  Try first. Each hint gives away a little more.
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">All three hints are showing.</p>
+          )}
+          {error ? (
+            <p role="alert" className="text-destructive text-sm">
+              {error}
+            </p>
+          ) : null}
+        </section>
+      )}
+
+      {submitted ? timeline : null}
+
+      {submitted ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {!timerEnabled ? (
+            <span />
+          ) : (
+            <AttemptTimer
+              attemptId={attemptId}
+              initialSeconds={initialSeconds}
+              registerFlush={registerFlush}
+            />
+          )}
+          <DifficultyRating attemptId={attemptId} initialRating={initialRating} />
+        </div>
+      )}
+
+      {submitted ? null : (
+        <WorkingInput
+          // A new attempt starts with an empty draft, so remount to drop the old text.
+          key={attemptId ?? "none"}
+          attemptId={attemptId}
+          initialText={initialText}
+          initialFiles={initialFiles}
+          submitted={submitted}
+          beforeSubmit={() => flushTimer.current()}
+          onSubmitted={() => router.refresh()}
+        />
+      )}
+
+      {children}
 
       {submitted ? (
-        <Panel className="flex flex-wrap items-center gap-3">
-          <span className="mr-auto">Your working has been submitted.</span>
-          <Link
-            href={`/questions/${questionId}/mark?attempt=${attemptId}${sessionId ? `&session=${sessionId}` : ""}`}
-            className={buttonVariants()}
-          >
-            See the mark
-          </Link>
+        <div className="flex flex-wrap items-center gap-3">
           <Button type="button" variant="outline" onClick={startNewAttempt} disabled={pending}>
             Start a new attempt
           </Button>
-        </Panel>
+          {newestHref ? (
+            <Link href={newestHref} className={buttonVariants({ variant: "ghost" })}>
+              Go to your newest attempt
+            </Link>
+          ) : null}
+        </div>
       ) : null}
-
-      {children}
 
       <nav
         aria-label="Questions"

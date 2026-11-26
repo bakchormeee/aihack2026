@@ -7,6 +7,8 @@ import { PageHeader, Panel, RULED_ROW_LINK, RuledList } from "@/components/page-
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getSheetQuestionStatuses } from "@/db/queries/history";
+import { QuestionStatusView } from "@/components/question-status";
 import { listQuestionsWithTopics } from "@/db/queries/sheets";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireSheet } from "@/lib/auth/ownership";
@@ -23,10 +25,11 @@ import { retryHintsAction, retryParseAction, setTimerAction, submitAllAction } f
 // The retry button starts the background parse again, which can run for a few minutes.
 export const maxDuration = 300;
 
-const HINTS_LABEL = {
-  pending: "Hints being prepared…",
-  ready: "Hints ready",
-  failed: "Hints failed",
+// "Hints ready" is not shown: only a hint state that needs attention (SPEC-study-views.md).
+const HINTS_NOTE = {
+  pending: " · Hints being prepared…",
+  ready: "",
+  failed: " · Hints failed",
 } as const;
 
 export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]">) {
@@ -40,6 +43,7 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
     ),
   );
   const questions = sheet.status === "ready" ? await listQuestionsWithTopics(user.id, sheetId) : [];
+  const statuses = questions.length > 0 ? await getSheetQuestionStatuses(user.id, sheetId) : {};
 
   const stuck = sheet.status === "parsing" && isStale(sheet.statusUpdatedAt);
   const reading = sheet.status === "parsing" && !stuck;
@@ -137,13 +141,18 @@ export default async function SheetPage({ params }: PageProps<"/sheets/[sheetId]
           {questions.map((question) => (
             <li key={question.id}>
               <Link href={`/questions/${question.id}`} className={`${RULED_ROW_LINK} gap-3 py-5`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-heading text-lg font-medium">
-                    Question {question.label}
-                  </span>
-                  <span className="text-muted-foreground shrink-0 text-xs">
-                    about {question.expectedMinutes} min · {HINTS_LABEL[question.hintsStatus]}
-                  </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-heading text-lg font-medium">
+                      Question {question.label}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      about {question.expectedMinutes} min{HINTS_NOTE[question.hintsStatus]}
+                    </span>
+                  </div>
+                  <div className="shrink-0">
+                    <QuestionStatusView status={statuses[question.id] ?? { kind: "none" }} />
+                  </div>
                 </div>
                 <div
                   className={

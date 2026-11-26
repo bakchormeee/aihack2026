@@ -19,7 +19,8 @@ import { requireSheet } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
 import { MAX_BATCH_PHOTOS, MAX_CROPS_PER_QUESTION } from "@/lib/batch/regions";
 import { mapLimit } from "@/lib/concurrency";
-import { claimMark, performMark } from "@/lib/pipeline/mark";
+import { performMark } from "@/lib/pipeline/mark";
+import { resolveMarkWithAi, startMarking } from "@/lib/pipeline/start-marking";
 import {
   BatchProposalError,
   MATCH_FAILED_MESSAGE,
@@ -49,6 +50,8 @@ const proposeSchema = z.object({
 const questionIds = z.array(id).min(1).max(100);
 const submitSchema = z.object({
   sheetId: id,
+  /** The "Mark with AI now" switch; without it the sheet's last position is used. */
+  markWithAi: z.boolean().optional(),
   questions: z
     .array(
       z.object({
@@ -148,6 +151,7 @@ export async function openBatchAttemptsAction(input: {
  */
 export async function submitBatchAction(input: {
   sheetId: string;
+  markWithAi?: boolean;
   questions: { questionId: string; cropKeys: string[] }[];
 }): Promise<SubmitResult> {
   const user = await requireUser();
@@ -156,9 +160,10 @@ export async function submitBatchAction(input: {
   const { sheetId, questions } = parsed.data;
   await orNotFound(requireSheet(user.id, sheetId));
   const keys = questions.flatMap((q) => q.cropKeys);
+  const markWithAi = await resolveMarkWithAi(user.id, sheetId, parsed.data.markWithAi);
 
-  // One mark for each question.
-  const refusal = await demoRefusal(user.id, questions.length);
+  // One mark for each question. Waiting makes no AI call, so it needs no calls to be left.
+  const refusal = markWithAi ? await demoRefusal(user.id, questions.length) : null;
   if (refusal) return { ok: false, error: refusal };
 
   let submitted: { attemptId: string; submissionId: string }[];
@@ -181,9 +186,10 @@ export async function submitBatchAction(input: {
     return { ok: false, error: error.message };
   }
 
-  const claims = (
-    await Promise.all(submitted.map(({ submissionId }) => claimMark({ submissionId, basis: "ai" })))
-  ).filter((claim) => claim !== null);
+  const claims = await startMarking(
+    submitted.map(({ submissionId }) => submissionId),
+    markWithAi,
+  );
   after(() => mapLimit(claims, 5, (claim) => performMark(claim)));
   await deleteBatchPhotos(user.id, sheetId).catch((error) =>
     console.error(`deleting batch photos of sheet ${sheetId} failed`, error),

@@ -60,4 +60,15 @@ describe("WorkingWithBoxes", () => {
     expect(html).toContain("Start");
     expect(html).not.toContain("data-mistake");
   });
+
+  it("uses the numbers it is given, and leaves an unnumbered mistake unboxed", () => {
+    const html = renderToStaticMarkup(
+      <WorkingWithBoxes text={text} mistakes={[gap, slip]} numbers={[null, 1]} />,
+    );
+
+    expect(html).toContain('data-mistake="1"');
+    expect(html).not.toContain('data-mistake="2"');
+    expect(html).toMatch(/data-mistake="1"[^>]*data-severity="careless"/);
+    expect(html).toContain("Start"); // the text is still there, unboxed
+  });
 });

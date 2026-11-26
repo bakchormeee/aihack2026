@@ -1,4 +1,5 @@
 import { MathText } from "@/components/math-text";
+import { solutionLabel } from "@/lib/marking/labels";
 
 /**
  * The worked solution. Render it only with a value from getVisibleSolution(),
@@ -18,11 +19,7 @@ export function SolutionPanel({
         <h2 id="solution-heading" className="text-lg font-medium">
           Worked solution
         </h2>
-        <span className="text-muted-foreground text-xs">
-          {solution.basis === "official"
-            ? "Official solution"
-            : "Written by the AI, not checked by your tutor"}
-        </span>
+        <span className="text-muted-foreground text-xs">{solutionLabel(solution.basis)}</span>
       </div>
       <MathText>{solution.body}</MathText>
     </section>

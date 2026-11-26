@@ -47,5 +47,5 @@ export async function openQuestion(page: Page, sheetUrl: string, label: string) 
 export async function submitTypedWorking(page: Page, text: string) {
   await page.getByLabel(/Type it/).fill(text);
   await page.getByRole("button", { name: "Submit working" }).click();
-  await expect(page.getByText("Your working has been submitted.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your working (submitted)" })).toBeVisible();
 }

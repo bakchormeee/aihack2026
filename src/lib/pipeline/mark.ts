@@ -42,9 +42,10 @@ export async function claimMark(input: MarkInput): Promise<ClaimedMark | null> {
   // The first mark of a submission starts from none or failed. A re-mark (a
   // dispute or the official one) may also start from done.
   const isRemark = basis === "official" || disputeReason !== undefined;
+  // A submission waiting for the official solution can be marked by either kind.
   const startable = isRemark
-    ? (["none", "done", "failed"] as const)
-    : (["none", "failed"] as const);
+    ? (["none", "done", "failed", "awaiting_official"] as const)
+    : (["none", "failed", "awaiting_official"] as const);
   const staleBefore = new Date(Date.now() - STALE_JOB_MS);
 
   const claimed = await db
@@ -65,6 +66,26 @@ export async function claimMark(input: MarkInput): Promise<ClaimedMark | null> {
     )
     .returning();
   return claimed.length === 0 ? null : { ...input, submission: claimed[0] };
+}
+
+/**
+ * Leaves a freshly submitted submission waiting for the official solutions: no AI call is made,
+ * and it has no mark, so it counts nowhere until it is marked. False when it cannot wait (not
+ * submitted, or already being marked or marked).
+ */
+export async function holdForOfficial(submissionId: string): Promise<boolean> {
+  const held = await db
+    .update(submissions)
+    .set({ markStatus: "awaiting_official", markStatusUpdatedAt: new Date() })
+    .where(
+      and(
+        eq(submissions.id, submissionId),
+        isNotNull(submissions.submittedAt),
+        eq(submissions.markStatus, "none"),
+      ),
+    )
+    .returning({ id: submissions.id });
+  return held.length > 0;
 }
 
 /** Claims and marks in one go. Used by tests and by jobs that are already in the background. */

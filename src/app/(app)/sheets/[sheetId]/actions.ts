@@ -9,7 +9,11 @@ import { demoAiRefusal } from "@/lib/ai/budget";
 import { requireUser } from "@/lib/auth/session";
 import { mapLimit } from "@/lib/concurrency";
 import { runHintsForSheet } from "@/lib/pipeline/hints";
-import { claimMark, performMark } from "@/lib/pipeline/mark";
+import { orNotFound } from "@/lib/auth/guards";
+import { requireSheet } from "@/lib/auth/ownership";
+import { parseSwitch } from "@/lib/marking/plan";
+import { performMark } from "@/lib/pipeline/mark";
+import { resolveMarkWithAi, startMarking } from "@/lib/pipeline/start-marking";
 import { runSheetPipeline } from "@/lib/pipeline/sheet-job";
 
 /** Runs the reading of a failed or stuck sheet again. Does nothing for any other sheet. */
@@ -35,14 +39,26 @@ export async function setTimerAction(sheetId: string, enabled: boolean): Promise
   revalidatePath(`/sheets/${sheetId}`);
 }
 
-/** Submits every question's working that is still a draft and starts the marking, five at a time. */
-export async function submitAllAction(sheetId: string): Promise<void> {
+/**
+ * Submits every question's working that is still a draft. Each is then marked by the marking
+ * plan (official solution at once, the AI five at a time, or waiting when "Mark with AI now" is
+ * off). The form may send `markWithAi`; without it the sheet's last position is used.
+ */
+export async function submitAllAction(sheetId: string, formData?: FormData): Promise<void> {
   const user = await requireUser();
-  if (await demoAiRefusal(user.id)) return; // a demo copy at its AI limit: nothing starts
+  const sheet = await orNotFound(requireSheet(user.id, sheetId));
+  const markWithAi = await resolveMarkWithAi(
+    user.id,
+    sheet.id,
+    parseSwitch(formData?.get("markWithAi")),
+  );
+  // Waiting makes no AI call, so a demo copy at its limit may still submit.
+  if (markWithAi && (await demoAiRefusal(user.id))) return; // nothing starts
   const submitted = await submitAllDrafts(user.id, sheetId);
-  const claims = (
-    await Promise.all(submitted.map(({ submissionId }) => claimMark({ submissionId, basis: "ai" })))
-  ).filter((claim) => claim !== null);
+  const claims = await startMarking(
+    submitted.map(({ submissionId }) => submissionId),
+    markWithAi,
+  );
   after(() => mapLimit(claims, 5, (claim) => performMark(claim)));
   revalidatePath(`/sheets/${sheetId}`);
 }

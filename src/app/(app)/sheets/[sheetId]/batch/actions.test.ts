@@ -2,10 +2,19 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/db";
-import { attempts, courses, questions, sheets, submissions, users } from "@/db/schema";
+import {
+  attempts,
+  courses,
+  marks,
+  questions,
+  sheets,
+  solutions,
+  submissions,
+  users,
+} from "@/db/schema";
 import { DEMO_AI_LIMIT_MESSAGE } from "@/lib/ai/budget";
 import { setAiClient, type AiClient } from "@/lib/ai/client";
-import { demoCallsOf, makeDemoCopy } from "@/lib/ai/test-helpers";
+import { demoCallsOf, fakeAi, fixture, makeDemoCopy, sentText } from "@/lib/ai/test-helpers";
 
 const signedIn = vi.hoisted(() => ({ id: "" }));
 const after = vi.hoisted(() => vi.fn());
@@ -353,6 +362,94 @@ describe("submitBatchAction", () => {
         questions: [{ questionId: other.qs[0].id, cropKeys: [cropKey(0, 1)] }],
       }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  describe("and the marking plan", () => {
+    const requests = (create: ReturnType<typeof fakeAi>) =>
+      create.mock.calls
+        .map(([params], index) => ({ system: String(params.system), index }))
+        .filter(({ system }) => system.includes("fair marker of university mathematics"))
+        .map(({ index }) => sentText(create, index));
+
+    async function submitTwo(email: string, o: { markWithAi?: boolean; official?: number[] }) {
+      vi.stubEnv("AI_FIXTURES", "");
+      const create = fakeAi(...Array.from({ length: 6 }, () => fixture("markAttempt")));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const s = await ready(email);
+      for (const [i, q] of s.qs.entries()) {
+        await db.insert(solutions).values({ questionId: q.id, basis: "ai", body: `AI ${i}` });
+        if (o.official?.includes(i))
+          await db
+            .insert(solutions)
+            .values({ questionId: q.id, basis: "official", body: `Official ${i}` });
+      }
+      const result = await submitBatchAction({
+        sheetId: s.sheet.id,
+        markWithAi: o.markWithAi,
+        questions: [
+          { questionId: s.qs[0].id, cropKeys: [s.cropKey(0, 1)] },
+          { questionId: s.qs[1].id, cropKeys: [s.cropKey(1, 2)] },
+        ],
+      });
+      await Promise.all(after.mock.calls.map(([job]) => job()));
+      const statuses = await Promise.all(
+        s.attempts.map(async ({ attemptId }) => ({
+          status: (
+            await db.select().from(submissions).where(eq(submissions.attemptId, attemptId))
+          )[0].markStatus,
+          bases: (await db.select().from(marks).where(eq(marks.attemptId, attemptId))).map(
+            (m) => m.basis,
+          ),
+        })),
+      );
+      return { ...s, create, result, statuses };
+    }
+
+    it("marks every question with the AI by default", async () => {
+      const r = await submitTwo("ba-plan-ai@test.local", {});
+      expect(r.result).toEqual({ ok: true });
+      expect(requests(r.create)).toHaveLength(2);
+      expect(r.statuses).toEqual([
+        { status: "done", bases: ["ai"] },
+        { status: "done", bases: ["ai"] },
+      ]);
+    });
+
+    it("with the switch off makes no AI call, leaves every question waiting and saves the switch", async () => {
+      const r = await submitTwo("ba-plan-wait@test.local", { markWithAi: false });
+      expect(r.result).toEqual({ ok: true });
+      expect(r.create).not.toHaveBeenCalled();
+      expect(r.statuses).toEqual([
+        { status: "awaiting_official", bases: [] },
+        { status: "awaiting_official", bases: [] },
+      ]);
+      expect((await db.select().from(sheets).where(eq(sheets.id, r.sheet.id)))[0].markWithAi).toBe(
+        false,
+      );
+    });
+
+    it("marks the questions that have an official solution against it and waits for the rest", async () => {
+      const r = await submitTwo("ba-plan-mixed@test.local", { markWithAi: false, official: [0] });
+      expect(requests(r.create)).toHaveLength(1);
+      expect(requests(r.create)[0]).toContain("Official 0");
+      expect(r.statuses).toEqual([
+        { status: "done", bases: ["official"] },
+        { status: "awaiting_official", bases: [] },
+      ]);
+    });
+
+    it("needs no demo AI calls when the switch is off", async () => {
+      vi.stubEnv("AI_FIXTURES", "");
+      const s = await ready("ba-plan-demo@test.local");
+      await makeDemoCopy(s.user.id, 30);
+      expect(
+        await submitBatchAction({
+          sheetId: s.sheet.id,
+          markWithAi: false,
+          questions: [{ questionId: s.qs[0].id, cropKeys: [s.cropKey(0, 1)] }],
+        }),
+      ).toEqual({ ok: true });
+    });
   });
 
   it("still succeeds when deleting the photos fails", async () => {

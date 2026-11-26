@@ -19,6 +19,7 @@ import { NotFoundError } from "@/lib/auth/ownership";
 import {
   getMarkScreenData,
   getRemarkProgress,
+  hasOfficialSolution,
   getSolutionsReview,
   getVisibleSolution,
   DisputeRefusedError,
@@ -125,6 +126,29 @@ describe("getMarkScreenData", () => {
     const other = await setup("ms-other@test.local");
 
     await expect(getMarkScreenData(other.user.id, owner.attempt.id)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe("hasOfficialSolution", () => {
+  it("is true only when the question has an official solution", async () => {
+    const { user, question } = await setup("hos@test.local");
+    expect(await hasOfficialSolution(user.id, question.id)).toBe(false);
+    await db
+      .insert(solutions)
+      .values({ questionId: question.id, basis: "ai", body: "AI worked solution" });
+    expect(await hasOfficialSolution(user.id, question.id)).toBe(false);
+    await db
+      .insert(solutions)
+      .values({ questionId: question.id, basis: "official", body: "Official" });
+    expect(await hasOfficialSolution(user.id, question.id)).toBe(true);
+  });
+
+  it("refuses another user's question", async () => {
+    const owner = await setup("hos-owner@test.local");
+    const other = await setup("hos-other@test.local");
+    await expect(hasOfficialSolution(other.user.id, owner.question.id)).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });

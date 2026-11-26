@@ -22,8 +22,8 @@ test("the Topics tab labels a marked topic and shows its mastery when the row is
 
   await openQuestion(page, sheetUrl, "1");
   await submitTypedWorking(page, "By parts, working here.");
-  await page.getByRole("link", { name: "See the mark" }).click();
-  await expect(page.getByText("3/5", { exact: true })).toBeVisible();
+  // The mark is on the question page itself: there is no "See the mark" step.
+  await expect(page.getByText("3 / 5", { exact: true })).toBeVisible();
 
   await page.goto(`${courseUrl}/topics`);
   const row = page.getByRole("listitem").filter({ hasText: "Product rule" });

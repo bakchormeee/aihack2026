@@ -59,7 +59,7 @@ test("upload two photos for four questions, correct a part, submit and see the m
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page).toHaveURL(new RegExp(`${sheetUrl}$`));
   await openQuestion(page, sheetUrl, "1");
-  await expect(page.getByText("Your working has been submitted.")).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Your working (submitted)" })).toBeHidden();
 
   // Now for real: the review shows the four questions and the part that was not matched.
   await uploadPhotos(page, sheetUrl);
@@ -82,7 +82,6 @@ test("upload two photos for four questions, correct a part, submit and see the m
   // Each question was submitted and gets a mark.
   for (const label of ["1", "3"]) {
     await openQuestion(page, sheetUrl, label);
-    await page.getByRole("link", { name: "See the mark" }).click();
     await expect(page.getByText("AI-marked, provisional")).toBeVisible();
   }
 

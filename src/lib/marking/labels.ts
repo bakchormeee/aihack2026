@@ -18,6 +18,11 @@ export const ERROR_LABEL: Record<ErrorType, string> = {
   notation: "Notation or typo",
 };
 
+/** Which kind of solution is on screen: the official one wins, so the two are never mixed up. */
+export function solutionLabel(basis: "ai" | "official"): string {
+  return basis === "official" ? "Official solution" : "AI-written solution";
+}
+
 export const SEVERITY_LABEL: Record<Severity, string> = {
   careless: "Careless slip",
   structural: "Structural mistake",
