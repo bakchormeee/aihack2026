@@ -8,10 +8,10 @@ Every task is built test first and gets one commit. "Checks" means `npm run lint
 
 ## Phase 1: Foundations (coordinator)
 
-- [ ] **F1: Migration 0006, coverage list, Tooltip and Switch** (M)
+- [x] **F1: Migration 0006, coverage list, Tooltip and Switch** (M)
 
 ### Checkpoint 1
-- [ ] Checks pass; the tracks can start
+- [x] Checks pass; the tracks can start
 
 ## Phase 2: Course screens
 
