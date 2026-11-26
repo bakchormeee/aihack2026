@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { MAX_BATCH_PHOTOS, readingOrder, validateAssignments, type Box } from "@/lib/batch/regions";
 import { mapLimit } from "@/lib/concurrency";
 import { cropImage, resizeImageToJpeg } from "@/lib/image-resize";
+import { checkChoice, renderPdfPages } from "@/lib/pdf-pages";
 import { ACCEPTED_IMAGE_MIMES, validateUpload } from "@/lib/storage/limits";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ async function sizeOf(file: File): Promise<{ width: number; height: number }> {
   }
 }
 
-const isPhoto = (file: File) => (ACCEPTED_IMAGE_MIMES as readonly string[]).includes(file.type);
+const isPdf = (file: File) => file.type === "application/pdf";
 
 /** The part of the photo inside the box, scaled to the width available (at most 12rem high). */
 function CropPreview({ photo, box, label }: { photo: Photo; box: Box; label: string }) {
@@ -160,18 +161,16 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
   function addFiles(list: FileList | File[]) {
     setError(null);
     const files = Array.from(list);
-    if (files.some((file) => !isPhoto(file)))
-      return setError("Use photos here (JPEG, PNG or WebP), not a PDF or another file.");
-    const all = [...chosen, ...files];
-    if (all.length > MAX_BATCH_PHOTOS)
-      return setError(`Choose at most ${MAX_BATCH_PHOTOS} photos.`);
-    setChosen(all);
+    const check = checkChoice(chosen, files);
+    if (!check.ok) return setError(check.message);
+    setChosen([...chosen, ...files]);
   }
 
   async function propose(keys: string[]) {
     setBusy("Matching your working to the questions… This can take a minute.");
     const result = await proposeBatchAction({ sheetId, photoKeys: keys }).catch(
-      () => ({ ok: false, error: "Matching failed. Check your connection and try again." }) as const,
+      () =>
+        ({ ok: false, error: "Matching failed. Check your connection and try again." }) as const,
     );
     setBusy(null);
     if (!result.ok) {
@@ -195,8 +194,17 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
     setError(null);
     const uploaded: Photo[] = [];
     try {
-      for (const [index, original] of chosen.entries()) {
-        setBusy(`Uploading photo ${index + 1} of ${chosen.length}…`);
+      // A PDF becomes one JPEG per page here, before anything is uploaded; the pages
+      // are then treated exactly like photos.
+      let sources = chosen;
+      if (chosen.length === 1 && isPdf(chosen[0])) {
+        setBusy("Reading the PDF…");
+        sources = await renderPdfPages(chosen[0]);
+      }
+      for (const [index, original] of sources.entries()) {
+        setBusy(
+          `Uploading ${isPdf(chosen[0]) ? "page" : "photo"} ${index + 1} of ${sources.length}…`,
+        );
         const file = await resizeImageToJpeg(original);
         const size = await sizeOf(file);
         const key = await upload("batch", sheetId, file);
@@ -316,12 +324,12 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
           >
             <p className="text-muted-foreground">
               Drag photos here, choose them, or take them with your camera. Up to {MAX_BATCH_PHOTOS}{" "}
-              photos (JPEG, PNG, WebP).
+              photos (JPEG, PNG, WebP), or one PDF of up to 10 pages.
             </p>
             <input
               ref={picker}
               type="file"
-              accept={ACCEPTED_IMAGE_MIMES.join(",")}
+              accept={[...ACCEPTED_IMAGE_MIMES, "application/pdf"].join(",")}
               multiple
               className="sr-only"
               aria-label="Choose photos"
@@ -370,7 +378,7 @@ export function BatchWorking({ sheetId, sheetHref }: { sheetId: string; sheetHre
             {chosen.map((file, index) => (
               <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2">
                 <span className="min-w-0 truncate">
-                  Photo {index + 1}: {file.name}
+                  {isPdf(file) ? "PDF" : `Photo ${index + 1}`}: {file.name}
                 </span>
                 <Button
                   type="button"
