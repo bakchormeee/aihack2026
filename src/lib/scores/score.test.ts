@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  coverageText,
   formatAttempted,
   formatScore,
   numberedQuestions,
@@ -103,6 +104,43 @@ describe("sheetScore", () => {
 
   it("handles a sheet with no questions", () => {
     expect(sheetScore([])).toEqual({ attempted: 0, total: 0, points: 0, max: 0, percent: null });
+  });
+});
+
+describe("coverageText", () => {
+  it("names the questions with a mark, and the parts of a partly marked one", () => {
+    expect(
+      coverageText([
+        { label: "1", mark: 5 },
+        { label: "2(a)", mark: 4 },
+        { label: "2(b)", mark: null },
+        { label: "3", mark: null },
+        { label: "4", mark: 2 },
+      ]),
+    ).toBe("Based on questions 1, 2(a) and 4");
+  });
+
+  it("names a question by its number once every part is marked", () => {
+    expect(
+      coverageText([
+        { label: "2(a)", mark: 4 },
+        { label: "2(b)", mark: 3 },
+      ]),
+    ).toBe("Based on question 2");
+  });
+
+  it("says nothing when nothing is marked", () => {
+    expect(coverageText([{ label: "1", mark: null }])).toBe("");
+  });
+
+  it("names two marked parts of a question with a third unmarked", () => {
+    expect(
+      coverageText([
+        { label: "2(a)", mark: 4 },
+        { label: "2(b)", mark: 3 },
+        { label: "2(c)", mark: null },
+      ]),
+    ).toBe("Based on questions 2(a) and 2(b)");
   });
 });
 

@@ -85,6 +85,22 @@ export function formatAttempted(score: SheetScore): string {
   return `Attempted ${score.attempted} / ${score.total}`;
 }
 
+/**
+ * Which questions the Summary covers: "Based on questions 1, 2(a) and 4". A question with only
+ * some parts marked is named by those parts. Empty when nothing is marked.
+ */
+export function coverageText(parts: PartMark[]): string {
+  const names = numberedQuestions(parts)
+    .filter((question) => question.mark !== null)
+    .flatMap((question) =>
+      question.markedLabels.length === question.parts ? [question.number] : question.markedLabels,
+    );
+  if (names.length === 0) return "";
+  const list =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `Based on ${names.length === 1 ? "question" : "questions"} ${list}`;
+}
+
 /** The score line above a sheet's tabs: "17 / 25" large, then the detail beside it. */
 export function scoreLine(score: SheetScore): { big: string | null; detail: string } {
   if (score.percent === null) {

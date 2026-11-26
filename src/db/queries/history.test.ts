@@ -444,7 +444,7 @@ describe("listMistakes", () => {
 });
 
 describe("getSheetSummaryInput", () => {
-  it("is incomplete until every question has a marked attempt, and counts what remains", async () => {
+  it("has marks from the first marked part, and counts what is marked", async () => {
     const w = await world("h-sum@test.local", ["1", "2", "3"]);
     await addAttempt(w.user.id, w.qs[0].id, {
       startedAt: 1,
@@ -452,10 +452,44 @@ describe("getSheetSummaryInput", () => {
     });
     await addAttempt(w.user.id, w.qs[1].id, { startedAt: 3, submitted: true }); // submitted, not marked
     const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
-    expect(input).toMatchObject({ total: 3, marked: 1, complete: false });
+    expect(input).toMatchObject({
+      total: 3,
+      marked: 1,
+      hasMarks: true,
+      covers: "Based on question 1",
+    });
   });
 
-  it("uses each question's newest marked attempt for items and the hint ladder", async () => {
+  it("has no marks while parts are only marking or waiting", async () => {
+    const w = await world("h-sum0@test.local", ["1", "2"]);
+    await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "pending",
+    });
+    await addAttempt(w.user.id, w.qs[1].id, {
+      startedAt: 1,
+      submitted: true,
+      markStatus: "awaiting_official",
+    });
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input).toMatchObject({ marked: 0, hasMarks: false, covers: "", items: [] });
+  });
+
+  it("names a partly marked question by its marked parts", async () => {
+    const w = await world("h-sum00@test.local", ["1", "2(a)", "2(b)", "3"]);
+    for (const q of [w.qs[0], w.qs[1], w.qs[3]]) {
+      await addAttempt(w.user.id, q.id, {
+        startedAt: 1,
+        marks: [{ score: 4, outcome: "full", at: 2 }],
+      });
+    }
+    const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
+    expect(input.covers).toBe("Based on questions 1, 2(a) and 3");
+    expect(input.items.map((item) => item.label)).toEqual(["1", "2(a)", "3"]);
+  });
+
+  it("uses each question's latest submitted attempt for items and the hint ladder", async () => {
     const w = await world("h-sum2@test.local", ["1", "2", "3"]);
     const [q1, q2, q3] = w.qs;
     // q1: first full with 3 hints, newest full with none -> level 0
@@ -480,12 +514,10 @@ describe("getSheetSummaryInput", () => {
       reveals: [1],
       marks: [{ score: 3, outcome: "partial", errorType: "algebra_slip", feedback: "slip", at: 6 }],
     });
-    // an unmarked later attempt does not replace the marked one
-    await addAttempt(w.user.id, q3.id, { startedAt: 50, submitted: true });
 
     const input = await getSheetSummaryInput(w.user.id, w.sheet.id);
 
-    expect(input.complete).toBe(true);
+    expect(input.hasMarks).toBe(true);
     expect(input.ladder).toEqual([1, 0, 1, 0]);
     expect(input.newestMarkAt).toEqual(at(11));
     expect(input.items[2]).toEqual({
@@ -502,7 +534,7 @@ describe("getSheetSummaryInput", () => {
     const w = await world("h-sum3@test.local");
     const other = await world("h-sum3-other@test.local");
     const input = await getSheetSummaryInput(other.user.id, w.sheet.id);
-    expect(input).toMatchObject({ total: 0, complete: false, items: [] });
+    expect(input).toMatchObject({ total: 0, hasMarks: false, items: [] });
   });
 });
 

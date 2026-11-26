@@ -82,20 +82,59 @@ beforeEach(() => {
 });
 
 describe("startSummaryIfNeeded", () => {
-  it("does nothing until every question is marked, and reports how many remain", async () => {
+  it("does nothing until one question has a mark", async () => {
     const w = await world("g-wait@test.local");
-    await mark(w.user.id, w.ids[0], new Date(Date.now() - 60_000));
     const job = run();
 
     const state = await startSummaryIfNeeded(w.user.id, w.sheet.id, job.schedule);
 
-    expect(state).toMatchObject({ kind: "waiting", remaining: 1, total: 2 });
+    expect(state).toEqual({ kind: "waiting", total: 2 });
     await job.done();
     expect(summarise).not.toHaveBeenCalled();
     expect(await db.select().from(sheetSummaries)).toEqual([]);
   });
 
-  it("generates once when complete, even when two page loads race", async () => {
+  it("is written from the first mark, names that question and leaves the others out", async () => {
+    const w = await world("g-one@test.local", 3);
+    await mark(w.user.id, w.ids[1], new Date(Date.now() - 60_000));
+    // A submitted question still waiting for the official solution has no mark and is left out.
+    const [attempt] = await db
+      .insert(attempts)
+      .values({ userId: w.user.id, questionId: w.ids[2], context: "sheet" })
+      .returning();
+    await db.insert(submissions).values({
+      attemptId: attempt.id,
+      text: "x",
+      submittedAt: new Date(),
+      markStatus: "awaiting_official",
+    });
+    const job = run();
+
+    const state = await startSummaryIfNeeded(w.user.id, w.sheet.id, job.schedule);
+    await job.done();
+
+    expect(state).toMatchObject({ kind: "generating", covers: "Based on question 2" });
+    expect(summarise).toHaveBeenCalledTimes(1);
+    expect(summarise.mock.calls[0][0].items).toHaveLength(1);
+    expect(summarise.mock.calls[0][0].items[0].label).toBe("2");
+  });
+
+  it("is rewritten when a second question gets its mark", async () => {
+    const w = await world("g-two@test.local");
+    await mark(w.user.id, w.ids[0], new Date(Date.now() - 120_000));
+    const job = run();
+    await startSummaryIfNeeded(w.user.id, w.sheet.id, job.schedule);
+    await job.done();
+    await mark(w.user.id, w.ids[1], new Date(Date.now() + 5_000));
+    const state = await startSummaryIfNeeded(w.user.id, w.sheet.id, job.schedule);
+    await job.done();
+
+    expect(state).toMatchObject({ kind: "generating", covers: "Based on questions 1 and 2" });
+    expect(summarise).toHaveBeenCalledTimes(2);
+    expect(summarise.mock.calls[1][0].items).toHaveLength(2);
+  });
+
+  it("generates once when marked, even when two page loads race", async () => {
     const w = await world("g-gen@test.local");
     for (const id of w.ids) await mark(w.user.id, id, new Date(Date.now() - 60_000));
     const job = run();

@@ -22,7 +22,7 @@ import {
 import type { ErrorType, HintLevel, MarkBasis, MarkStatus, Outcome } from "@/lib/domain";
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
-import { sheetScore, type PartMark, type SheetScore } from "@/lib/scores/score";
+import { coverageText, sheetScore, type PartMark, type SheetScore } from "@/lib/scores/score";
 import { questionStatus, type QuestionStatus } from "@/lib/scores/status";
 
 import { binnedQuestionIdsOf, liveCourse } from "./bin";
@@ -379,7 +379,10 @@ export async function listMistakes(
 
 // ── Sheet summary ──
 
-/** The newest marked attempt of each question, ready for the summary and the hint ladder. */
+/**
+ * The marked parts, one item each (the mark of a question by the one rule above), ready for the
+ * summary and the hint ladder. The summary needs at least one mark: `hasMarks`.
+ */
 export async function getSheetSummaryInput(userId: string, sheetId: string) {
   const records = await loadRecords(userId, { sheetId });
   const items: {
@@ -399,7 +402,7 @@ export async function getSheetSummaryInput(userId: string, sheetId: string) {
         if (newestMarkAt === null || mark.createdAt > newestMarkAt) newestMarkAt = mark.createdAt;
       }
     }
-    const newest = [...record.attempts].reverse().find((attempt) => attempt.current !== null);
+    const newest = latestSubmitted(record);
     if (!newest?.current) continue;
     items.push({
       label: record.question.label,
@@ -416,7 +419,9 @@ export async function getSheetSummaryInput(userId: string, sheetId: string) {
   return {
     total: records.length,
     marked: items.length,
-    complete: records.length > 0 && items.length === records.length,
+    hasMarks: items.length > 0,
+    /** "Based on questions 1, 2(a) and 4"; empty with no marks. */
+    covers: coverageText(partMarks(records)),
     items,
     ladder,
     newestMarkAt,

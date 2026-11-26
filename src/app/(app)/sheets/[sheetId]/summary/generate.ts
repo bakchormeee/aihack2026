@@ -13,15 +13,17 @@ import { summariseSheet } from "@/lib/ai/summarise-sheet";
 
 type SummaryBody = { wentWell: string[]; wasHard: string[]; nextSteps: string[] };
 
+type Ladder = [number, number, number, number];
+
 export type SummaryState =
-  | { kind: "waiting"; remaining: number; total: number }
-  | { kind: "generating"; ladder: [number, number, number, number] }
-  | { kind: "failed"; ladder: [number, number, number, number] }
-  | { kind: "ready"; body: SummaryBody; ladder: [number, number, number, number] };
+  | { kind: "waiting"; total: number }
+  | { kind: "generating"; ladder: Ladder; covers: string }
+  | { kind: "failed"; ladder: Ladder; covers: string }
+  | { kind: "ready"; body: SummaryBody; ladder: Ladder; covers: string };
 
 /**
  * What the Summary tab shows, starting the AI summary in the background when
- * it is needed: every question has a marked attempt and there is no summary,
+ * it is needed: at least one question has a mark and there is no summary,
  * or a mark is newer than the stored one. A claim in the database makes sure
  * two page loads do not both call the AI.
  */
@@ -31,14 +33,13 @@ export async function startSummaryIfNeeded(
   schedule: (job: () => Promise<void>) => void = (job) => after(job),
 ): Promise<SummaryState> {
   const input = await getSheetSummaryInput(userId, sheetId);
-  if (!input.complete) {
-    return { kind: "waiting", remaining: input.total - input.marked, total: input.total };
-  }
+  if (!input.hasMarks) return { kind: "waiting", total: input.total };
+  const { ladder, covers } = input;
 
   const stored = await readSummary(userId, sheetId);
-  if (stored?.state === "failed") return { kind: "failed", ladder: input.ladder };
+  if (stored?.state === "failed") return { kind: "failed", ladder, covers };
   if (stored?.state === "ready" && !summaryIsStale(stored.generatedAt, input.newestMarkAt)) {
-    return { kind: "ready", body: stored.body, ladder: input.ladder };
+    return { kind: "ready", body: stored.body, ladder, covers };
   }
 
   const claimedAt =
@@ -56,5 +57,5 @@ export async function startSummaryIfNeeded(
     );
   }
   // Without a claim of our own, someone else has the job, or the summary is being replaced.
-  return { kind: "generating", ladder: input.ladder };
+  return { kind: "generating", ladder, covers };
 }
