@@ -10,6 +10,7 @@ import {
   marks,
   questions,
   questionTopics,
+  revisionSessions,
   sheetSummaries,
   sheets,
   submissionFiles,
@@ -26,6 +27,7 @@ import {
   failSummary,
   finishSummary,
   getCourseSheetOverview,
+  getQuestionTimeline,
   getSheetScore,
   getSheetHistory,
   getSheetQuestionStatuses,
@@ -762,5 +764,59 @@ describe("the mark of a question (question-marks)", () => {
 
     const other = await world("h-empty2@test.local", ["1"]);
     expect(await getSheetQuestionStatuses(other.user.id, w.sheet.id)).toEqual({});
+  });
+});
+
+describe("getQuestionTimeline", () => {
+  it("lists the submitted attempts oldest first with their current marks", async () => {
+    const w = await world("h-tl@test.local", ["1"]);
+    const first = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [
+        { score: 2, outcome: "partial", at: 5 },
+        { score: 4, outcome: "full", basis: "official", at: 9 },
+      ],
+    });
+    const second = await addAttempt(w.user.id, w.qs[0].id, { startedAt: 20, submitted: true });
+    await addAttempt(w.user.id, w.qs[0].id, { startedAt: 40, submitted: false });
+
+    const timeline = await getQuestionTimeline(w.user.id, w.qs[0].id);
+
+    expect(timeline).toEqual([
+      { id: first.id, date: at(2), score: 4, outcome: "full" },
+      { id: second.id, date: at(21), score: null, outcome: null },
+    ]);
+  });
+
+  it("keeps revision-session attempts apart from the sheet's", async () => {
+    const w = await world("h-tls@test.local", ["1"]);
+    const plain = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 1,
+      marks: [{ score: 3, outcome: "partial", at: 2 }],
+    });
+    const inSession = await addAttempt(w.user.id, w.qs[0].id, {
+      startedAt: 5,
+      marks: [{ score: 5, outcome: "full", at: 6 }],
+    });
+    const [session] = await db
+      .insert(revisionSessions)
+      .values({ userId: w.user.id, courseId: w.course.id })
+      .returning();
+    await db
+      .update(attempts)
+      .set({ revisionSessionId: session.id })
+      .where(eq(attempts.id, inSession.id));
+
+    expect((await getQuestionTimeline(w.user.id, w.qs[0].id)).map((a) => a.id)).toEqual([plain.id]);
+    expect((await getQuestionTimeline(w.user.id, w.qs[0].id, session.id)).map((a) => a.id)).toEqual(
+      [inSession.id],
+    );
+  });
+
+  it("is empty for another user's question", async () => {
+    const w = await world("h-tlo@test.local", ["1"]);
+    const other = await world("h-tlo2@test.local", ["1"]);
+    await addAttempt(w.user.id, w.qs[0].id, { startedAt: 1, submitted: true });
+    expect(await getQuestionTimeline(other.user.id, w.qs[0].id)).toEqual([]);
   });
 });

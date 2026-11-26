@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
 
 import { AttemptEvaluation } from "@/components/attempt-evaluation";
+import { AttemptTimeline } from "@/components/attempt-timeline";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MathText } from "@/components/math-text";
 import { PageHeader, Panel } from "@/components/page-parts";
 import { QuestionView } from "@/components/question-view";
 import { getLatestAttemptFor, getSheetNeighbours, visibleHintsFor } from "@/db/queries/attempts";
+import { getQuestionTimeline } from "@/db/queries/history";
 import { getVisibleSolution } from "@/db/queries/marking";
 import { getWorkingFor } from "@/db/queries/working";
 import { SolutionPanel } from "@/components/solution-panel";
@@ -16,6 +18,7 @@ import { notFound } from "next/navigation";
 import { orNotFound } from "@/lib/auth/guards";
 import { requireAttempt, requireQuestion } from "@/lib/auth/ownership";
 import { requireUser } from "@/lib/auth/session";
+import { timelineDots } from "@/lib/scores/timeline";
 
 // Submitting starts the AI marking in the background, which can run for a minute or two.
 export const maxDuration = 300;
@@ -48,6 +51,9 @@ export default async function QuestionPage({
   const submitted = working?.submittedAt != null;
   // Once the attempt is submitted its evaluation shows the solution; before that, the page does.
   const solution = submitted ? null : await getVisibleSolution(user.id, questionId);
+  const dots = submitted
+    ? timelineDots(await getQuestionTimeline(user.id, questionId, sessionId), attempt?.id ?? null)
+    : [];
   const suffix = sessionId ? `?session=${sessionId}` : "";
   const hintsReady = question.hintsStatus === "ready";
   const [sheet] = question.sheetId
@@ -92,6 +98,7 @@ export default async function QuestionPage({
         initialText={working?.text ?? ""}
         initialFiles={(working?.files ?? []).map((file) => ({ id: file.id, mime: file.mime }))}
         submitted={submitted}
+        timeline={<AttemptTimeline dots={dots} questionId={question.id} sessionId={sessionId} />}
         newestHref={
           attempt && newest && attempt.id !== newest.id ? `/questions/${questionId}${suffix}` : null
         }

@@ -23,6 +23,7 @@ import type { ErrorType, HintLevel, MarkBasis, MarkStatus, Outcome } from "@/lib
 import { attemptHintLevel, currentMark } from "@/lib/marking/rules";
 import { isStale } from "@/lib/pipeline/stale";
 import { coverageText, sheetScore, type PartMark, type SheetScore } from "@/lib/scores/score";
+import type { TimelineAttempt } from "@/lib/scores/timeline";
 import { questionStatus, type QuestionStatus } from "@/lib/scores/status";
 
 import { binnedQuestionIdsOf, liveCourse } from "./bin";
@@ -33,6 +34,8 @@ type Mark = typeof marks.$inferSelect;
 export type AttemptRecord = {
   id: string;
   questionId: string;
+  /** Set for an attempt made in a revision session. */
+  revisionSessionId: string | null;
   startedAt: Date;
   secondsSpent: number | null;
   inheritedHintLevel: number;
@@ -99,6 +102,29 @@ export function statusOfQuestion(record: QuestionRecord): QuestionStatus {
   });
 }
 
+/**
+ * The question's submitted attempts for the timeline, oldest first, each with its current
+ * mark. `sessionId` limits them to one revision session; without it, to attempts made outside
+ * revision sessions.
+ */
+export async function getQuestionTimeline(
+  userId: string,
+  questionId: string,
+  sessionId?: string,
+): Promise<TimelineAttempt[]> {
+  const [record] = await loadRecords(userId, { questionId });
+  return (record?.attempts ?? [])
+    .filter(
+      (attempt) => isSubmitted(attempt) && (attempt.revisionSessionId ?? undefined) === sessionId,
+    )
+    .map((attempt) => ({
+      id: attempt.id,
+      date: attempt.submission?.submittedAt ?? attempt.startedAt,
+      score: attempt.current?.score ?? null,
+      outcome: attempt.current?.outcome ?? null,
+    }));
+}
+
 /** Status of every question of the sheet, by question id. */
 export async function getSheetQuestionStatuses(
   userId: string,
@@ -117,12 +143,14 @@ export async function getSheetQuestionStatuses(
  */
 async function loadRecords(
   userId: string,
-  where: { courseId: string } | { sheetId: string },
+  where: { courseId: string } | { sheetId: string } | { questionId: string },
 ): Promise<QuestionRecord[]> {
   const scope =
     "sheetId" in where
       ? eq(questions.sheetId, where.sheetId)
-      : eq(questions.courseId, where.courseId);
+      : "questionId" in where
+        ? eq(questions.id, where.questionId)
+        : eq(questions.courseId, where.courseId);
   const all = await db
     .select({ question: questions, sheetTitle: sheets.title, sheetUploadedAt: sheets.uploadedAt })
     .from(questions)
@@ -185,6 +213,7 @@ async function loadRecords(
     return {
       id: attempt.id,
       questionId: attempt.questionId,
+      revisionSessionId: attempt.revisionSessionId,
       startedAt: attempt.startedAt,
       secondsSpent: attempt.secondsSpent,
       inheritedHintLevel: attempt.inheritedHintLevel,

@@ -68,6 +68,7 @@ function elements(node: ReactNode, found: ReactElement<Record<string, unknown>>[
     const element = node as ReactElement<Record<string, unknown>>;
     found.push(element);
     elements(element.props.children as ReactNode, found);
+    elements(element.props.timeline as ReactNode, found);
   }
   return found;
 }
@@ -103,6 +104,26 @@ describe("the question page", () => {
     expect(evaluationOf(tree)?.props.attemptId).toBe(old.id);
     const view = elements(tree).find((element) => "newestHref" in element.props);
     expect(view?.props.newestHref).toBe(`/questions/${w.qs[0].id}`);
+  });
+
+  it("gives the timeline one dot per submitted attempt, the newest selected, or the chosen one", async () => {
+    const w = await world("qp-tl@test.local");
+    const ids = [];
+    for (const start of [1_000_000, 2_000_000, 3_000_000])
+      ids.push((await attempt(w.user.id, w.qs[0].id, start, true)).id);
+
+    const timelineOf = (tree: ReactNode) =>
+      elements(tree).find((element) => "dots" in element.props)?.props.dots as {
+        id: string;
+        selected: boolean;
+      }[];
+
+    const newest = timelineOf(await render(w.qs[0].id));
+    expect(newest.map((dot) => dot.id)).toEqual(ids);
+    expect(newest.map((dot) => dot.selected)).toEqual([false, false, true]);
+
+    const oldest = timelineOf(await render(w.qs[0].id, { attempt: ids[0] }));
+    expect(oldest.map((dot) => dot.selected)).toEqual([true, false, false]);
   });
 
   it("shows no evaluation while the newest attempt is a draft", async () => {

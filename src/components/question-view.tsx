@@ -48,6 +48,8 @@ type Props = {
   submitted: boolean;
   /** When the shown attempt is not the newest one, where the newest one is. */
   newestHref?: string | null;
+  /** The attempt timeline, shown under the locked hints line once submitted. */
+  timeline?: React.ReactNode;
   prevHref: string | null;
   nextHref: string | null;
   children?: React.ReactNode;
@@ -67,6 +69,7 @@ export function QuestionView({
   initialFiles,
   submitted,
   newestHref = null,
+  timeline,
   prevHref,
   nextHref,
   children,
@@ -182,6 +185,8 @@ export function QuestionView({
           ) : null}
         </section>
       )}
+
+      {submitted ? timeline : null}
 
       {submitted ? null : (
         <div className="flex flex-wrap items-center justify-between gap-4">
