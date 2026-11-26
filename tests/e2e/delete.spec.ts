@@ -17,7 +17,7 @@ test("delete a sheet, restore it, then delete the course", async ({ page }) => {
   const courseName = `E2E Delete ${Date.now()}`;
   const { courseUrl, sheetUrl } = await createCourseWithSheet(page, courseName);
 
-  // The skill map has topics while the sheet is there.
+  // The course page lists its sheet, so the empty state is hidden.
   await page.goto(courseUrl);
   await expect(page.getByText("Upload your first problem sheet")).toBeHidden();
 
@@ -30,7 +30,7 @@ test("delete a sheet, restore it, then delete the course", async ({ page }) => {
   await noSidewaysScroll(page);
   await dialog.getByRole("button", { name: "Delete" }).click();
 
-  // Back on the course: the notice shows and the skill map is empty again.
+  // Back on the course: the notice shows and the empty state is back.
   await expect(page).toHaveURL(new RegExp(`${courseUrl}\\?deleted=1$`));
   await expect(page.getByText("Moved to Recently deleted.")).toBeVisible();
   await expect(page.getByText("Upload your first problem sheet")).toBeVisible();

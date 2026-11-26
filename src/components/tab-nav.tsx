@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-export type TabLink = { href: string; label: string; exact?: boolean };
+/** `alsoActive`: other address prefixes on which this tab shows as selected (an old address). */
+export type TabLink = { href: string; label: string; exact?: boolean; alsoActive?: string[] };
+
+/** Whether a tab is the current one: its own address (exact or as a prefix) or an `alsoActive` prefix. */
+export function isTabActive(pathname: string, tab: TabLink): boolean {
+  const own = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
+  return own || (tab.alsoActive ?? []).some((prefix) => pathname.startsWith(prefix));
+}
 
 /** A row of links with the current one highlighted. Scrolls sideways on a narrow screen. */
 export function TabNav({ tabs, label }: { tabs: TabLink[]; label: string }) {
@@ -15,7 +22,7 @@ export function TabNav({ tabs, label }: { tabs: TabLink[]; label: string }) {
     <nav aria-label={label} className="-mx-4 overflow-x-auto border-b px-4 sm:-mx-6 sm:px-6">
       <ul className="flex min-w-max gap-1">
         {tabs.map((tab) => {
-          const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
+          const active = isTabActive(pathname, tab);
           return (
             <li key={tab.href}>
               <Link

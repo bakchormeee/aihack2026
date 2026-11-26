@@ -32,7 +32,7 @@ test("Focus next shows when a marked topic is next due for review", async ({ pag
   await page.getByRole("link", { name: "See the mark" }).click();
   await expect(page.getByText("3/5", { exact: true })).toBeVisible();
 
-  await page.goto(courseUrl);
+  await page.goto(`${courseUrl}/topics`);
   const due = `Next review in 1 day (${tomorrowInLondon()})`;
   await expect(page.getByText(due).first()).toBeVisible();
   await expect(page.getByText(`Nothing due. Next review on ${tomorrowInLondon()}.`)).toBeVisible();

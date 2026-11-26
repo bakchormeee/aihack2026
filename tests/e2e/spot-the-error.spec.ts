@@ -54,7 +54,7 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
   await expect(page.getByText("3/5", { exact: true })).toBeVisible();
 
   // Mastery of the topic before any spot-the-error answer.
-  await page.goto(courseUrl);
+  await page.goto(`${courseUrl}/topics`);
   await page.getByRole("link", { name: /Product rule/ }).click();
   await expect(page.getByText(/Mastery \d+% from 1 attempt\b/)).toBeVisible();
 
@@ -127,7 +127,7 @@ test("common errors, a spot-the-error session, the reveal, the summary and maste
   await expect(page.getByText(/^(Correct|Partly right|Stuck)$/).first()).toBeVisible();
 
   // The answers count on the topic: one marked attempt plus five spot-the-error answers.
-  await page.goto(courseUrl);
+  await page.goto(`${courseUrl}/topics`);
   await page.getByRole("link", { name: /Product rule/ }).click();
   await expect(page.getByText(/Mastery \d+% from 6 attempts/)).toBeVisible();
 

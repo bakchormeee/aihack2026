@@ -124,7 +124,7 @@ test("history lists the attempts and the hand-in export downloads a PDF", async 
 });
 
 test("the skill map leads to a revision session with a fresh variant", async () => {
-  await page.goto(courseUrl);
+  await page.goto(`${courseUrl}/topics`);
   await page.getByRole("link", { name: /Integration by parts/ }).click();
   await expect(page).toHaveURL(/topic=/);
   await page.getByRole("link", { name: "Revise this topic" }).click();
@@ -143,7 +143,8 @@ test("every main screen fits a phone screen without sideways scrolling", async (
   await page.setViewportSize({ width: 375, height: 812 });
   const urls: Record<string, string> = {
     courses: "/courses",
-    "skill map": courseUrl,
+    sheets: courseUrl,
+    topics: `${courseUrl}/topics`,
     "sheets tab": `${courseUrl}/sheets`,
     mistakes: `${courseUrl}/mistakes`,
     progress: `${courseUrl}/progress`,
